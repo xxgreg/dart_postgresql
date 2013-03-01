@@ -95,8 +95,9 @@ class _Row {
 }
 
 class _ExecuteResult implements ExecuteResult {
-  _ExecuteResult(this.lastInsertId, this.rowsAffected);
-  final int lastInsertId;
+  _ExecuteResult(this._lastInsertId, this.rowsAffected);
+  final int _lastInsertId;
+  int get lastInsertId => throw new Exception('lastInsertedId is not supported by postgres.');
   final int rowsAffected;
   String toString() => 'lastInsertId: $lastInsertId, rowsAffected: $rowsAffected';
 }

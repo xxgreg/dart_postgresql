@@ -345,6 +345,9 @@ class _Connection implements Connection {
     if (_query != null)
       return;
     
+    if (_state == _CLOSED)
+      return;
+
     assert(_state == _IDLE);
     
     _query = _sendQueryQueue.removeFirst();
@@ -463,6 +466,8 @@ class _Connection implements Connection {
     assert(_buffer.bytesAvailable >= length);
     
     var list = _buffer.readString(length).split(' ');
+    
+    print(list);
     
     int lastInsertId, rowsAffected;
     

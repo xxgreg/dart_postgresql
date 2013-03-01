@@ -5,7 +5,7 @@
 ### Obtaining a connection
 
 ```dart
-connect('database', 'username', 'password').then((conn) {
+connect('database', 'username', 'password', host: 'localhost', port: 5432).then((conn) {
 	// ...
 });
 ```
@@ -57,6 +57,28 @@ it is received, or you can wait till they all arrive by calling String.toList().
 
 To run the unit tests you will need to create a database, and add the database
 name, username and password to 'postgresql_test.dart'.
+
+### Creating a database for testing
+
+Change to the postgres user and run the administration commands.
+```bash
+sudo su postgres
+createuser --pwprompt testdb
+  Enter password for new role: password
+  Enter it again: password
+  Shall the new role be a superuser? (y/n) n
+  Shall the new role be allowed to create databases? (y/n) n
+  Shall the new role be allowed to create more new roles? (y/n) n
+createdb --owner testdb testdb
+exit
+```
+
+Check that it worked by logging in.
+```bash
+psql -h localhost -U testdb3 -W
+```
+
+Enter "\q" to quit from the psql console.
 
 ## Links
 
