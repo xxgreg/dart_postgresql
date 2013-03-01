@@ -1,0 +1,4 @@
+name: postgresql
+description: Postgresql database driver.
+dependencies:
+  unittest: any
