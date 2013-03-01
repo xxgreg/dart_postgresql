@@ -278,21 +278,18 @@ main() {
       conn.execute('insert into dart_unit_test values (1), (2), (3)').then(
           expectAsync1((result) {
             expect(result.rowsAffected, equals(3));
-            expect(result.lastInsertId, equals(0));
           })
       );
       
       conn.execute('update dart_unit_test set a = 5 where a = 1').then(
           expectAsync1((result) {
             expect(result.rowsAffected, equals(1));
-            expect(result.lastInsertId, equals(0));
           })
       );
       
       conn.execute('delete from dart_unit_test where a > 2').then(
           expectAsync1((result) {
             expect(result.rowsAffected, equals(2));
-            expect(result.lastInsertId, equals(0));
           })
       );
     });
