@@ -29,19 +29,14 @@ class _Connection implements Connection {
   int _msgLength;
 
   static Future<_Connection> _connect(_Settings settings) {
-    var socket = new Socket(settings._host, settings._port);
-    var conn = new _Connection(socket, settings);
-    
-    socket
-    ..onConnect = () {
+
+    return Socket.connect(settings._host, settings._port).then((socket) {
+      var conn = new _Connection(socket, settings);
+      socket.listen(conn._readData, onError: conn._handleSocketError, onDone: conn._handleSocketClosed);
       conn._state = _SOCKET_CONNECTED;
       conn._sendStartupMessage();
-    }
-    ..onData = conn._readData
-    ..onError = conn._handleSocketError
-    ..onClosed = conn._handleSocketClosed;
-    
-    return conn._connected.future;
+      return conn._connected.future;
+    });
   }
   
   
@@ -60,7 +55,7 @@ class _Connection implements Connection {
     msg.addByte(0);
     msg.setLength(startup: true);
     
-    _socket.writeList(msg.buffer, 0, msg.buffer.length);
+    _socket.add(msg.buffer);
     
     _state = _AUTHENTICATING;
   }
@@ -94,7 +89,7 @@ class _Connection implements Connection {
     msg.addString(md5);
     msg.setLength();
     
-    _socket.writeList(msg.buffer, 0, msg.buffer.length);
+    _socket.add(msg.buffer);
   }
   
   void _readReadyForQuery(int msgType, int length) {
@@ -130,9 +125,14 @@ class _Connection implements Connection {
     }
   }
   
-  void _handleSocketError(error) {
-    _state = _CLOSED;
+  void _handleSocketError(error) {    
     _socket.close();
+
+    if (_state == _CLOSED)
+      return;
+
+    _state = _CLOSED;
+
     //FIXME wrap exception.
     if (!_hasConnected) {
       _connected.completeError(error);
@@ -148,16 +148,11 @@ class _Connection implements Connection {
     _handleSocketError(new Exception("Socket closed."));
   }
   
-  void _readData() {
+  void _readData(List<int> data) {
     
     try {
       
       if (_state == _CLOSED)
-        return;
-      
-      var data = _socket.read();
-  
-      if (data == null)
         return;
   
       _buffer.append(data);
@@ -358,7 +353,7 @@ class _Connection implements Connection {
     msg.addString(_query.sql);
     msg.setLength();
     
-    _socket.writeList(msg.buffer, 0, msg.buffer.length);
+    _socket.add(msg.buffer);
     
     _state = _BUSY;
     _query._state = _BUSY;
@@ -467,8 +462,6 @@ class _Connection implements Connection {
     
     var list = _buffer.readString(length).split(' ');
     
-    print(list);
-    
     int lastInsertId, rowsAffected;
     
     if (list[0] == 'INSERT') {
@@ -508,7 +501,7 @@ class _Connection implements Connection {
     msg.addInt32(0);
     msg.setLength();
     
-    _socket.writeList(msg.buffer, 0, msg.buffer.length);
+    _socket.add(msg.buffer);
     _socket.close();
   }
 }
