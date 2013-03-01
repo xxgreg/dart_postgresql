@@ -53,7 +53,7 @@ conn.query("select color from crayons").toList().then((rows) {
 ### Query streaming
 
 Connection.query() returns a Stream of results. You can use each row as soon as
-it is received, or you can wait till they all arrive by calling String.toList().
+it is received, or you can wait till they all arrive by calling Stream.toList().
 
 
 ## Testing
