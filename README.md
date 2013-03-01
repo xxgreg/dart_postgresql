@@ -83,6 +83,10 @@ psql -h localhost -U testdb3 -W
 
 Enter "\q" to quit from the psql console.
 
+## License
+
+BSD
+
 ## Links
 
 http://www.postgresql.org/docs/9.2/static/index.html
