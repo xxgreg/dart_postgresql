@@ -1,4 +1,7 @@
 name: postgresql
 description: Postgresql database driver.
+version: 0.1.0
+author: Greg Lowe <greg@vis.net.nz>
+homepage: https://github.com/xxgreg/postgresql
 dependencies:
   unittest: any
