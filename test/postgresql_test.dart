@@ -335,5 +335,30 @@ main() {
     });
     
   });
+  
+  group('PgException', () {
+    
+    Connection conn;
+    
+    setUp(() {
+      return connect(username, database, password).then((c) => conn = c);
+    });
+    
+    tearDown(() {
+      if (conn != null) conn.close();
+    });
+  
+    // This test depends on the locale settings of the postgresql server.
+    solo_test('Error information for invalid sql statement', () {
+      conn.query('elect 1').toList().then(
+          (rows) => throw new Exception('Should not be reached.'),
+          onError: expectAsync1((err) { 
+            expect(err.error.severity, equals('ERROR'));
+            expect(err.error.code, equals('42601'));
+            expect(err.error.position, equals(1));
+            print(err.error.allInformation);
+          }));
+    });
+  });
 }
 

@@ -9,6 +9,7 @@ import 'dart:utf' show encodeUtf8, decodeUtf8;
 part 'buffer.dart';
 part 'connection.dart';
 part 'constants.dart';
+part 'exceptions.dart';
 part 'message_buffer.dart';
 part 'query.dart';
 part 'settings.dart';
@@ -52,4 +53,48 @@ abstract class Connection {
   /// Close the current [Connection]. It is safe to call this multiple times.
   /// This will never throw an exception.
   void close();
+}
+
+/// A marker interface implemented by all postgresql library exceptions.
+abstract class PgException implements Exception {
+}
+
+/// A exception caused by a problem within the postgresql library. 
+abstract class PgClientException implements PgException, Exception {
+}
+
+/// A exception representing an error reported by the postgresql server. 
+abstract class PgServerException implements 
+  PgException, PgServerInformation, Exception {
+}
+
+/// Information returned from the server about an error or a notice.
+abstract class PgServerInformation {
+  
+  /// Returns true if this is a server error, otherwise it is a notice.
+  bool get isError;
+  
+  /// A PostgreSQL error code.
+  /// See http://www.postgresql.org/docs/9.2/static/errcodes-appendix.html
+  String get code;
+  
+  /// For a english localized database the field contents are ERROR, FATAL, or
+  /// PANIC, for an error message. Otherwise in a notice message they are 
+  /// WARNING, NOTICE, DEBUG, INFO, or LOG.
+  String get severity;
+  
+  /// A human readible error message, typically one line.
+  String get message;
+  
+  /// More detailed information.
+  String get detail;
+  
+  /// The position as an index into the original query string where the syntax
+  /// error was found. The first character has index 1, and positions are
+  /// measured in characters not bytes. If the server does not supply a
+  /// position this field is null.
+  int get position;
+  
+  /// All of the information returned from the server.
+  String get allInformation;
 }

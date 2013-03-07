@@ -1,11 +1,5 @@
 part of postgresql;
 
-class _Notice implements Exception {
-  _Notice(this._map);
-  Map<int, String> _map;
-  String toString() => _map.containsKey(_M) ? _map[_M] : _map.values.reduce('', (val, item) => '$val, $item'); 
-}
-
 class _Connection implements Connection {
   
   _Connection(this._socket, this._settings);
@@ -259,26 +253,28 @@ class _Connection implements Connection {
   void _readErrorOrNoticeResponse(int msgType, int length) {
     assert(_buffer.bytesAvailable >= length);
     
-    var map = new Map<int, String>();
+    var map = new Map<String, String>();
     int errorCode = _buffer.readByte();
     while (errorCode != 0) {
       var msg = _buffer.readString(length); //TODO check length remaining.
-      map[errorCode] = msg;
-      errorCode = _buffer.readByte();      
+      map[new String.fromCharCode(errorCode)] = msg;
+      errorCode = _buffer.readByte();
     }
     
-    var notice = new _Notice(map);
+    var info = new _PgServerInformation(
+                         msgType == _MSG_ERROR_RESPONSE,
+                         map);
     
     if (msgType == _MSG_ERROR_RESPONSE) {
       if (!_hasConnected) {
           _state = _CLOSED;
           _socket.destroy();
-          _connected.completeError(notice);                     
+          _connected.completeError(new _PgServerException(info));                     
       } else if (_query != null) {
-        _query.streamError(notice);
+        _query.streamError(new _PgServerException(info));
       } else {
         //TODO
-        throw new Exception(notice.toString());
+        throw new _PgServerException(info);
       }
     }
   }
