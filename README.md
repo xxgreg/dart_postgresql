@@ -27,8 +27,8 @@ conn.query('select color from crayons').toList().then((rows) {
 ### Executing
 
 ```dart
-conn.execute("update crayons set color = 'pink'").then((result) {
-	print(result.rowsAffected);
+conn.execute("update crayons set color = 'pink'").then((rowsAffected) {
+	print(rowsAffected);
 });
 ```
 
@@ -36,6 +36,49 @@ conn.execute("update crayons set color = 'pink'").then((result) {
 
 You must remember to call Connection.close() when you're done. This wont be
 done automatically for you.
+
+### Mapping the results of a query to an object
+
+```dart
+class Crayon {
+	String color;
+	int length;
+}
+
+conn.query('select color, length from crayons')
+	.map((row) => new Crayon()
+	                     ..color = row.color,
+	                     ..length = row.length)
+	.toList()
+	.then((List<Crayon> crayons) {
+		for (var c in crayons) {
+			print(c is Crayon);
+			print(c.color);
+			print(c.length);
+		}
+	});
+```
+
+Or for an immutable object:
+
+```dart
+class ImmutableCrayon {
+	ImmutableCrayon(this.color, this.length);
+	final String color;
+	final int length;
+}
+
+conn.query('select color, length from crayons')
+	.map((row) => new ImmutableCrayon(row.color, row.length))
+	.toList()
+	.then((List<ImmutableCrayon> crayons) {
+		for (var c in crayons) {
+			print(c is ImmutableCrayon);
+			print(c.color);
+			print(c.length);
+		}
+	});
+```
 
 ### Query queueing
 

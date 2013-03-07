@@ -8,31 +8,8 @@
       - fromPsqlEnv()
       - fromHerokuEnv()
 
-## Add a PgException class
-    - Only throw this type, not Error, or Exception.
-    - Allow reading database error numder, and severity.
-
-## Add an unhandled error/notice event on the connection class.
-    - The connection can receive errors, and notices from the 
-      database even when in idle state (not running a query). Need
-      a way to return these errors to the client.
-    - Perhaps if no listener is registered then log to standard
-      error.
-
-## Add mapping support  
-  (Though - you can do this already with stream.)
-
-  query('select a, b from blah', map: (r) => new Blah(r.a, r.b));
-
-  query('select a, b from blah', map: (r) => new Blah(r[0, r[1]));
-
-  query('select a, b from blah', map: (r) {
-    return new Blah()
-                    ..a = r.a
-                    .. b = r.b;
-  });
-
-
+## If no unhandled error/notice listener is registered then log to standard
+   error.
 
 ## Query value subsitution and escaping
   - Goal: Prevent sql injection attacks.

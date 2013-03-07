@@ -376,5 +376,54 @@ main() {
           }));
     });
   });
+
+  group('Object mapping', () {
+    
+    Connection conn;
+    
+    setUp(() {
+      return connect(username, database, password).then((c) => conn = c);
+    });
+    
+    tearDown(() {
+      if (conn != null) conn.close();
+    });
+  
+    test('Map person.', () {
+      conn.query('''
+        select 'Greg' as firstname, 'Lowe' as lastname;
+        select 'Bob' as firstname, 'Jones' as lastname;
+      ''')
+        .map((row) => new Person()
+                            ..firstname = row.firstname
+                            ..lastname = row.lastname)
+        .toList()
+        .then(expectAsync1((result) { }));
+    });
+    
+    test('Map person immutable.', () {
+      conn.query('''
+          select 'Greg' as firstname, 'Lowe' as lastname;
+          select 'Bob' as firstname, 'Jones' as lastname;
+      ''')
+        .map((row) => new ImmutablePerson(row.firstname, row.lastname))
+        .toList()
+        .then(expectAsync1((result) { print(result); }));
+    });
+  });
+
+}
+
+class Person {
+  String firstname;
+  String lastname;
+  String toString() => '$firstname $lastname';
+}
+
+class ImmutablePerson {
+  ImmutablePerson(this.firstname, this.lastname);
+  final String firstname;
+  final String lastname;
+  String toString() => '$firstname $lastname';
 }
 
