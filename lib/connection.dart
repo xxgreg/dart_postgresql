@@ -463,34 +463,9 @@ class _Connection implements Connection {
     
     assert(_buffer.bytesAvailable >= length);
     
-    var list = _buffer.readString(length).split(' ');
-    
-    int lastInsertId, rowsAffected;
-    
-    if (list[0] == 'INSERT') {
-      if (list.length != 3)
-        throw new _PgClientException('Badly formed command complete message.');
-      
-      lastInsertId = int.parse(list[1]);
-      rowsAffected = int.parse(list[2]);
-      
-    } else if (list[0] == 'SELECT'
-          || list[0] == 'DELETE'
-          || list[0] == 'UPDATE'
-          || list[0] == 'MOVE'
-          || list[0] == 'FETCH'
-          || list[0] == 'COPY') {        
-      
-      if (list.length < 2)
-        throw new _PgClientException('Badly formed command complete message.');
-      
-      lastInsertId = 0;
-      rowsAffected = int.parse(list[1], onError: (_) => rowsAffected = 0);
-      
-    } else {
-      lastInsertId = 0;
-      rowsAffected = 0;
-    }
+    var commandString = _buffer.readString(length);
+    int rowsAffected = 
+        int.parse(commandString.split(' ').last, onError: (_) => null);
     
     _query._commandIndex++;
     _query._rowsAffected = rowsAffected;

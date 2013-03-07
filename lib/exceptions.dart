@@ -19,7 +19,10 @@ class _PgServerException implements PgServerException, PgException, Exception {
   int get position => _info.position;
   String get allInformation => _info.allInformation;
   
-  String toString() => 'PostgreSQL $severity $code $message';
+  String toString() {
+    var p = position == null ? '' : ' (position: $position)';
+    return 'PostgreSQL $severity $code $message$p';
+  }
 }
 
 class _PgServerInformation implements PgServerInformation {

@@ -332,6 +332,23 @@ main() {
             expect(rowsAffected, equals(2));
           })
       );
+      
+      conn.execute('create temporary table bob (a int)').then(
+          expectAsync1((rowsAffected) {
+            expect(rowsAffected, equals(null));
+          })
+      );
+      
+      conn.execute('''
+        select 'one';
+        create temporary table jim (a int);
+        create temporary table sally (a int);
+      ''').then(
+          expectAsync1((rowsAffected) {
+            expect(rowsAffected, equals(null));
+          })
+      );
+      
     });
     
   });
