@@ -13,8 +13,6 @@ part 'message_buffer.dart';
 part 'query.dart';
 part 'settings.dart';
 
-//FIXME Just for hacking
-part 'private_test.dart';
 
 Future<Connection> connect(
     String username,
