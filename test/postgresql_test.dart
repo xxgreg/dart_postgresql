@@ -1,5 +1,6 @@
 library postgresql_test;
 
+import 'dart:async';
 import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
 
@@ -35,6 +36,37 @@ main() {
       connect(username, database, password, host: 'google.com', port: 80)
         .then((c) => throw new Exception('Should not be reached.'),
             onError: expectAsync1((err) { /* boom! */ }));
+    });
+    
+  });
+  
+  group('Close', () {
+    test('Close multiple times.', () {
+      connect(username, database, password).then((conn) {
+        conn.close();
+        conn.close();
+        new Future.delayed(new Duration(milliseconds: 20))
+          .then((_) { conn.close(); });
+      });
+    });
+    
+    
+    test('Query on closed connection.', () {
+      connect(username, database, password).then((conn) {
+        conn.close();
+        conn.query("select 'blah'").toList()
+          .then((_) => throw new Exception('Should not be reached.'))
+          .catchError(expectAsync1((e) {}));
+      });
+    });
+    
+    test('Execute on closed connection.', () {
+      connect(username, database, password).then((conn) {
+        conn.close();
+        conn.execute("select 'blah'")
+          .then((_) => throw new Exception('Should not be reached.'))
+          .catchError(expectAsync1((e) {}));
+      });
     });
     
   });
