@@ -84,12 +84,13 @@ conn.query('select color, length from crayons')
 
 Queries are queued and executed in the order in which they were queued.
 
-So you can write code like this:
+So if you're not concerned about handling errors, you can write code like this:
 
 ```dart
-conn.execute("update crayons set color = 'pink'");
-conn.query("select color from crayons").toList().then((rows) {
-	rows.forEach((row) => print(row.color); 
+conn.execute("create table crayons (color text, length int)");
+conn.execute("insert into crayons values ('pink', 5)");
+conn.query("select color from crayons").single.then((crayon) {
+	print(crayon.color); // prints 'pink'
 });
 ```
 
