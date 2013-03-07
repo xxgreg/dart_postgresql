@@ -8,6 +8,17 @@
       - fromPsqlEnv()
       - fromHerokuEnv()
 
+## Add a PgException class
+    - Only throw this type, not Error, or Exception.
+    - Allow reading database error numder, and severity.
+
+## Add an unhandled error/notice event on the connection class.
+    - The connection can receive errors, and notices from the 
+      database even when in idle state (not running a query). Need
+      a way to return these errors to the client.
+    - Perhaps if no listener is registered then log to standard
+      error.
+
 ## Add mapping support  
   (Though - you can do this already with stream.)
 
@@ -21,10 +32,6 @@
                     .. b = r.b;
   });
 
-## Write some reflection mappers
-  query('select a, b from blah', map: constructorMapper(Blah));
-  query('select a, b from blah', map: memberMapper(Blah));
-  Note: this will be slow, as it uses reflection. But it's convienient.
 
 
 ## Query value subsitution and escaping
@@ -51,6 +58,32 @@
 
     query('select a, b from blah where id = @id:int', {'id': 5});
     query('select a, b from blah where id = @0:int', [5]);
+
+
+## Write some reflection mappers
+
+  A way to map to immutable classes.
+
+  query('select a, b from blah', map: constructorMapper(Bob));
+
+  class Bob {
+    Bob(this.a, this.b);
+    final int a;
+    final int b;
+  }
+
+
+  A way to map to mutable classes.
+
+  query('select a, b from blah', map: memberMapper(Jim));
+
+  class Jim {
+    int a;
+    int b;
+  }
+
+  Note: this will be slow, as it uses reflection. But it's convienient.
+
 
 
 ## Add support for new types
@@ -102,3 +135,4 @@
    - See if there are any feature ideas.
    - Add support for serialising lists to sql:
     query('select a, b from blah where id in @id', {'id': [1, 2, 3, 4]});
+
