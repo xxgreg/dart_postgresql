@@ -126,7 +126,7 @@ class _Connection implements Connection {
   }
   
   void _handleSocketError(error) {    
-    _socket.close();
+    _socket.destroy();
 
     if (_state == _CLOSED)
       return;
@@ -271,7 +271,7 @@ class _Connection implements Connection {
     if (msgType == _MSG_ERROR_RESPONSE) {
       if (!_hasConnected) {
           _state = _CLOSED;
-          _socket.close();
+          _socket.destroy();
           _connected.completeError(notice);                     
       } else if (_query != null) {
         _query.streamError(notice);
@@ -496,12 +496,18 @@ class _Connection implements Connection {
   void close() {
     _state = _CLOSED;
     
-    var msg = new _MessageBuffer();
-    msg.addByte(_MSG_TERMINATE);
-    msg.addInt32(0);
-    msg.setLength();
-    
-    _socket.add(msg.buffer);
-    _socket.close();
+    try {
+      var msg = new _MessageBuffer();
+      msg.addByte(_MSG_TERMINATE);
+      msg.addInt32(0);
+      msg.setLength();
+      
+      _socket.add(msg.buffer);
+    } catch (e) {
+      //FIXME Add a connection level error handler.
+      print('Postgresql connection closed without sending terminate message. Error: $e');
+    }
+
+    _socket.destroy();
   }
 }
