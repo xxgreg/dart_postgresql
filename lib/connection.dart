@@ -306,10 +306,10 @@ class _Connection implements Connection {
     }
   }
   
-  Future<ExecuteResult> execute(String sql) {
+  Future<int> execute(String sql) {
     try {
       var query = _enqueueQuery(sql);
-      return query.stream.isEmpty.then((_) => _query._executeResult);
+      return query.stream.isEmpty.then((_) => _query._rowsAffected);
     } on Exception catch (ex) {
       return new Future.immediateError(ex);
     }
@@ -490,7 +490,7 @@ class _Connection implements Connection {
     }
     
     _query._commandIndex++;
-    _query._executeResult = new _ExecuteResult(lastInsertId, rowsAffected);
+    _query._rowsAffected = rowsAffected;
   }
   
   void close() {

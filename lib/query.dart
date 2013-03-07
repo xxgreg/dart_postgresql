@@ -17,7 +17,7 @@ class _Query {
   int _columnCount;
   List<_Column> _columns;
   List<dynamic> _rowData;
-  ExecuteResult _executeResult;
+  int _rowsAffected;
   
   _Query(this.sql);
   
@@ -92,14 +92,6 @@ class _Row {
   
   String toString() => _values.toString();
   List<dynamic> toList() => _values;
-}
-
-class _ExecuteResult implements ExecuteResult {
-  _ExecuteResult(this._lastInsertId, this.rowsAffected);
-  final int _lastInsertId;
-  int get lastInsertId => throw new Exception('lastInsertedId is not supported by postgres.');
-  final int rowsAffected;
-  String toString() => 'lastInsertId: $lastInsertId, rowsAffected: $rowsAffected';
 }
 
 
