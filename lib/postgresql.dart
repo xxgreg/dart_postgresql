@@ -53,6 +53,12 @@ abstract class Connection {
   /// Close the current [Connection]. It is safe to call this multiple times.
   /// This will never throw an exception.
   void close();
+  
+  //FIXME test this properly - I'm not sure if it works.
+  /// Listen for a [PgServerException], [PgServerInformation], or 
+  /// [PgClientException], that occur while the connection is idle, or are not
+  /// related to a specific query.
+  Stream get unhandled;
 }
 
 /// A marker interface implemented by all postgresql library exceptions.

@@ -22,6 +22,9 @@ class _Connection implements Connection {
   int _msgType;
   int _msgLength;
 
+  Stream get unhandled => _unhandled.stream;
+  final StreamController _unhandled = new StreamController();
+  
   static Future<_Connection> _connect(_Settings settings) {
 
     return Socket.connect(settings._host, settings._port).then((socket) {
@@ -137,8 +140,7 @@ class _Connection implements Connection {
     } else if (_query != null) {
       _query.streamError(ex);
     } else {
-      //FIXME add unhandled error stream.
-      print('Unhandled error: $ex');
+      _unhandled.add(ex);
     }
   }
   
@@ -196,8 +198,8 @@ class _Connection implements Connection {
       }
       
     } on Exception catch (e) {
-      print('Fatal error: $e');
-      close();
+      _destroy();
+      throw new _PgClientException('Error reading data.', e); //TODO test that this will be caught by unhandled stream.
     }
   }
 
@@ -272,16 +274,18 @@ class _Connection implements Connection {
                          map);
     
     if (msgType == _MSG_ERROR_RESPONSE) {
+      var ex = new _PgServerException(info);
       if (!_hasConnected) {
           _state = _CLOSED;
           _socket.destroy();
-          _connected.completeError(new _PgServerException(info));                     
+          _connected.completeError(ex);                     
       } else if (_query != null) {
-        _query.streamError(new _PgServerException(info));
+        _query.streamError(ex);
       } else {
-        //TODO add an unhandled error stream.
-        throw new _PgServerException(info);
+        _unhandled.add(ex);
       }
+    } else {
+      _unhandled.add(info);
     }
   }
   
@@ -482,8 +486,7 @@ class _Connection implements Connection {
       
       _socket.add(msg.buffer);
     } catch (e) {
-      //FIXME Add a connection level error handler.
-      print('Postgresql connection closed without sending terminate message. Error: $e');
+      _unhandled.add(new _PgClientException('Postgresql connection closed without sending terminate message.', e));
     }
 
     _destroy();
