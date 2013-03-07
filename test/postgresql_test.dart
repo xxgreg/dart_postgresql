@@ -63,19 +63,27 @@ main() {
           onError: expectAsync1((err) { /* boom! */ }));
     });
     
-    //FIXME Fails. Need to implement message type _MSG_EMPTY_QUERY_REPONSE
-    //test('Empty sql statement', () {
-    //  conn.query('').toList().then(
-    //      (rows) => throw new Exception('Should not be reached.'),
-    //      onError: expectAsync1((err) { /* boom! */ }));
-    //});
+    test('Empty sql statement', () {
+      conn.query('').toList().then(
+          (rows) => throw new Exception('Should not be reached.'),
+          onError: expectAsync1((err) { /* boom! */ }));
+    });
     
-    //FIXME Fails. Need to implement message type _MSG_EMPTY_QUERY_REPONSE
-    //test('Whitespace only sql statement', () {
-    //  conn.query('  ').toList().then(
-    //      (rows) => throw new Exception('Should not be reached.'),
-    //      onError: expectAsync1((err) { /* boom! */ }));
-    //});
+    test('Whitespace only sql statement', () {
+      conn.query('  ').toList().then(
+          expectAsync1((rows) => expect(rows.length, 0)),
+          onError: (err) { throw new Exception('Should not be reached.'); });
+    });
+    
+    test('Empty multi-statement', () {
+      conn.query('''
+        select 'bob';
+        ;
+        select 'jim';
+      ''').toList().then(
+          expectAsync1((rows) => expect(rows.length, 2)),
+          onError: (err) { throw new Exception('Should not be reached.'); });
+    });
     
     test('Query queueing', () {
 

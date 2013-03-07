@@ -245,6 +245,7 @@ class _Connection implements Connection {
       
       case _MSG_ROW_DESCRIPTION:  _readRowDescription(msgType, length); break;
       case _MSG_DATA_ROW:         _readDataRow(msgType, length); break;
+      case _MSG_EMPTY_QUERY_REPONSE: assert(length == 0); break;
       case _MSG_COMMAND_COMPLETE: _readCommandComplete(msgType, length); break;
         
       default:

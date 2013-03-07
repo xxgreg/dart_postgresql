@@ -1,7 +1,5 @@
 # Roadmap
 
-## Handle empty queries
-
 ## Connection Settings
    - Export connection Settings class.
    - Change connect to take Settings class as parameter.
