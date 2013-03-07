@@ -78,7 +78,7 @@ exit
 
 Check that it worked by logging in.
 ```bash
-psql -h localhost -U testdb3 -W
+psql -h localhost -U testdb -W
 ```
 
 Enter "\q" to quit from the psql console.
