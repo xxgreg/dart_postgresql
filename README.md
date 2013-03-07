@@ -8,7 +8,7 @@ number of breaking changes happening in Dart's libraries at the moment.
 ### Obtaining a connection
 
 ```dart
-connect('database', 'username', 'password', host: 'localhost', port: 5432).then((conn) {
+connect('username', 'database', 'password', host: 'localhost', port: 5432).then((conn) {
 	// ...
 });
 ```
