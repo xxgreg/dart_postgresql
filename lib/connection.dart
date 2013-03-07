@@ -36,7 +36,7 @@ class _Connection implements Connection {
   
   void _sendStartupMessage() {
     if (_state != _SOCKET_CONNECTED)
-      throw new Error();
+      throw new StateError('Invalid state during startup.');
     
     var msg = new _MessageBuffer();
     msg.addInt32(0); // Length padding.
@@ -58,7 +58,7 @@ class _Connection implements Connection {
     assert(_buffer.bytesAvailable >= length);
     
     if (_state != _AUTHENTICATING)
-      throw new Exception('Invalid state.');
+      throw new StateError('Invalid connection state while authenticating.');
     
     int authType = _buffer.readInt32();
     
@@ -69,7 +69,7 @@ class _Connection implements Connection {
     
     // Only MD5 authentication is supported.
     if (authType != _AUTH_TYPE_MD5) {
-      throw new Exception('Unsupported or unknown authentication type: ${_authTypeAsString(authType)}, only MD5 authentication is supported.');
+      throw new _PgClientException('Unsupported or unknown authentication type: ${_authTypeAsString(authType)}, only MD5 authentication is supported.');
     }
     
     var bytes = _buffer.readBytes(4);
@@ -110,36 +110,42 @@ class _Connection implements Connection {
       //FIXME Dear deep thought, what is the idiomatic way to do this?
       new Future.immediate(42).then((_) => _processSendQueryQueue());
       
-    } else if (c == _T) {
-      throw new Exception('Transaction handling not implemented.');
-    } else if (c == _E) {
-      throw new Exception('Transaction handling not implemented.');
     } else {
-      throw new Exception('Unknown ReadyForQuery transaction status: ${_itoa(c)}');
+      _destroy();
+      var msg = (c == _T || c == _E)
+          ? 'Transaction handling not implemented.'
+          : 'Unknown ReadyForQuery transaction status: ${_itoa(c)}.';
+      throw new _PgClientException(msg);
     }
   }
   
-  void _handleSocketError(error) {    
-    _socket.destroy();
+  void _handleSocketError(error) {
 
-    if (_state == _CLOSED)
+    if (_state == _CLOSED) {
+      //FIXME logging
+      print('Error after socket closed: $error');
+      _destroy();
       return;
+    }
 
-    _state = _CLOSED;
+    _destroy();
 
-    //FIXME wrap exception.
+    var ex = new _PgClientException('Socket error.', error);
+    
     if (!_hasConnected) {
-      _connected.completeError(error);
+      _connected.completeError(ex);
     } else if (_query != null) {
-      _query.streamError(error);
+      _query.streamError(ex);
     } else {
-      //throw error;
-      print('Unhandled error: $error');
+      //FIXME add unhandled error stream.
+      print('Unhandled error: $ex');
     }
   }
   
   void _handleSocketClosed() {
-    _handleSocketError(new Exception("Socket closed."));
+    if (_state != _CLOSED) {
+      _handleSocketError(new _PgClientException('Socket closed.'));
+    }
   }
   
   void _readData(List<int> data) {
@@ -175,7 +181,7 @@ class _Connection implements Connection {
         int length = _buffer.readInt32() - 4;
         
         if (!_checkMessageLength(msgType, length + 4)) {
-          throw new Exception("Lost sync.");
+          throw new _PgClientException('Lost message sync.');
         }
         
         if (length > _buffer.bytesAvailable) {
@@ -243,11 +249,11 @@ class _Connection implements Connection {
       case _MSG_COMMAND_COMPLETE: _readCommandComplete(msgType, length); break;
         
       default:
-        throw new Exception("Unknown, or unimplemented message: ${decodeUtf8([msgType])}.");
+        throw new _PgClientException("Unknown, or unimplemented message: ${decodeUtf8([msgType])}.");
     }
     
     if (pos + length != _buffer.bytesRead)
-      throw new Exception("Lost message sync.");
+      throw new _PgClientException('Lost message sync.');
   }
 
   void _readErrorOrNoticeResponse(int msgType, int length) {
@@ -273,7 +279,7 @@ class _Connection implements Connection {
       } else if (_query != null) {
         _query.streamError(new _PgServerException(info));
       } else {
-        //TODO
+        //TODO add an unhandled error stream.
         throw new _PgServerException(info);
       }
     }
@@ -298,7 +304,7 @@ class _Connection implements Connection {
     try {
       var query = _enqueueQuery(sql);
       return query.stream;
-    } on Exception catch (ex) {
+    } on Exception catch (ex) { //TODO Should this be on PgException? 
       return new Stream.fromFuture(new Future.immediateError(ex));  
     }
   }
@@ -307,7 +313,7 @@ class _Connection implements Connection {
     try {
       var query = _enqueueQuery(sql);
       return query.stream.isEmpty.then((_) => _query._rowsAffected);
-    } on Exception catch (ex) {
+    } on Exception catch (ex) { //TODO Should this be on PgException?
       return new Future.immediateError(ex);
     }
   }
@@ -315,10 +321,10 @@ class _Connection implements Connection {
   _Query _enqueueQuery(String sql) {
 
     if (sql == null || sql == '')
-      throw new Exception('SQL query is null or empty.');
+      throw new _PgClientException('SQL query is null or empty.');
     
     if (_state == _CLOSED)
-      throw new Exception('Connection is closed, cannot execute query.');
+      throw new _PgClientException('Connection is closed, cannot execute query.');
     
     var query = new _Query(sql);
     _sendQueryQueue.addLast(query);
@@ -463,7 +469,7 @@ class _Connection implements Connection {
     
     if (list[0] == 'INSERT') {
       if (list.length != 3)
-        throw new Exception('Badly formed command complete message.');
+        throw new _PgClientException('Badly formed command complete message.');
       
       lastInsertId = int.parse(list[1]);
       rowsAffected = int.parse(list[2]);
@@ -476,7 +482,7 @@ class _Connection implements Connection {
           || list[0] == 'COPY') {        
       
       if (list.length < 2)
-        throw new Exception('Badly formed command complete message.');
+        throw new _PgClientException('Badly formed command complete message.');
       
       lastInsertId = 0;
       rowsAffected = int.parse(list[1], onError: (_) => rowsAffected = 0);
@@ -505,6 +511,11 @@ class _Connection implements Connection {
       print('Postgresql connection closed without sending terminate message. Error: $e');
     }
 
+    _destroy();
+  }
+  
+  void _destroy() {
+    _state = _CLOSED;
     _socket.destroy();
   }
 }

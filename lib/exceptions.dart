@@ -2,8 +2,9 @@ part of postgresql;
 
 class _PgClientException implements PgClientException, PgException, Exception {
   final String _msg;
-  _PgClientException(this._msg);
-  String toString() => _msg;
+  final dynamic error;
+  _PgClientException(this._msg, [this.error]);
+  String toString() => error == null ? _msg : '$_msg ($error)';
 }
 
 class _PgServerException implements PgServerException, PgException, Exception {
