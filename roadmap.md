@@ -1,5 +1,7 @@
 # Roadmap
 
+## Write some transaction handling tests.
+
 ## Consider exposing the transaction state of the connection.
    - Connection.transactionState = 
         BUSY, Query is in progress, might be in a transaction, might not.
@@ -106,6 +108,8 @@
 
 ## Read about binary transfer mode
   - figure out how important this is to support.
+  - This is used for extended queries, i.e. prepared statements, not simple queries.
+    Probably don't need to implement this yet.
 
 
 ## Write performance tests
@@ -119,4 +123,13 @@
    - See if there are any feature ideas.
    - Add support for serialising lists to sql:
     query('select a, b from blah where id in @id', {'id': [1, 2, 3, 4]});
+
+
+## Implement large object support. Copy command, for streaming data in and out of the database.
+
+
+## Consider implementing prepared queries.
+    - The protocol looks pretty complicated and slow. May not be worth it.
+    - Do some benchmarking with libpq, to figure out if this performs much better, and is worth
+      adding.
 
