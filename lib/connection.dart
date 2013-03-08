@@ -94,7 +94,13 @@ class _Connection implements Connection {
     
     int c = _buffer.readByte();
     
-    if (c == _I) {
+    // print('Ready for query. Transaction state: ${_itoa(c)}');
+
+    // TODO store transaction state somewhere. Perhaps this needs to be able
+    // to be read via the api. Perhaps Connection.transactionState, or just Connection.state?
+    // which is one of: {BUSY, IDLE, IN_TRANSACTION, ERROR};
+
+    if (c == _I || c == _T || c == _E) {
       
       var was = _state;
       
@@ -115,10 +121,7 @@ class _Connection implements Connection {
       
     } else {
       _destroy();
-      var msg = (c == _T || c == _E)
-          ? 'Transaction handling not implemented.'
-          : 'Unknown ReadyForQuery transaction status: ${_itoa(c)}.';
-      throw new _PgClientException(msg);
+      throw new _PgClientException('Unknown ReadyForQuery transaction status: ${_itoa(c)}.');
     }
   }
   

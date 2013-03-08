@@ -1,5 +1,12 @@
 # Roadmap
 
+## Consider exposing the transaction state of the connection.
+   - Connection.transactionState = 
+        BUSY, Query is in progress, might be in a transaction, might not.
+        | In Transaction
+        | Not in Transaction (Idle?)
+        | Error state. In a failed transaction. Commands will be aborted until next rollback.
+
 ## Connection Settings
    - Export connection Settings class.
    - Change connect to take Settings class as parameter.
