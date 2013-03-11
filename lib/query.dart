@@ -19,21 +19,32 @@ class _Query {
   List<dynamic> _rowData;
   int _rowsAffected;
   
+  List<String> _columnNames;
+  Map<String, int> _columnIndex;
+  
   _Query(this.sql);
   
   Stream<dynamic> get stream => _controller.stream;
   
-  void streamRow() {
+  void addRowDescription() {
     if (_state == _QUEUED)
       _state = _STREAMING;
     
-    var names = _columns.map((c) => c.name).toList();
-    var row = new _Row(names, _rowData);
+    _columnNames = _columns.map((c) => c.name).toList();
+    
+    _columnIndex = new Map<String, int>();
+    for (var i = 0; i < _columnNames.length; i++) {
+      _columnIndex[_columnNames[i]] = i;
+    }
+  }
+  
+  void addRow() {
+    var row = new _Row(_columnNames, _rowData, _columnIndex);
     _rowData = null;
     _controller.add(row);    
   }
   
-  void streamError(Exception err) {
+  void addError(Exception err) {
     _controller.signalError(err);
     // stream will be closed once the ready for query message is received.
   }
@@ -66,32 +77,35 @@ class _Column {
 }
 
 class _Row {
-  _Row(this._columnNames, this._values) {
-    assert(this._columnNames.length == this._values.length);
+  _Row(this._columnNames, this._columnValues, this._index) {
+    assert(this._columnNames.length == this._columnValues.length);
   }
   
+  // Map column name to column index
+  final Map<String, int> _index;
   final List<String> _columnNames;
-  final List<dynamic> _values;
+  final List _columnValues;
   
-  operator[] (int i) => _values[i];
+  operator[] (int i) => _columnValues[i];
+  
+  void forEach(void f(String columnName, columnValue)) {
+    assert(_columnValues.length == _columnNames.length);
+    for (int i = 0; i < _columnValues.length; i++) {
+      f(_columnNames[i], _columnValues[i]);
+    }
+  }
   
   noSuchMethod(InvocationMirror invocationMirror) {
     var name = invocationMirror.memberName;
     if (invocationMirror.isGetter) {
-      var i = _columnNames.indexOf(name);
-      if (i != -1)
-        return _values[i];
-      else
-        //FIXME throw NoSuchMethodError
-        throw new Exception('Unknown column name: $name.');
-    } else {
-      //FIXME throw NoSuchMethodError
-      throw new Exception();
+      var i = _index[name];
+      if (i != null)
+        return _columnValues[i];
     }
+    super.noSuchMethod(invocationMirror);
   }
   
-  String toString() => _values.toString();
-  List<dynamic> toList() => _values;
+  String toString() => _columnValues.toString();
 }
 
 

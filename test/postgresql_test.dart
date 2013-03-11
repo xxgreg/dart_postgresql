@@ -408,7 +408,7 @@ main() {
       ''')
         .map((row) => new ImmutablePerson(row.firstname, row.lastname))
         .toList()
-        .then(expectAsync1((result) { print(result); }));
+        .then(expectAsync1((result) { }));
     });
   });
 

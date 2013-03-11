@@ -141,7 +141,7 @@ class _Connection implements Connection {
     if (!_hasConnected) {
       _connected.completeError(ex);
     } else if (_query != null) {
-      _query.streamError(ex);
+      _query.addError(ex);
     } else {
       _unhandled.add(ex);
     }
@@ -283,7 +283,7 @@ class _Connection implements Connection {
           _socket.destroy();
           _connected.completeError(ex);                     
       } else if (_query != null) {
-        _query.streamError(ex);
+        _query.addError(ex);
       } else {
         _unhandled.add(ex);
       }
@@ -393,6 +393,8 @@ class _Connection implements Connection {
     _query._columnCount = count;
     _query._columns = list;
     _query._commandIndex++;
+    
+    _query.addRowDescription();
   }
   
   void _readDataRow(int msgType, int length) {
@@ -427,7 +429,7 @@ class _Connection implements Connection {
     
     // If last column, then return the row.
     if (index == _query._columnCount - 1)
-      _query.streamRow();
+      _query.addRow();
   }
   
   dynamic _decodeStringValue(_Column col, List<int> data) {
