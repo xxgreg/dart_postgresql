@@ -1,8 +1,5 @@
 # PostgreSQL database driver for Dart
 
-This is alpha level software, expect things to break, especially with the
-number of breaking changes happening in Dart's libraries at the moment.
-
 ## Basic usage
 
 ### Obtaining a connection
