@@ -52,7 +52,7 @@ class _Connection implements Connection {
     msg.addByte(0);
     msg.setLength(startup: true);
     
-    _socket.add(msg.buffer);
+    _socket.writeBytes(msg.buffer);
     
     _state = _AUTHENTICATING;
   }
@@ -77,7 +77,7 @@ class _Connection implements Connection {
     
     var bytes = _buffer.readBytes(4);
     var salt = new String.fromCharCodes(bytes);
-    var md5 = 'md5'.concat(_md5s(_settings._passwordHash.concat(salt)));
+    var md5 = 'md5' + _md5s('${_settings._passwordHash}$salt');
     
     // Build message.
     var msg = new _MessageBuffer();
@@ -86,7 +86,7 @@ class _Connection implements Connection {
     msg.addString(md5);
     msg.setLength();
     
-    _socket.add(msg.buffer);
+    _socket.writeBytes(msg.buffer);
   }
   
   void _readReadyForQuery(int msgType, int length) {
@@ -363,7 +363,7 @@ class _Connection implements Connection {
     msg.addString(_query.sql);
     msg.setLength();
     
-    _socket.add(msg.buffer);
+    _socket.writeBytes(msg.buffer);
     
     _state = _BUSY;
     _query._state = _BUSY;
@@ -376,7 +376,7 @@ class _Connection implements Connection {
     _state = _STREAMING;
     
     int count = _buffer.readInt16();
-    var list = new List<_Column>.fixedLength(count);
+    var list = new List<_Column>(count);
     
     for (int i = 0; i < count; i++) {      
       var name = _buffer.readString(length); //FIXME better maxSize.
@@ -413,7 +413,7 @@ class _Connection implements Connection {
     assert(_buffer.bytesAvailable >= colSize);
     
     if (index == 0)
-      _query._rowData = new List<dynamic>.fixedLength(_query._columns.length);
+      _query._rowData = new List<dynamic>(_query._columns.length);
       
     if (colSize == -1) {
       _query._rowData[index] = null;
@@ -489,7 +489,7 @@ class _Connection implements Connection {
       msg.addInt32(0);
       msg.setLength();
       
-      _socket.add(msg.buffer);
+      _socket.writeBytes(msg.buffer);
     } catch (e) {
       _unhandled.add(new _PgClientException('Postgresql connection closed without sending terminate message.', e));
     }

@@ -7,7 +7,7 @@ class _Settings {
       {host : 'localhost',
        port: 5432})
     : _username = username,
-      _passwordHash = _md5s(password.concat(username)),
+      _passwordHash = _md5s('$password$username'),
       _host = host,
       _port = port;      
   

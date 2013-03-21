@@ -44,8 +44,8 @@ class _Query {
     _controller.add(row);    
   }
   
-  void addError(Exception err) {
-    _controller.signalError(err);
+  void addError(Object err) {
+    _controller.addError(err);
     // stream will be closed once the ready for query message is received.
   }
   
