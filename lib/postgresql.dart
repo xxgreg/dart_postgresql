@@ -12,18 +12,10 @@ part 'constants.dart';
 part 'exceptions.dart';
 part 'message_buffer.dart';
 part 'query.dart';
-part 'settings.dart';
 
 /// Connect to a PostgreSQL database.
-Future<Connection> connect(
-    String username,
-    String database,
-    String password,
-    {String host : 'localhost', int port: 5432}) {
-  
-  var settings = new _Settings(username, database, password, host: host, port: port);
-  return _Connection._connect(settings);
-}
+///
+Future<Connection> connect(String uri) => _Connection._connect(uri);
 
 /// A connection to a PostgreSQL database.
 abstract class Connection {

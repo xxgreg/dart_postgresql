@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:postgresql/postgresql.dart' as pg;
 
 void main() {
-  pg.connect('testdb', 'testdb', 'password').then((conn) {
+  var uri = 'postgres://testdb:password@localhost:5432/testdb';
+  pg.connect(uri).then((conn) {
     run(sql) => conn.query(sql).toList();
     readline(run);
   });

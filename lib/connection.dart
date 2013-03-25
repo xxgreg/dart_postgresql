@@ -2,7 +2,7 @@ part of postgresql;
 
 class _Connection implements Connection {
   
-  _Connection(this._socket, this._settings);
+  _Connection(this._socket, this._databaseName, this._userName, this._passwordHash);
   
   int __state = _NOT_CONNECTED;  
   int get _state => __state;
@@ -12,9 +12,11 @@ class _Connection implements Connection {
     //print('Connection state change: ${_stateToString(was)} => ${_stateToString(s)}.');
   }
   
+  final String _databaseName;
+  final String _userName;
+  final String _passwordHash;
   final Socket _socket;
   final _Buffer _buffer = new _Buffer();
-  final _Settings _settings;
   bool _hasConnected = false;
   final Completer _connected = new Completer();
   final Queue<_Query> _sendQueryQueue = new Queue<_Query>();
@@ -25,17 +27,44 @@ class _Connection implements Connection {
   Stream get unhandled => _unhandled.stream;
   final StreamController _unhandled = new StreamController();
   
-  static Future<_Connection> _connect(_Settings settings) {
+  static final _uriRe = new RegExp(r'^postgres://([a-zA-Z0-9\-\_]+)\:([a-zA-Z0-9\-\_]+)\@([a-zA-Z0-9\-\_\.]+)\:([0-9]+)\/([a-zA-Z0-9\-\_]+)');
 
-    return Socket.connect(settings._host, settings._port).then((socket) {
-      var conn = new _Connection(socket, settings);
+  static Future<_Connection> _connect(String uri) {
+
+    // FIXME allow optional hostname and port.
+    // Perhaps default database name to be username.
+    // FIXME testing.
+
+    String userName, database, passwordHash, host;
+    int port = 5432;
+
+    var match = _uriRe.firstMatch(uri);
+    if (match != null && match.groupCount == 5) {    
+      userName = match[1];
+      passwordHash = _md5s(match[2] + match[1]);
+      host = match[3];
+      port = int.parse(match[4], onError: (_) => port);
+      database = match[5];
+    } else {
+      //TODO fail - return completeError. Or throw, and use future of.
+      throw new UnimplementedError();
+    }
+
+    return Socket.connect(host, port).then((socket) {
+      var conn = new _Connection(socket, database, userName, passwordHash);
       socket.listen(conn._readData, onError: conn._handleSocketError, onDone: conn._handleSocketClosed);
       conn._state = _SOCKET_CONNECTED;
       conn._sendStartupMessage();
       return conn._connected.future;
     });
   }
-  
+
+  static String _md5s(String s) {
+    var hash = new MD5();
+    hash.add(s.codeUnits.toList());
+    return CryptoUtils.bytesToHex(hash.close());
+  }
+
   
   void _sendStartupMessage() {
     if (_state != _SOCKET_CONNECTED)
@@ -45,9 +74,9 @@ class _Connection implements Connection {
     msg.addInt32(0); // Length padding.
     msg.addInt32(_PROTOCOL_VERSION);    
     msg.addString('user');
-    msg.addString(_settings._username);
+    msg.addString(_userName);
     msg.addString('database');
-    msg.addString(_settings._database);
+    msg.addString(_databaseName);
     //TODO write params list.
     msg.addByte(0);
     msg.setLength(startup: true);
@@ -77,7 +106,7 @@ class _Connection implements Connection {
     
     var bytes = _buffer.readBytes(4);
     var salt = new String.fromCharCodes(bytes);
-    var md5 = 'md5' + _md5s('${_settings._passwordHash}$salt');
+    var md5 = 'md5' + _md5s('${_passwordHash}$salt');
     
     // Build message.
     var msg = new _MessageBuffer();

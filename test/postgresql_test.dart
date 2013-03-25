@@ -5,21 +5,19 @@ import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
 
 main() {
-  var username = 'testdb';
-  var database = 'testdb';
-  var password = 'password';
+  var uri = 'postgres://testdb:password@localhost:5432/testdb';
   
   group('Connect', () {
     
     test('Connect', () {
-      connect(username, database, password)
+      connect(uri)
         .then(expectAsync1((c) {
           c.close();
         }));
     });
     
     test('Connect failure - incorrect password', () {
-      connect(username, database, 'boom!')
+      connect('postgres://testdb:WRONG_PASSWORD@localhost:5432/testdb')
         .then((c) => throw new Exception('Should not be reached.'),
             onError: expectAsync1((err) { /* boom! */ }));
     });
@@ -27,13 +25,13 @@ main() {
     // Should fail with a message like:
     // AsyncError: 'SocketIOException: OS Error: Connection refused, errno = 111'
     test('Connect failure - incorrect port', () {
-      connect(username, database, password, port: 32423423)
+      connect('postgres://testdb:WRONG_PASSWORD@localhost:565675/testdb')
         .then((c) => throw new Exception('Should not be reached.'),
             onError: expectAsync1((err) { /* boom! */ }));
     });
     
     test('Connect failure - connect to http server', () {
-      connect(username, database, password, host: 'google.com', port: 80)
+      connect('postgres://testdb:WRONG_PASSWORD@google.com:80/testdb')
         .then((c) => throw new Exception('Should not be reached.'),
             onError: expectAsync1((err) { /* boom! */ }));
     });
@@ -42,7 +40,7 @@ main() {
   
   group('Close', () {
     test('Close multiple times.', () {
-      connect(username, database, password).then((conn) {
+      connect(uri).then((conn) {
         conn.close();
         conn.close();
         new Future.delayed(new Duration(milliseconds: 20))
@@ -52,7 +50,7 @@ main() {
     
     
     test('Query on closed connection.', () {
-      connect(username, database, password).then((conn) {
+      connect(uri).then((conn) {
         conn.close();
         conn.query("select 'blah'").toList()
           .then((_) => throw new Exception('Should not be reached.'))
@@ -61,7 +59,7 @@ main() {
     });
     
     test('Execute on closed connection.', () {
-      connect(username, database, password).then((conn) {
+      connect(uri).then((conn) {
         conn.close();
         conn.execute("select 'blah'")
           .then((_) => throw new Exception('Should not be reached.'))
@@ -76,7 +74,7 @@ main() {
     Connection conn;
     
     setUp(() {
-      return connect(username, database, password).then((c) => conn = c);
+      return connect(uri).then((c) => conn = c);
     });
     
     tearDown(() {
@@ -173,7 +171,7 @@ main() {
     Connection conn;
     
     setUp(() {
-      return connect(username, database, password).then((c) => conn = c);
+      return connect(uri).then((c) => conn = c);
     });
     
     tearDown(() {
@@ -305,7 +303,7 @@ main() {
     Connection conn;
     
     setUp(() {
-      return connect(username, database, password).then((c) => conn = c);
+      return connect(uri).then((c) => conn = c);
     });
     
     tearDown(() {
@@ -358,7 +356,7 @@ main() {
     Connection conn;
     
     setUp(() {
-      return connect(username, database, password).then((c) => conn = c);
+      return connect(uri).then((c) => conn = c);
     });
     
     tearDown(() {
@@ -382,7 +380,7 @@ main() {
     Connection conn;
     
     setUp(() {
-      return connect(username, database, password).then((c) => conn = c);
+      return connect(uri).then((c) => conn = c);
     });
     
     tearDown(() {
