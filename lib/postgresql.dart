@@ -51,7 +51,16 @@ abstract class Connection {
   /// [PgClientException], that occur while the connection is idle, or are not
   /// related to a specific query.
   Stream get unhandled;
+
+  int get transactionStatus;
+
+  Future get onClosed;
 }
+
+const int TRANSACTION_UNKNOWN = 1;
+const int TRANSACTION_NONE = 2;
+const int TRANSACTION_BEGUN = 3;
+const int TRANSACTION_ERROR = 4;
 
 /// A marker interface implemented by all postgresql library exceptions.
 abstract class PgException implements Exception {

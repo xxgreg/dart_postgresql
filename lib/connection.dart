@@ -11,6 +11,9 @@ class _Connection implements Connection {
     __state = s;
     //print('Connection state change: ${_stateToString(was)} => ${_stateToString(s)}.');
   }
+
+  int _transactionStatus = TRANSACTION_UNKNOWN;
+  int get transactionStatus => _transactionStatus;
   
   final String _databaseName;
   final String _userName;
@@ -19,6 +22,7 @@ class _Connection implements Connection {
   final _Buffer _buffer = new _Buffer();
   bool _hasConnected = false;
   final Completer _connected = new Completer();
+  final Completer _closed = new Completer();
   final Queue<_Query> _sendQueryQueue = new Queue<_Query>();
   _Query _query;
   int _msgType;
@@ -127,10 +131,17 @@ class _Connection implements Connection {
 
     // TODO store transaction state somewhere. Perhaps this needs to be able
     // to be read via the api. Perhaps Connection.transactionState, or just Connection.state?
-    // which is one of: {BUSY, IDLE, IN_TRANSACTION, ERROR};
+    // which is one of: {BUSY, IDLE, BEGUN, ERROR};
 
     if (c == _I || c == _T || c == _E) {
       
+      if (c == _I)
+        _transactionStatus = TRANSACTION_NONE;
+      else if (c == _T)
+        _transactionStatus = TRANSACTION_BEGUN;
+      else if (c == _E)
+        _transactionStatus = TRANSACTION_ERROR;
+
       var was = _state;
       
       _state = _IDLE;
@@ -396,6 +407,7 @@ class _Connection implements Connection {
     
     _state = _BUSY;
     _query._state = _BUSY;
+    _transactionStatus = TRANSACTION_UNKNOWN;
   }
   
   void _readRowDescription(int msgType, int length) {
@@ -510,8 +522,12 @@ class _Connection implements Connection {
   }
   
   void close() {
+    if (_state == _CLOSED)
+      return;
+
+    var prior = _state;
     _state = _CLOSED;
-    
+
     try {
       var msg = new _MessageBuffer();
       msg.addByte(_MSG_TERMINATE);
@@ -523,6 +539,9 @@ class _Connection implements Connection {
       _unhandled.add(new _PgClientException('Postgresql connection closed without sending terminate message.', e));
     }
 
+    if (prior != _CLOSED)
+      _closed.complete(null);      
+
     _destroy();
   }
   
@@ -530,4 +549,6 @@ class _Connection implements Connection {
     _state = _CLOSED;
     _socket.destroy();
   }
+
+  Future get onClosed => _closed.future;
 }
