@@ -10,11 +10,13 @@ part 'buffer.dart';
 part 'connection.dart';
 part 'constants.dart';
 part 'exceptions.dart';
+part 'format_value.dart';
 part 'message_buffer.dart';
 part 'query.dart';
+part 'substitute.dart';
 
 /// Connect to a PostgreSQL database.
-///
+/// A postgres uri has the following format: 'postgres://testdb:password@localhost:5432/testdb'.
 Future<Connection> connect(String uri) => _Connection._connect(uri);
 
 /// A connection to a PostgreSQL database.
@@ -34,12 +36,12 @@ abstract class Connection {
   ///        print(row.a);
   ///     });
   ///
-  Stream<dynamic> query(String sql);
+  Stream<dynamic> query(String sql, [values]);
   
   
   /// Queues a command for execution, and when done, returns the number of rows
   /// affected by the sql command.
-  Future<int> execute(String sql);
+  Future<int> execute(String sql, [values]);
   
   
   /// Close the current [Connection]. It is safe to call this multiple times.
@@ -105,3 +107,7 @@ abstract class PgServerInformation {
   /// All of the information returned from the server.
   String get allInformation;
 }
+
+/// Made public for testing.
+String substitute(String source, values) => _substitute(source, values);
+String formatValue(value, String type) => _formatValue(value, type);

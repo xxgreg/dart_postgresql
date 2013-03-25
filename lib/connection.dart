@@ -347,8 +347,10 @@ class _Connection implements Connection {
         new Future.immediateError(err));
   }
   
-  Stream query(String sql) {
+  Stream query(String sql, [values]) {
     try {
+      if (values != null)
+        sql = _substitute(sql, values);
       var query = _enqueueQuery(sql);
       return query.stream;
     } on Exception catch (ex) { //TODO Should this be on PgException? 
@@ -356,8 +358,10 @@ class _Connection implements Connection {
     }
   }
   
-  Future<int> execute(String sql) {
+  Future<int> execute(String sql, [values]) {
     try {
+      if (values != null)
+        sql = _substitute(sql, values);
       var query = _enqueueQuery(sql);
       return query.stream.isEmpty.then((_) => _query._rowsAffected);
     } on Exception catch (ex) { //TODO Should this be on PgException?
