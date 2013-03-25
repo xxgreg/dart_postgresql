@@ -194,8 +194,8 @@ class _PoolConnection implements pg.Connection {
 		  _isReleased = true;
 
 	void close() => _pool._release(this);
-	Stream query(String sql) => _conn.query(sql);
-	Future<int> execute(String sql) => _conn.execute(sql);
+	Stream query(String sql, [values]) => _conn.query(sql, values);
+	Future<int> execute(String sql, [values]) => _conn.execute(sql, values);
 
 	bool get isClosed => false; //TODO.
 	int get transactionStatus => _conn.transactionStatus;

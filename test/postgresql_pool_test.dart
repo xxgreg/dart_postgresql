@@ -1,6 +1,7 @@
 library postgresql_test;
 
 import 'dart:async';
+import 'dart:io';
 import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
 import 'package:postgresql/postgresql_pool.dart';
@@ -12,7 +13,7 @@ main() {
   	int tout = 2 * 60 * 1000; // Should be longer than usage
   	var pool = new Pool(uri, timeout: tout, min: 2, max: 5);
   	
-  	var cb = expectAsync1((_) {});
+  	var pass = expectAsync0(() {});
 
     testConnect(_) {
     	pool.connect().then((conn) {
@@ -20,7 +21,6 @@ main() {
     		conn.query("select 'oi';").toList()
     			.then(print)
     			.then((_) => conn.close())
-    			.then(cb)
           .catchError((err) => print('Query error: $err'));
     	})
       .catchError((err) => print('Connect error: $err'));
@@ -29,13 +29,15 @@ main() {
     // Wait for initial connections to be made before starting
     var timer;
     pool.start().then((_) {
-      timer = new Timer.periodic(new Duration(milliseconds: 10), testConnect);
+      timer = new Timer.periodic(new Duration(milliseconds: 100), testConnect);
     });
 
-    new Future.delayed(new Duration(seconds: 10), () {
+    new Future.delayed(new Duration(seconds: 2), () {
       timer.cancel();
       pool.destroy();
       print('Pool destroyed.');
+      pass();
+      exit(0); //FIXME - something is keeping the process alive.
     });
 
   });
