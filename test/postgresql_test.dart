@@ -50,20 +50,22 @@ main() {
     
     
     test('Query on closed connection.', () {
+      var cb = expectAsync1((e) {});
       connect(uri).then((conn) {
         conn.close();
         conn.query("select 'blah'").toList()
           .then((_) => throw new Exception('Should not be reached.'))
-          .catchError(expectAsync1((e) {}));
+          .catchError(cb);
       });
     });
     
     test('Execute on closed connection.', () {
+      var cb = expectAsync1((e) {});
       connect(uri).then((conn) {
         conn.close();
         conn.execute("select 'blah'")
           .then((_) => throw new Exception('Should not be reached.'))
-          .catchError(expectAsync1((e) {}));
+          .catchError(cb);
       });
     });
     
