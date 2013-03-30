@@ -1,11 +1,11 @@
-library postgresql;
+library postgresql_test;
 
 import 'dart:async';
 import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
+import 'load_settings.dart';
 
 main() {
-  var uri = 'postgres://testdb:password@localhost:5432/testdb';  
   
   group('Substitute by id', () {
     test('Substitute 1', () {
@@ -73,9 +73,7 @@ main() {
     
     Connection conn;
     
-    setUp(() {
-      return connect(uri).then((c) => conn = c);
-    });
+    setUp(() => connect(loadSettings().toUri()).then((c) => conn = c));
     
     tearDown(() {
       if (conn != null) conn.close();
@@ -98,6 +96,3 @@ main() {
   });
   
 }
-
-
-

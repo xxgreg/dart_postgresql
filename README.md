@@ -99,8 +99,8 @@ it is received, or you can wait till they all arrive by calling Stream.toList().
 
 ## Testing
 
-To run the unit tests you will need to create a database, and add the database
-name, username and password to 'postgresql_test.dart'.
+To run the unit tests you will need to create a database, and edit
+'test/config.yaml' accordingly.
 
 ### Creating a database for testing
 

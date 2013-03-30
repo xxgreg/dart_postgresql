@@ -3,44 +3,46 @@ library postgresql_test;
 import 'dart:async';
 import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
+import 'load_settings.dart';
 
 main() {
-  var uri = 'postgres://testdb:password@localhost:5432/testdb';
+  
+  String validUri = loadSettings().toUri();
   
   group('Connect', () {
     
     test('Connect', () {
-      connect(uri)
+      connect(validUri)
         .then(expectAsync1((c) {
           c.close();
         }));
     });
     
     test('Connect failure - incorrect password', () {
-      connect('postgres://testdb:WRONG_PASSWORD@localhost:5432/testdb')
-        .then((c) => throw new Exception('Should not be reached.'),
-            onError: expectAsync1((err) { /* boom! */ }));
+      var uri = loadSettings(password: 'WRONGPASSWORD').toUri();
+      connect(uri).then((c) => throw new Exception('Should not be reached.'), 
+        onError: expectAsync1((err) { /* boom! */ }));
     });
     
-    // Should fail with a message like:
+    // Should fail with a message like:settings.toUri()
     // AsyncError: 'SocketIOException: OS Error: Connection refused, errno = 111'
     test('Connect failure - incorrect port', () {
-      connect('postgres://testdb:WRONG_PASSWORD@localhost:565675/testdb')
-        .then((c) => throw new Exception('Should not be reached.'),
-            onError: expectAsync1((err) { /* boom! */ }));
+      var uri = loadSettings(port: 565675).toUri();
+      connect(uri).then((c) => throw new Exception('Should not be reached.'),
+        onError: expectAsync1((err) { /* boom! */ }));
     });
     
     test('Connect failure - connect to http server', () {
-      connect('postgres://testdb:WRONG_PASSWORD@google.com:80/testdb')
-        .then((c) => throw new Exception('Should not be reached.'),
-            onError: expectAsync1((err) { /* boom! */ }));
+      var uri = loadSettings(host: 'google.com', port: 80).toUri();
+      connect(uri).then((c) => throw new Exception('Should not be reached.'),
+        onError: expectAsync1((err) { /* boom! */ }));
     });
     
   });
   
   group('Close', () {
     test('Close multiple times.', () {
-      connect(uri).then((conn) {
+      connect(validUri).then((conn) {
         conn.close();
         conn.close();
         new Future.delayed(new Duration(milliseconds: 20))
@@ -48,10 +50,9 @@ main() {
       });
     });
     
-    
     test('Query on closed connection.', () {
       var cb = expectAsync1((e) {});
-      connect(uri).then((conn) {
+      connect(validUri).then((conn) {
         conn.close();
         conn.query("select 'blah'").toList()
           .then((_) => throw new Exception('Should not be reached.'))
@@ -61,7 +62,7 @@ main() {
     
     test('Execute on closed connection.', () {
       var cb = expectAsync1((e) {});
-      connect(uri).then((conn) {
+      connect(validUri).then((conn) {
         conn.close();
         conn.execute("select 'blah'")
           .then((_) => throw new Exception('Should not be reached.'))
@@ -76,7 +77,7 @@ main() {
     Connection conn;
     
     setUp(() {
-      return connect(uri).then((c) => conn = c);
+      return connect(validUri).then((c) => conn = c);
     });
     
     tearDown(() {
@@ -173,7 +174,7 @@ main() {
     Connection conn;
     
     setUp(() {
-      return connect(uri).then((c) => conn = c);
+      return connect(validUri).then((c) => conn = c);
     });
     
     tearDown(() {
@@ -305,7 +306,7 @@ main() {
     Connection conn;
     
     setUp(() {
-      return connect(uri).then((c) => conn = c);
+      return connect(validUri).then((c) => conn = c);
     });
     
     tearDown(() {
@@ -358,7 +359,7 @@ main() {
     Connection conn;
     
     setUp(() {
-      return connect(uri).then((c) => conn = c);
+      return connect(validUri).then((c) => conn = c);
     });
     
     tearDown(() {
@@ -382,7 +383,7 @@ main() {
     Connection conn;
     
     setUp(() {
-      return connect(uri).then((c) => conn = c);
+      return connect(validUri).then((c) => conn = c);
     });
     
     tearDown(() {
@@ -426,4 +427,3 @@ class ImmutablePerson {
   final String lastname;
   String toString() => '$firstname $lastname';
 }
-
