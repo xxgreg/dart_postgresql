@@ -9,6 +9,7 @@ dart_analyzer --type-checks-for-inferred-types test/postgresql_test.dart
 dart_analyzer --type-checks-for-inferred-types test/postgresql_pool_test.dart
 dart_analyzer --type-checks-for-inferred-types test/substitute_test.dart
 
+dart --checked test/settings_test.dart
 dart --checked test/postgresql_test.dart
 dart --checked test/postgresql_pool_test.dart
 dart --checked test/substitute_test.dart
