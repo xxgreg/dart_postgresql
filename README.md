@@ -96,6 +96,26 @@ conn.query("select color from crayons").single.then((crayon) {
 Connection.query() returns a Stream of results. You can use each row as soon as
 it is received, or you can wait till they all arrive by calling Stream.toList().
 
+### Connection pooling
+
+In server applications, a connection pool can be used to avoid the overhead of obtaining a connection for each request.
+
+```dart
+// import 'postgres/postgres_pool.dart';
+
+var pool = new Pool(uri, min: 2, max: 5);
+pool.start().then((_) {
+  print('Min connections established.');
+  pool.connect().then((conn) { // Obtain connection from pool
+    conn.query("select 'oi';")
+      .toList()
+      .then(print)
+      .then((_) => conn.close()) // Return connection to pool
+      .catchError((err) => print('Query error: $err'));
+  });
+});
+
+```
 
 ## Testing
 
