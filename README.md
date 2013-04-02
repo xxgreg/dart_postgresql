@@ -5,7 +5,7 @@
 ### Obtaining a connection
 
 ```dart
-connect('username', 'database', 'password', host: 'localhost', port: 5432).then((conn) {
+connect('postgres://username:password@localhost:5432/database').then((conn) {
 	// ...
 });
 ```
