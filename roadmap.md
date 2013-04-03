@@ -9,41 +9,8 @@
         | Not in Transaction (Idle?)
         | Error state. In a failed transaction. Commands will be aborted until next rollback.
 
-## Connection Settings
-   - Export connection Settings class.
-   - Change connect to take Settings class as parameter.
-   - Write Settings ctors:
-      - fromPostgresUri()
-      - fromPsqlEnv()
-      - fromHerokuEnv()
-
 ## If no unhandled error/notice listener is registered then log to standard
    error.
-
-## Query value subsitution and escaping
-  - Goal: Prevent sql injection attacks.
-  - Change query(), and exec() methods to:
-     
-     Stream query(String sql, dynamic values);
-     // Where values should be either a OrderedMap<String,Object> aka LinkedHashMap<String,Object>,
-        or a List<Object>.
-
-     query('select a, b from blah where id = @id', {'id': 5});
-     query('select a, b from blah where id = @0', [5]);
-
-     Strings will have quotes added, and will have quotes escaped. (TODO Check if any other escaping is required).
-
-  -  Support for standard types:
-     Map
-     List<int> binary (bytea, blob etc).
-     DateTime
-     JSON
-     XML 
-
-  - Allow types to be specified in query.
-
-    query('select a, b from blah where id = @id:int', {'id': 5});
-    query('select a, b from blah where id = @0:int', [5]);
 
 
 ## Write some reflection mappers
@@ -80,7 +47,7 @@
 
   - Date with timezone => OffsetDateTime()
 
-  - numeric => class Real { final int value; final int scale; final int precision; // Is precision needed? }
+  - numeric => class Numeric { final int value; final int scale; final int precision; // Is precision needed? }
   - First only implement parsing for now, don't implement num interface.
   - Implment num interface. (Can you implement num interface or is it magic?)
 
@@ -104,12 +71,6 @@
     can be implemented as: class RecordingSocket implements Socket. and passed
     into the settings object specified above.
   - The mock socket can then use this data to replay the conversation.
-
-
-## Read about binary transfer mode
-  - figure out how important this is to support.
-  - This is used for extended queries, i.e. prepared statements, not simple queries.
-    Probably don't need to implement this yet.
 
 
 ## Write performance tests
