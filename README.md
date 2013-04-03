@@ -5,7 +5,8 @@
 ### Obtaining a connection
 
 ```dart
-connect('postgres://username:password@localhost:5432/database').then((conn) {
+var uri = 'postgres://username:password@localhost:5432/database';
+connect(uri).then((conn) {
 	// ...
 });
 ```
