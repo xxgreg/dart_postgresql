@@ -39,12 +39,14 @@ done automatically for you.
 
 Below is the mapping from Postgresql types to Dart types. The type mapping is still a work in progress. All types which do not have an explicit mapping will be returned as a String in Postgresql's standard text format. This means that it is still possible to handle all types, as you can parse the string yourself.
 
+```
   Postgresql type        Dart type
 	boolean                bool
 	int2, int4, int8       int
 	float4, float8         double
 	timestamp, date        Datetime
 	All other types        String
+```
 
 ### Mapping the results of a query to an object
 
