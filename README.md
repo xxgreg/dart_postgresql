@@ -103,7 +103,7 @@ In server applications, a connection pool can be used to avoid the overhead of o
 
 ```dart
 // import 'postgres/postgres_pool.dart';
-
+var uri = 'postgres://username:password@localhost:5432/database';
 var pool = new Pool(uri, min: 2, max: 5);
 pool.start().then((_) {
   print('Min connections established.');
