@@ -480,30 +480,32 @@ class _Connection implements Connection {
   dynamic _decodeStringValue(_Column col, List<int> data) {
     
     switch (col.fieldType) {
-      case t_bool:
+      case _PG_BOOL:
         return data[0] == 116;
       
-      case t_int2:
-      case t_int4:
-      case t_int8:
+      case _PG_INT2:
+      case _PG_INT4:
+      case _PG_INT8:
         return int.parse(decodeUtf8(data));
         
-      case t_float4:
-      case t_float8:
+      case _PG_FLOAT4:
+      case _PG_FLOAT8:
         return double.parse(decodeUtf8(data));
       
-      case t_timestamp:
-      case t_date:
+      case _PG_TIMESTAMP:
+      case _PG_DATE:
         return DateTime.parse(decodeUtf8(data));      
         
-      // Not implemented
-      case t_timestamptz:
-      case t_timetz:        
-      case t_time: 
-      case t_interval:
-      case t_numeric:
+      // Not implemented yet - return a string.
+      case _PG_MONEY:
+      case _PG_TIMESTAMPZ:
+      case _PG_TIMETZ:
+      case _PG_TIME: 
+      case _PG_INTERVAL:
+      case _PG_NUMERIC:
         
       default:
+        // Return a string for unknown types. The end user can parse this.
         return decodeUtf8(data);
     }    
   }
