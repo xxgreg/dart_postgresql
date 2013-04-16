@@ -371,9 +371,9 @@ main() {
       conn.query('elect 1').toList().then(
           (rows) => throw new Exception('Should not be reached.'),
           onError: expectAsync1((err) { 
-            expect(err.error.severity, equals('ERROR'));
-            expect(err.error.code, equals('42601'));
-            expect(err.error.position, equals(1));
+            expect(err.severity, equals('ERROR'));
+            expect(err.code, equals('42601'));
+            expect(err.position, equals(1));
           }));
     });
   });

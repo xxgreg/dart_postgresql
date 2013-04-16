@@ -10,7 +10,7 @@ class _Buffer {
   int _bytesRead = 0;
   int get bytesRead => _bytesRead;
   
-  int get bytesAvailable => _queue.reduce(0, (len, buffer) => len + buffer.length) - _position;
+  int get bytesAvailable => _queue.fold(0, (len, buffer) => len + buffer.length) - _position;
   
   int readByte() {
     if (_queue.isEmpty)

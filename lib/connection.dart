@@ -85,7 +85,7 @@ class _Connection implements Connection {
     msg.addByte(0);
     msg.setLength(startup: true);
     
-    _socket.writeBytes(msg.buffer);
+    _socket.add(msg.buffer);
     
     _state = _AUTHENTICATING;
   }
@@ -119,7 +119,7 @@ class _Connection implements Connection {
     msg.addString(md5);
     msg.setLength();
     
-    _socket.writeBytes(msg.buffer);
+    _socket.add(msg.buffer);
   }
   
   void _readReadyForQuery(int msgType, int length) {
@@ -157,7 +157,7 @@ class _Connection implements Connection {
       }
       
       //FIXME Dear deep thought, what is the idiomatic way to do this?
-      new Future.immediate(42).then((_) => _processSendQueryQueue());
+      new Future.value(42).then((_) => _processSendQueryQueue());
       
     } else {
       _destroy();
@@ -344,7 +344,7 @@ class _Connection implements Connection {
   
   Stream _errorStream(err) {
     return new Stream.fromFuture(
-        new Future.immediateError(err));
+        new Future.error(err));
   }
   
   Stream query(String sql, [values]) {
@@ -354,7 +354,7 @@ class _Connection implements Connection {
       var query = _enqueueQuery(sql);
       return query.stream;
     } on Exception catch (ex) { //TODO Should this be on PgException? 
-      return new Stream.fromFuture(new Future.immediateError(ex));  
+      return new Stream.fromFuture(new Future.error(ex));  
     }
   }
   
@@ -365,7 +365,7 @@ class _Connection implements Connection {
       var query = _enqueueQuery(sql);
       return query.stream.isEmpty.then((_) => _query._rowsAffected);
     } on Exception catch (ex) { //TODO Should this be on PgException?
-      return new Future.immediateError(ex);
+      return new Future.error(ex);
     }
   }
   
@@ -381,7 +381,7 @@ class _Connection implements Connection {
     _sendQueryQueue.addLast(query);
     
     //FIXME What is the idiomatic way to do this?
-    new Future.immediate(42).then((_) => _processSendQueryQueue());
+    new Future.value(42).then((_) => _processSendQueryQueue());
     
     return query;
   }
@@ -407,7 +407,7 @@ class _Connection implements Connection {
     msg.addString(_query.sql);
     msg.setLength();
     
-    _socket.writeBytes(msg.buffer);
+    _socket.add(msg.buffer);
     
     _state = _BUSY;
     _query._state = _BUSY;
@@ -540,7 +540,7 @@ class _Connection implements Connection {
       msg.addInt32(0);
       msg.setLength();
       
-      _socket.writeBytes(msg.buffer);
+      _socket.add(msg.buffer);
     } catch (e) {
       _unhandled.add(new _PgClientException('Postgresql connection closed without sending terminate message.', e));
     }

@@ -28,7 +28,7 @@ class _Pool implements Pool {
 	final int _min;
 	final int _max;	
 	final _connections = new List<_PoolConnection>();
-	final _available = new Queue<_PoolConnection>();
+	final _available = new List<_PoolConnection>();
 	bool _destroyed = false;
 	int get _count => _connections.length + _connecting;
 	int _connecting = 0;
@@ -48,20 +48,20 @@ class _Pool implements Pool {
 
 	Future<_PoolConnection> connect([int timeout]) {
 		if (_destroyed)
-			return new Future.immediateError('Connect() called on destroyed pool.');
+			return new Future.error('Connect() called on destroyed pool.');
 
 		if (!_available.isEmpty)
-			return new Future.immediate(_available.removeFirst());
+			return new Future.value(_available.removeAt(0));
 
 		if (_count >= _max)
-			return new Future.immediateError('Maximum number of connections for the connection pool was exhausted.');
+			return new Future.error('Maximum number of connections for the connection pool was exhausted.');
 
 		return _incConnections().then((_) {
 
 			if (_available.isEmpty)
 				throw new Exception('No connections available.'); //FIXME exception type.
 
-			var c = _available.removeFirst();
+			var c = _available.removeAt(0);
 
 			if (_destroyed) {
 				_destroy(c);
@@ -137,7 +137,7 @@ class _Pool implements Pool {
 		
 		} else {
 			_setReleasedState(conn);
-			_available.addLast(conn);
+			_available.add(conn);
 		}
 	}
 

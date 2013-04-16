@@ -33,7 +33,7 @@ class _PgServerInformation implements PgServerInformation {
         message = map['M'] == null ? '' : map['M'],
         detail = map['D'] == null ? '' : map['D'],
         position = map['P'] == null ? null : int.parse(map['P'], onError: (_) => null),
-        allInformation = map.keys.reduce('', (val, item) {
+        allInformation = map.keys.fold('', (val, item) {
           var fieldName = _fieldNames[item] == null ? item : _fieldNames[item]; 
           var fieldValue = map[item];
           return '$val\n$fieldName: $fieldValue';

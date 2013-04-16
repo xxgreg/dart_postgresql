@@ -95,14 +95,14 @@ class _Row {
     }
   }
   
-  noSuchMethod(InvocationMirror invocationMirror) {
-    var name = invocationMirror.memberName;
-    if (invocationMirror.isGetter) {
+  noSuchMethod(Invocation invocation) {
+    var name = invocation.memberName;
+    if (invocation.isGetter) {
       var i = _index[name];
       if (i != null)
         return _columnValues[i];
     }
-    super.noSuchMethod(invocationMirror);
+    super.noSuchMethod(invocation);
   }
   
   String toString() => _columnValues.toString();

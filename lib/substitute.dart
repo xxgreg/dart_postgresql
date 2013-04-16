@@ -211,6 +211,6 @@ class _CharReader {
     }
     
     int end = hasMore() ? _i : _source.length;    
-    return _source.slice(start, end);
+    return _source.substring(start, end);
   }
 }
