@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:crypto';
 import 'dart:io';
+import 'dart:uri';
 import 'dart:utf' show encodeUtf8, decodeUtf8;
 
 part 'buffer.dart';
@@ -13,6 +14,7 @@ part 'exceptions.dart';
 part 'format_value.dart';
 part 'message_buffer.dart';
 part 'query.dart';
+part 'settings.dart';
 part 'substitute.dart';
 
 /// Connect to a PostgreSQL database.

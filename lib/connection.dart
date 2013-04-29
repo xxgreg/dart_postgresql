@@ -31,35 +31,23 @@ class _Connection implements Connection {
   Stream get unhandled => _unhandled.stream;
   final StreamController _unhandled = new StreamController();
   
-  static final _uriRe = new RegExp(r'^postgres://([a-zA-Z0-9\-\_]+)\:([a-zA-Z0-9\-\_]+)\@([a-zA-Z0-9\-\_\.]+)\:([0-9]+)\/([a-zA-Z0-9\-\_]+)');
-
   static Future<_Connection> _connect(String uri) {
+    return new Future.sync(() {
+      var settings = new Settings.fromUri(uri);
 
-    // FIXME allow optional hostname and port.
-    // Perhaps default database name to be username.
-    // FIXME testing.
+      var userName = settings.user;
+      var passwordHash = _md5s(settings.password + settings.user);
+      var host = settings.host;
+      var port = settings.port;
+      var database = settings.database;
 
-    String userName, database, passwordHash, host;
-    int port = 5432;
-
-    var match = _uriRe.firstMatch(uri);
-    if (match != null && match.groupCount == 5) {    
-      userName = match[1];
-      passwordHash = _md5s(match[2] + match[1]);
-      host = match[3];
-      port = int.parse(match[4], onError: (_) => port);
-      database = match[5];
-    } else {
-      //TODO fail - return completeError. Or throw, and use future of.
-      throw new UnimplementedError();
-    }
-
-    return Socket.connect(host, port).then((socket) {
-      var conn = new _Connection(socket, database, userName, passwordHash);
-      socket.listen(conn._readData, onError: conn._handleSocketError, onDone: conn._handleSocketClosed);
-      conn._state = _SOCKET_CONNECTED;
-      conn._sendStartupMessage();
-      return conn._connected.future;
+      return Socket.connect(host, port).then((socket) {
+        var conn = new _Connection(socket, database, userName, passwordHash);
+        socket.listen(conn._readData, onError: conn._handleSocketError, onDone: conn._handleSocketClosed);
+        conn._state = _SOCKET_CONNECTED;
+        conn._sendStartupMessage();
+        return conn._connected.future;
+      });
     });
   }
 

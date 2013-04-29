@@ -1,4 +1,4 @@
-library postgresql;
+part of postgresql;
 
 final String DEFAULT_HOST = "localhost";
 final num DEFAULT_PORT = 5432;
@@ -12,6 +12,7 @@ class Settings {
   String _user;
   String _password;
   String _database;
+  bool _requireSsl;
   
   /**
    * Settings map keys
@@ -22,7 +23,40 @@ class Settings {
   static final String PASSWORD = "password";
   static final String DATABASE = "database";
 
-  Settings(this._host, this._port, this._user, this._password, this._database);
+  Settings(this._host,
+      this._port,
+      this._user,
+      this._password,
+      this._database,
+      {bool requireSsl: false})
+    : _requireSsl = requireSsl;
+
+  factory Settings.fromUri(String uri) {
+
+    var u = Uri.parse(uri);
+    if (u.scheme != 'postgres' && u.scheme != 'postgresql')
+      throw new FormatException('Invalid uri.');
+
+    if (u.userInfo == null || !u.userInfo.contains(':'))
+      throw new FormatException('Invalid uri.');
+
+    var userInfo = u.userInfo.split(':');
+
+    if (u.path == null || !u.path.startsWith('/'))
+      throw new FormatException('Invalid uri.');
+
+    bool requireSsl = false;
+    if (u.query != null)
+      requireSsl = u.query.contains('sslmode=require');
+
+    return new Settings(
+        u.domain,
+        u.port == null ? DEFAULT_PORT : u.port,
+        userInfo[0],
+        userInfo[1],
+        u.path.substring(1, u.path.length), // Remove preceding forward slash.
+        requireSsl: requireSsl);
+  }
 
   /**
    * Parse a map, apply default rules etc.
@@ -49,8 +83,18 @@ class Settings {
     this._user = config[USER];
     this._password = config[PASSWORD];
     this._database = config[DATABASE];
+
+    this._requireSsl = config.containsKey('sslmode') 
+        && config['sslmode'] == 'require';
   }
   
+  String get host => _host;
+  int get port => _port;
+  String get user => _user;
+  String get password => _password;
+  String get database => _database;
+  bool get requireSsl => _requireSsl;
+
   /**
    * Return connection URI.
    * 
