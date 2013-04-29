@@ -20,7 +20,7 @@ class _Query {
   int _rowsAffected;
   
   List<String> _columnNames;
-  Map<String, int> _columnIndex;
+  Map<Symbol, int> _columnIndex;
   
   _Query(this.sql);
   
@@ -32,9 +32,12 @@ class _Query {
     
     _columnNames = _columns.map((c) => c.name).toList();
     
-    _columnIndex = new Map<String, int>();
+    var ident = new RegExp(r'^[a-zA-Z][a-zA-Z0-9_]*$');
+    _columnIndex = new Map<Symbol, int>();
     for (var i = 0; i < _columnNames.length; i++) {
-      _columnIndex[_columnNames[i]] = i;
+      var name = _columnNames[i];
+      if (ident.hasMatch(name))
+        _columnIndex[new Symbol(name)] = i;
     }
   }
   
@@ -82,7 +85,7 @@ class _Row {
   }
   
   // Map column name to column index
-  final Map<String, int> _index;
+  final Map<Symbol, int> _index;
   final List<String> _columnNames;
   final List _columnValues;
   
