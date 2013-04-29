@@ -2,7 +2,10 @@ part of postgresql;
 
 class _Connection implements Connection {
   
-  _Connection(this._socket, this._databaseName, this._userName, this._passwordHash);
+  _Connection(this._socket, Settings settings)
+    : _userName = settings.user,
+      _passwordHash = _md5s(settings.password + settings.user),
+      _databaseName = settings.database;
   
   int __state = _NOT_CONNECTED;  
   int get _state => __state;
@@ -34,15 +37,17 @@ class _Connection implements Connection {
   static Future<_Connection> _connect(String uri) {
     return new Future.sync(() {
       var settings = new Settings.fromUri(uri);
+      
+      print('requireSSl: ${settings.requireSsl}');
 
-      var userName = settings.user;
-      var passwordHash = _md5s(settings.password + settings.user);
-      var host = settings.host;
-      var port = settings.port;
-      var database = settings.database;
+      var future = settings.requireSsl
+        ? _connectSsl(settings)
+        : Socket.connect(settings.host, settings.port);
 
-      return Socket.connect(host, port).then((socket) {
-        var conn = new _Connection(socket, database, userName, passwordHash);
+      return future.then((socket) {
+        print('secure: ${socket is SecureSocket}');
+
+        var conn = new _Connection(socket, settings);
         socket.listen(conn._readData, onError: conn._handleSocketError, onDone: conn._handleSocketClosed);
         conn._state = _SOCKET_CONNECTED;
         conn._sendStartupMessage();
@@ -57,6 +62,29 @@ class _Connection implements Connection {
     return CryptoUtils.bytesToHex(hash.close());
   }
 
+  static Future<SecureSocket> _connectSsl(Settings settings) {
+
+    var completer = new Completer<SecureSocket>();
+
+    Socket.connect(settings.host, settings.port).then((socket) {
+            
+      socket.listen((e) {
+        print('oi');
+        var data = socket.read(1);
+        if (data == null || data[0] != _S) {
+          socket.close();
+          completer.addError('This postgresql server is not configured to support SSL connections.');
+        } else {
+          completer.add(SecureSocket.secure(socket));
+        }
+      });
+
+      // Write SSL magic number.
+      socket.write([0, 0, 0, 8, 4, 210, 22, 47]);
+    });
+
+    return completer.future;
+  }
   
   void _sendStartupMessage() {
     if (_state != _SOCKET_CONNECTED)

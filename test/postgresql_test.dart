@@ -9,14 +9,8 @@ import 'package:yaml/yaml.dart';
 /**
  * Loads configuration from yaml file into [Settings].
  */
-Settings loadSettings({String user, String password, String host, int port, String db}){
-  var map = loadYaml(new File('test/test_config.yaml').readAsStringSync());
-  map[Settings.HOST] = ?host ? host : map[Settings.HOST];
-  map[Settings.PORT] = ?port ? port : map[Settings.PORT];
-  map[Settings.USER] = ?user ? user : map[Settings.USER];
-  map[Settings.PASSWORD] = ?password ? password : map[Settings.PASSWORD];
-  map[Settings.DATABASE] = ?db ? db : map[Settings.DATABASE];
-  
+Settings loadSettings(){
+  var map = loadYaml(new File('test/test_config.yaml').readAsStringSync()); 
   return new Settings.fromMap(map);
 }
 
@@ -34,21 +28,27 @@ main() {
     });
     
     test('Connect failure - incorrect password', () {
-      var uri = loadSettings(password: 'WRONGPASSWORD').toUri();
+      var map = loadSettings().toMap();
+      map['password'] = 'WRONG';
+      var uri = new Settings.fromMap(map).toUri();
+
       connect(uri).then((c) => throw new Exception('Should not be reached.'), 
         onError: expectAsync1((err) { /* boom! */ }));
     });
     
-    // Should fail with a message like:settings.toUri()
-    // AsyncError: 'SocketIOException: OS Error: Connection refused, errno = 111'
+    //Should fail with a message like:settings.toUri()
+    //AsyncError: 'SocketIOException: OS Error: Connection refused, errno = 111'
     test('Connect failure - incorrect port', () {
-      var uri = loadSettings(port: 565675).toUri();
+      var map = loadSettings().toMap();
+      map['port'] = 565675;
+      var uri = new Settings.fromMap(map).toUri();
+
       connect(uri).then((c) => throw new Exception('Should not be reached.'),
         onError: expectAsync1((err) { /* boom! */ }));
     });
     
     test('Connect failure - connect to http server', () {
-      var uri = loadSettings(host: 'google.com', port: 80).toUri();
+      var uri = 'postgresql://user:pwd@google.com:80/database';
       connect(uri).then((c) => throw new Exception('Should not be reached.'),
         onError: expectAsync1((err) { /* boom! */ }));
     });

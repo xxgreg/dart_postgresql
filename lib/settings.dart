@@ -102,8 +102,20 @@ class Settings {
    * Support http://www.postgresql.org/docs/9.2/static/libpq-connect.html#AEN38149
    */
   String toUri()
-    => "postgres://$_user:$_password@$_host:$_port/$_database";
+    => "postgres://$_user:$_password@$_host:$_port/$_database${requireSsl ? '?sslmode=require' : ''}";
   
   String toString()
     => "Settings: [host: $_host, port: $_port, user: $_user, database: $_database]";
+
+  Map toMap() {
+    var map = new Map<String, dynamic>();
+    map[HOST] = host;
+    map[PORT] = port;
+    map[USER] = user;
+    map[PASSWORD] = password;
+    map[DATABASE] = database;
+    if (requireSsl)
+      map['sslmode'] = 'require';
+    return map;
+  }
 }

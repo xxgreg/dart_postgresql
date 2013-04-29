@@ -32,6 +32,7 @@ const int _E = 69;
 
 const int _t = 116;
 const int _M = 77;
+const int _S = 83;
 
 const int _PROTOCOL_VERSION = 196608;
 
