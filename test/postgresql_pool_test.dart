@@ -5,7 +5,12 @@ import 'dart:io';
 import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
 import 'package:postgresql/postgresql_pool.dart';
-import 'load_settings.dart';
+import 'package:yaml/yaml.dart';
+
+Settings loadSettings(){
+  var map = loadYaml(new File('test/test_config.yaml').readAsStringSync()); 
+  return new Settings.fromMap(map);
+}
 
 main() {
   

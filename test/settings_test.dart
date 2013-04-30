@@ -1,8 +1,14 @@
 library postgresql_test;
 
+import 'dart:io';
+import 'package:postgresql/postgresql.dart';
 import 'package:unittest/unittest.dart';
-import 'package:postgresql/settings.dart';
-import 'load_settings.dart';
+import 'package:yaml/yaml.dart';
+
+Settings loadSettings(){
+  var map = loadYaml(new File('test/test_config.yaml').readAsStringSync()); 
+  return new Settings.fromMap(map);
+}
 
 main() {
 	
