@@ -37,16 +37,12 @@ class _Connection implements Connection {
   static Future<_Connection> _connect(String uri) {
     return new Future.sync(() {
       var settings = new Settings.fromUri(uri);
-      
-      print('requireSSl: ${settings.requireSsl}');
 
       var future = settings.requireSsl
         ? _connectSsl(settings)
         : Socket.connect(settings.host, settings.port);
 
       return future.then((socket) {
-        print('secure: ${socket is SecureSocket}');
-
         var conn = new _Connection(socket, settings);
         socket.listen(conn._readData, onError: conn._handleSocketError, onDone: conn._handleSocketClosed);
         conn._state = _SOCKET_CONNECTED;
@@ -67,20 +63,25 @@ class _Connection implements Connection {
     var completer = new Completer<SecureSocket>();
 
     Socket.connect(settings.host, settings.port).then((socket) {
-            
-      socket.listen((e) {
-        print('oi');
-        var data = socket.read(1);
+         
+      socket.listen((data) {
         if (data == null || data[0] != _S) {
           socket.close();
-          completer.addError('This postgresql server is not configured to support SSL connections.');
+          completer.completeError('This postgresql server is not configured to support SSL connections.');
         } else {
-          completer.add(SecureSocket.secure(socket));
+          // TODO validate certs
+          new Future.sync(() => SecureSocket.secure(socket, onBadCertificate: (cert) => true))
+            .then((s) => completer.complete(s))
+            .catchError((e) => completer.completeError(e));
         }
       });
 
-      // Write SSL magic number.
-      socket.write([0, 0, 0, 8, 4, 210, 22, 47]);
+      // Write header, and SSL magic number.
+      socket.add([0, 0, 0, 8, 4, 210, 22, 47]);
+
+    })
+    .catchError((e) {
+      completer.completeError(e);
     });
 
     return completer.future;

@@ -13,6 +13,17 @@ connect(uri).then((conn) {
 });
 ```
 
+### SSL connections
+
+Set the sslmode to require by appending this to the connection uri. This driver only supports sslmode=require, if sslmode is ommitted the driver will always connect without using SSL.
+
+```dart
+var uri = 'postgres://username:password@localhost:5432/database?sslmode=require';
+connect(uri).then((conn) {
+	// ...
+});
+```
+
 ### Querying
 
 ```dart
