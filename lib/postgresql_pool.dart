@@ -54,7 +54,7 @@ class _Pool implements Pool {
 		if (!_available.isEmpty)
 			return new Future.value(_available.removeAt(0));
 
-		if (_count < _max)
+		if (_count < _max) {
 			return _incConnections().then((_) {
 				if (_available.isEmpty)
 					throw new Exception('No connections available.'); //FIXME exception type.
@@ -74,10 +74,11 @@ class _Pool implements Pool {
 
 				return c;
 			});
-
-		return _whenConnectionReleased().then((_) {
-			return connect(timeout);
-		});
+		} else {
+			return _whenConnectionReleased().then((_) {
+				return connect(timeout);
+			});
+		}
 	}
 
 	// Close all connections and cleanup.
@@ -87,7 +88,7 @@ class _Pool implements Pool {
 		if (!waitForConnectionRelease) {
 			// Immediately close all connections
 			for (var c in _connections)
-				c.close();
+				c._conn.close();
 
 			_available.clear();
 			_connections.clear();
@@ -96,7 +97,7 @@ class _Pool implements Pool {
 		} else {
 			// Close available connections.
 			for (var c in _available)
-				c.close();
+				c._conn.close();
 			_available.clear();
 			_waitingForRelease.clear();
 
@@ -191,6 +192,8 @@ class _Pool implements Pool {
 	}
 
 	void _handleUnexpectedClose(_PoolConnection conn) {
+		if (_destroyed) return; // Expect closes while destroying connections.
+
 		print('Connection closed unexpectedly. Removed from pool.'); //TODO logging.
 		_destroy(conn);
 
