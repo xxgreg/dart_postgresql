@@ -29,6 +29,7 @@ class _Pool implements Pool {
 	final int _max;	
 	final _connections = new List<_PoolConnection>();
 	final _available = new List<_PoolConnection>();
+	final _waitingForRelease = new Queue<Completer>();
 	bool _destroyed = false;
 	int get _count => _connections.length + _connecting;
 	int _connecting = 0;
@@ -53,29 +54,31 @@ class _Pool implements Pool {
 		if (!_available.isEmpty)
 			return new Future.value(_available.removeAt(0));
 
-		if (_count >= _max)
-			return new Future.error('Maximum number of connections for the connection pool was exhausted.');
+		if (_count < _max) {
+			return _incConnections().then((_) {
+				if (_available.isEmpty)
+					throw new Exception('No connections available.'); //FIXME exception type.
 
-		return _incConnections().then((_) {
+				var c = _available.removeAt(0);
 
-			if (_available.isEmpty)
-				throw new Exception('No connections available.'); //FIXME exception type.
+				if (_destroyed) {
+					_destroy(c);
+					throw new Exception('Connect() called on destroyed pool (Pool was destroyed during connection establishment).');
+				}
 
-			var c = _available.removeAt(0);
+				if (!c._isReleased) {
+					throw new Exception('Connection not released.'); //FIXME
+				}
 
-			if (_destroyed) {
-				_destroy(c);
-				throw new Exception('Connect() called on destroyed pool (Pool was destroyed during connection establishment).');
-			}
+				_setObtainedState(c, timeout == null ? _timeout : timeout);
 
-			if (!c._isReleased) {
-				throw new Exception('Connection not released.'); //FIXME
-			}
-
-			_setObtainedState(c, timeout == null ? _timeout : timeout);
-
-			return c;
-		});
+				return c;
+			});
+		} else {
+			return _whenConnectionReleased().then((_) {
+				return connect(timeout);
+			});
+		}
 	}
 
 	// Close all connections and cleanup.
@@ -85,21 +88,36 @@ class _Pool implements Pool {
 		if (!waitForConnectionRelease) {
 			// Immediately close all connections
 			for (var c in _connections)
-				c.close();
+				c._conn.close();
 
 			_available.clear();
 			_connections.clear();
+			_waitingForRelease.clear();
 		
 		} else {
 			// Close available connections.
 			for (var c in _available)
-				c.close();
+				c._conn.close();
 			_available.clear();
+			_waitingForRelease.clear();
 
 			// Wait for other connections to be released
 			// ??
 			throw new UnimplementedError();
 		}
+	}
+
+	// Wait for a connection to be released.
+	Future _whenConnectionReleased() {
+		Completer completer = new Completer();
+		_waitingForRelease.add(completer);
+		return completer.future;
+	}
+
+	// Tell one listener that a connection has been released.
+	void _connectionReleased() {
+		if (!_waitingForRelease.isEmpty)
+			_waitingForRelease.removeFirst().complete(null);
 	}
 
 	// Establish another connection, add to the list of available connections.
@@ -121,9 +139,10 @@ class _Pool implements Pool {
 	}
 
 	void _release(_PoolConnection conn) {
-
-		if (_available.contains(conn))
+		if (_available.contains(conn)) {
+			_connectionReleased();
 			return;
+		}
 
 		if (conn.isClosed || conn.transactionStatus != pg.TRANSACTION_NONE) {
 
@@ -139,6 +158,8 @@ class _Pool implements Pool {
 			_setReleasedState(conn);
 			_available.add(conn);
 		}
+
+		_connectionReleased();
 	}
 
 	void _destroy(_PoolConnection conn) {
@@ -171,6 +192,8 @@ class _Pool implements Pool {
 	}
 
 	void _handleUnexpectedClose(_PoolConnection conn) {
+		if (_destroyed) return; // Expect closes while destroying connections.
+
 		print('Connection closed unexpectedly. Removed from pool.'); //TODO logging.
 		_destroy(conn);
 

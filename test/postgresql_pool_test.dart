@@ -36,7 +36,7 @@ main() {
     // Wait for initial connections to be made before starting
     var timer;
     pool.start().then((_) {
-      timer = new Timer.periodic(new Duration(milliseconds: 100), testConnect);
+      timer = new Timer.periodic(new Duration(milliseconds: 1), testConnect);
     });
 
     new Future.delayed(new Duration(seconds: 2), () {
