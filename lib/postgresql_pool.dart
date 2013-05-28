@@ -82,29 +82,19 @@ class _Pool implements Pool {
 	}
 
 	// Close all connections and cleanup.
-	void destroy({waitForConnectionRelease: false}) {
+	void destroy() {
 		_destroyed = true;
 
-		if (!waitForConnectionRelease) {
-			// Immediately close all connections
-			for (var c in _connections)
-				c._conn.close();
+		// Immediately close all connections
+		for (var c in _connections)
+			c._conn.close();
 
-			_available.clear();
-			_connections.clear();
-			_waitingForRelease.clear();
-		
-		} else {
-			// Close available connections.
-			for (var c in _available)
-				c._conn.close();
-			_available.clear();
-			_waitingForRelease.clear();
+		_available.clear();
+		_connections.clear();
 
-			// Wait for other connections to be released
-			// ??
-			throw new UnimplementedError();
-		}
+		for (var c in _waitingForRelease)
+			c.completeError('Connection pool destroyed.');
+		_waitingForRelease.clear();
 	}
 
 	// Wait for a connection to be released.

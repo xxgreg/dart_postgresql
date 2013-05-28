@@ -33,9 +33,23 @@ main() {
       .catchError((err) => print('Connect error: $err'));
     }
 
+    slowQuery() {
+     pool.connect().then((conn) {
+        print(pool);
+        conn.query("select generate_series (1, 1000);").toList()
+          .then((_) => print('slow query done.'))
+          .then((_) => conn.close())
+          .catchError((err) => print('Query error: $err'));
+      })
+      .catchError((err) => print('Connect error: $err')); 
+    }
+
     // Wait for initial connections to be made before starting
     var timer;
     pool.start().then((_) {
+      for (var i = 0; i < 10; i++)
+        slowQuery();
+
       timer = new Timer.periodic(new Duration(milliseconds: 1), testConnect);
     });
 
