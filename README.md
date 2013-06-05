@@ -43,6 +43,19 @@ conn.execute("update crayons set color = 'pink'").then((rowsAffected) {
 });
 ```
 
+### Query Parameters
+
+Query parameters can be provided using a map. Strings will be escaped to prevent sql injection vulnerabilities.
+
+```dart
+conn.query('select color from crayons where id = @id', {'id': 5}).toList()
+	.then((result) { print(result); });
+
+conn.execute('insert into crayons values (@id, @color)',
+             {'id': 1, 'color': 'pink'})
+	.then((_) { print('done.'); });
+```
+
 ### Closing the connection
 
 You must remember to call Connection.close() when you're done. This wont be
@@ -142,6 +155,34 @@ pool.start().then((_) {
   });
 });
 
+```
+
+### Example program
+
+Add postgresql to your pubspec.yaml file, and run pub install.
+
+```
+name: postgresql_example
+dependencies:
+  postgresql: any
+```
+
+```dart
+import 'package:postgresql/postgresql.dart';
+
+void main() {
+  var uri = 'postgres://testdb:password@localhost:5432/testdb';
+  var sql = "select 'oi'"; 
+  connect(uri).then((conn) {
+    conn.query(sql).toList()
+    	.then((result) {
+    		print('result: $result');
+    	})
+    	.whenComplete(() {
+    		conn.close();
+    	});
+  });
+}
 ```
 
 ## Testing
