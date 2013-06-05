@@ -45,10 +45,11 @@ conn.execute("update crayons set color = 'pink'").then((rowsAffected) {
 
 ### Query Parameters
 
-Query parameters can be provided using a map. Strings will be escaped to prevent sql injection vulnerabilities.
+Query parameters can be provided using a map. Strings will be escaped to prevent SQL injection vulnerabilities.
 
 ```dart
-conn.query('select color from crayons where id = @id', {'id': 5}).toList()
+conn.query('select color from crayons where id = @id', {'id': 5})
+  .toList()
 	.then((result) { print(result); });
 
 conn.execute('insert into crayons values (@id, @color)',
@@ -83,10 +84,10 @@ class Crayon {
 }
 
 conn.query('select color, length from crayons')
+  .toList()
 	.map((row) => new Crayon()
 	                     ..color = row.color,
 	                     ..length = row.length)
-	.toList()
 	.then((List<Crayon> crayons) {
 		for (var c in crayons) {
 			print(c is Crayon);
@@ -106,8 +107,8 @@ class ImmutableCrayon {
 }
 
 conn.query('select color, length from crayons')
+  .toList()
 	.map((row) => new ImmutableCrayon(row.color, row.length))
-	.toList()
 	.then((List<ImmutableCrayon> crayons) {
 		for (var c in crayons) {
 			print(c is ImmutableCrayon);
