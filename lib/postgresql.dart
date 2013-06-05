@@ -2,9 +2,8 @@ library postgresql;
 
 import 'dart:async';
 import 'dart:collection';
-import 'dart:crypto';
+import 'package:crypto/crypto.dart';
 import 'dart:io';
-import 'dart:uri';
 import 'dart:utf' show encodeUtf8, decodeUtf8;
 
 part 'buffer.dart';

@@ -50,7 +50,7 @@ class Settings {
       requireSsl = u.query.contains('sslmode=require');
 
     return new Settings(
-        u.domain,
+        u.host,
         u.port == null ? DEFAULT_PORT : u.port,
         userInfo[0],
         userInfo[1],

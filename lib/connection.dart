@@ -370,7 +370,7 @@ class _Connection implements Connection {
         sql = _substitute(sql, values);
       var query = _enqueueQuery(sql);
       return query.stream;
-    } on Exception catch (ex) { //TODO Should this be on PgException? 
+    } on Exception catch (ex) {
       return new Stream.fromFuture(new Future.error(ex));  
     }
   }
@@ -380,8 +380,8 @@ class _Connection implements Connection {
       if (values != null)
         sql = _substitute(sql, values);
       var query = _enqueueQuery(sql);
-      return query.stream.isEmpty.then((_) => _query._rowsAffected);
-    } on Exception catch (ex) { //TODO Should this be on PgException?
+      return query.stream.isEmpty.then((_) => query._rowsAffected);
+    } on Exception catch (ex) {
       return new Future.error(ex);
     }
   }

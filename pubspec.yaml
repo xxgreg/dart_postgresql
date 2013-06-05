@@ -1,8 +1,10 @@
 name: postgresql
-version: 0.2.6
+version: 0.2.7
 author: Greg Lowe <greg@vis.net.nz>
 description: Postgresql database driver.
 homepage: https://github.com/xxgreg/postgresql
+dependencies:
+  crypto: any
 dev_dependencies:
   yaml: any
   unittest: any

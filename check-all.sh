@@ -3,11 +3,11 @@
 # Abort if non-zero code returned.
 set -e
 
-dart_analyzer --type-checks-for-inferred-types lib/postgresql.dart
-dart_analyzer --type-checks-for-inferred-types lib/postgresql_pool.dart
-dart_analyzer --type-checks-for-inferred-types test/postgresql_test.dart
-dart_analyzer --type-checks-for-inferred-types test/postgresql_pool_test.dart
-dart_analyzer --type-checks-for-inferred-types test/substitute_test.dart
+dartanalyzer lib/postgresql.dart
+dartanalyzer lib/postgresql_pool.dart
+dartanalyzer test/postgresql_test.dart
+dartanalyzer test/postgresql_pool_test.dart
+dartanalyzer test/substitute_test.dart
 
 dart --checked test/settings_test.dart
 dart --checked test/postgresql_test.dart
