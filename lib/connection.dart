@@ -405,8 +405,6 @@ class _Connection implements Connection {
 
   _Query _enqueueQuery(String sql) {
 
-    print('_enqueueQuery() $sql');
-
     if (sql == null || sql == '')
       throw new _PgClientException('SQL query is null or empty.');
     

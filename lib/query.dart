@@ -79,7 +79,7 @@ class _Column {
   String toString() => 'Column: index: $index, name: $name, fieldId: $fieldId, tableColNo: $tableColNo, fieldType: $fieldType, dataSize: $dataSize, typeModifier: $typeModifier, formatCode: $formatCode.';
 }
 
-class _Row {
+class _Row implements Row {
   _Row(this._columnNames, this._columnValues, this._index) {
     assert(this._columnNames.length == this._columnValues.length);
   }

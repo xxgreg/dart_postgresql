@@ -37,7 +37,7 @@ abstract class Connection {
   ///        print(row.a);
   ///     });
   ///
-  Stream<dynamic> query(String sql, [values]);
+  Stream<Row> query(String sql, [values]);
   
   
   /// Queues a command for execution, and when done, returns the number of rows
@@ -58,6 +58,17 @@ abstract class Connection {
   int get transactionStatus;
 
   Future get onClosed;
+}
+
+/// Row allows field values to be retrieved as if they were getters.
+///
+///     c.query("select 'blah' as my_field")
+///        .single
+///        .then((row) => print(row.my_field));
+///
+abstract class Row {
+  operator[] (int i);
+  void forEach(void f(String columnName, columnValue));
 }
 
 const int TRANSACTION_UNKNOWN = 1;
