@@ -65,6 +65,16 @@ const int TRANSACTION_NONE = 2;
 const int TRANSACTION_BEGUN = 3;
 const int TRANSACTION_ERROR = 4;
 
+class Isolation {
+  final String name;
+  const Isolation(this.name);
+  String toString() => name;
+}
+
+const Isolation READ_COMMITTED = const Isolation('Read committed');
+const Isolation REPEATABLE_READ = const Isolation('Repeatable read');
+const Isolation SERIALIZABLE = const Isolation('Serializable');
+
 /// A marker interface implemented by all postgresql library exceptions.
 abstract class PgException implements Exception {
 }

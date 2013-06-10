@@ -386,7 +386,26 @@ class _Connection implements Connection {
     }
   }
   
+  Future runInTransaction(Future operation(), [Isolation isolation = READ_COMMITTED]) {
+
+    var begin = 'begin';
+    if (isolation == REPEATABLE_READ)
+      begin = 'begin; set transaction isolation level repeatable read;';
+    else if (isolation == SERIALIZABLE)
+      begin = 'begin; set transaction isolation level serializable;';
+
+    return execute(begin)
+      .then((_) => operation())
+      .then((_) => execute('commit'))
+      .catchError((e) {
+        return execute('rollback')
+          .then((_) => new Future.error(e));
+      });
+  }
+
   _Query _enqueueQuery(String sql) {
+
+    print('_enqueueQuery() $sql');
 
     if (sql == null || sql == '')
       throw new _PgClientException('SQL query is null or empty.');
