@@ -64,6 +64,16 @@ main() {
       expect(result, equals("'20'"));
     });
     
+    test('Substitute 11', () { 
+      var result = substitute('@blah_blah', {'blah_blah': 20});
+      expect(result, equals("20"));
+    });
+
+    test('Substitute 12', () { 
+      var result = substitute('@_blah_blah', {'_blah_blah': 20});
+      expect(result, equals("20"));
+    });
+
   });
   
   
@@ -85,7 +95,7 @@ main() {
       if (conn != null) conn.close();
     });
   
-    solo_test('Substitution', () {
+    test('Substitution', () {
       conn.query(
           'select @num, @num:string, @num:number, '
           '@int, @int:string, @int:number, '

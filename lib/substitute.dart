@@ -12,6 +12,7 @@ const int _0 = 48;
 const int _9 = 57;
 const int _at = 64;
 const int _colon = 58;
+const int _underscore = 95;
 
 class _Token {
   _Token(this.type, this.value, [this.typeName]);
@@ -23,7 +24,8 @@ class _Token {
 
 bool isIdentifier(int charCode) => (charCode >= _a && charCode <= _z)
                                     || (charCode >= _A && charCode <= _Z)
-                                  || (charCode >= _0 && charCode <= _9);
+                                  || (charCode >= _0 && charCode <= _9)
+                                  || (charCode == _underscore);
 
 bool isDigit(int charCode) => (charCode >= _0 && charCode <= _9);
 
