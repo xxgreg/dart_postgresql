@@ -44,6 +44,11 @@ abstract class Connection {
   /// affected by the sql command.
   Future<int> execute(String sql, [values]);
   
+
+  /// Allow multiple queries to be run in a transaction. The user must wait for
+  /// runInTransaction() to complete before making any further queries.
+  Future runInTransaction(Future operation(), [Isolation isolation = READ_COMMITTED]);
+  
   
   /// Close the current [Connection]. It is safe to call this multiple times.
   /// This will never throw an exception.
