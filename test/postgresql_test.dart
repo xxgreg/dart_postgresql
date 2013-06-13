@@ -428,7 +428,76 @@ main() {
     });
   });
 
+  group('Transactions', () {
+    
+    Connection conn1;
+    Connection conn2;
+    
+    setUp(() {
+      return connect(validUri)
+              .then((c) => conn1 = c)
+              .then((_) => connect(validUri))
+              .then((c) => conn2 = c)
+              .then((_) => conn1.execute('create table if not exists tx (val int); delete from tx;')); // if not exists requires pg9.1
+    });
+    
+    tearDown(() {
+      if (conn1 != null) conn1.close();
+      if (conn2 != null) conn2.close();
+    });
+  
+    test('simple query', () {
+      var cb = expectAsync1((_) { });
+      conn1.runInTransaction(() {
+        return conn1.query("select 'oi'").toList()
+          .then((result) { expect(result[0][0], equals('oi')); });
+      }).then(cb);
+    });
+
+    test('simple query read committed', () {
+      var cb = expectAsync1((_) { });
+      conn1.runInTransaction(() {
+        return conn1.query("select 'oi'").toList()
+          .then((result) { expect(result[0][0], equals('oi')); });
+      }, READ_COMMITTED).then(cb);
+    });
+
+    test('simple query repeatable read', () {
+      var cb = expectAsync1((_) { });
+      conn1.runInTransaction(() {
+        return conn1.query("select 'oi'").toList()
+          .then((result) { expect(result[0][0], equals('oi')); });
+      }, REPEATABLE_READ).then(cb);
+    });
+
+    test('simple query serializable', () {
+      var cb = expectAsync1((_) { });
+      conn1.runInTransaction(() {
+        return conn1.query("select 'oi'").toList()
+          .then((result) { expect(result[0][0], equals('oi')); });
+      }, SERIALIZABLE).then(cb);
+    });
+
+
+    test('rollback', () {
+      var cb = expectAsync1((_) { });
+      
+      conn1.runInTransaction(() {
+        return conn1.execute('insert into tx values (42)')
+          .then((_) => conn1.query('select val from tx').toList())
+          .then((result) { expect(result[0][0], equals(42)); })
+          .then((_) => throw new Exception('Boom!'));
+      })
+      .catchError((e) => print('Ignore: $e'))
+      .then((_) => conn1.query('select val from tx').toList())
+      .then((result) { expect(result, equals([])); })
+      .then(cb);
+    });
+
+  });
+
 }
+
 
 class Person {
   String firstname;
