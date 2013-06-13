@@ -210,6 +210,9 @@ class _PoolConnection implements pg.Connection {
 	Stream query(String sql, [values]) => _conn.query(sql, values);
 	Future<int> execute(String sql, [values]) => _conn.execute(sql, values);
 
+	Future runInTransaction(Future operation(), [pg.Isolation isolation = pg.READ_COMMITTED])
+		=> _conn.runInTransaction(operation, isolation);
+
 	bool get isClosed => false; //TODO.
 	int get transactionStatus => _conn.transactionStatus;
 
