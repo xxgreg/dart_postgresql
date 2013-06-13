@@ -494,6 +494,33 @@ main() {
       .then(cb);
     });
 
+/*
+    test('isolation', () {
+      var cb = expectAsync1((_) { });
+      var cb2 = expectAsync1((_) { });
+      
+      print('isolation');
+
+      conn1.runInTransaction(() {
+        return conn1.execute('insert into tx values (42)')
+          .then((_) => conn1.query('select val from tx').toList())
+          .then((result) { expect(result[0][0], equals(42)); });
+      })
+      .then((_) => conn1.query('select val from tx').toList())
+      .then((result) { expect(result[0][0], equals(42)); })
+      .then(cb);
+
+      conn2.runInTransaction(() {
+        return conn1.execute('insert into tx values (43)')
+          .then((_) => conn1.query('select val from tx').toList())
+          .then((result) { expect(result[0][0], equals(43)); });
+      })
+      .then((_) => conn1.query('select val from tx').toList())
+      .then((result) { expect(result[0][0], equals(43)); })
+      .then(cb2);
+    });
+*/
+
   });
 
 }
