@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'package:postgresql/postgresql.dart' as pg;
 
 void main() {
@@ -17,8 +18,8 @@ void readline(Future run(String sql)) {
   var buffer = new StringBuffer();
   
   stdin
-    .transform(new StringDecoder(Encoding.UTF_8, ' '.codeUnitAt(0)))
-    .transform(new LineTransformer())
+    .transform(UTF8.decoder)
+    .transform(new LineSplitter())
     .listen((line) {
       if (line != '') {
         buffer.writeln(line);
