@@ -5,6 +5,7 @@ description: Postgresql database driver.
 homepage: https://github.com/xxgreg/postgresql
 dependencies:
   crypto: any
+  meta: any
 dev_dependencies:
   yaml: any
   unittest: any
