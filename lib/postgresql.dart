@@ -5,6 +5,7 @@ import 'dart:collection';
 import 'package:crypto/crypto.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'package:meta/meta.dart' show proxy;
 
 part 'buffer.dart';
 part 'connection.dart';
@@ -71,6 +72,7 @@ abstract class Connection {
 ///        .single
 ///        .then((row) => print(row.my_field));
 ///
+@proxy
 abstract class Row {
   operator[] (int i);
   void forEach(void f(String columnName, columnValue));
