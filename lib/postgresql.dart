@@ -5,7 +5,6 @@ import 'dart:collection';
 import 'package:crypto/crypto.dart';
 import 'dart:io';
 import 'dart:convert';
-import 'package:meta/meta.dart' show proxy;
 
 part 'buffer.dart';
 part 'connection.dart';
