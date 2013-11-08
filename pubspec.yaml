@@ -1,11 +1,12 @@
 name: postgresql
-version: 0.2.10
+version: 0.2.11
 author: Greg Lowe <greg@vis.net.nz>
 description: Postgresql database driver.
 homepage: https://github.com/xxgreg/postgresql
+environment:
+  sdk: ">=0.8.10+6 <2.0.0"
 dependencies:
-  crypto: any
-  meta: any
+  crypto: ">=0.9.0 <0.10.0"
 dev_dependencies:
-  yaml: any
-  unittest: any
+  unittest: ">=0.9.0 <0.10.0"
+  yaml: ">=0.9.0 <0.10.0"
