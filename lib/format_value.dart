@@ -11,6 +11,9 @@ dynamic _formatValue(value, String type) {
   
   if (value == null)
     return 'null';
+    
+  if (value is bool)
+	  return value.toString();
   
   if (type != null)
     type = type.toLowerCase();
