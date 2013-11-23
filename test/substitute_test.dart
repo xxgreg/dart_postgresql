@@ -100,11 +100,15 @@ main() {
           'select @num, @num:string, @num:number, '
           '@int, @int:string, @int:number, '
           '@string, '
-          '@datetime, @datetime:date, @datetime:timestamp ',
+          '@datetime, @datetime:date, @datetime:timestamp, '
+          '@boolean, @boolean_false, @boolean_null',
           { 'num': 1.2, 
             'int': 3,
             'string': 'bob\njim',
-            'datetime': new DateTime(2013, 1, 1)
+            'datetime': new DateTime(2013, 1, 1),
+            'boolean' : true,
+            'boolean_false' : false,
+            'boolean_null' : null,
           }).toList()
             .then(expectAsync1((rows) {}));
     });
