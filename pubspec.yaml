@@ -1,5 +1,5 @@
 name: postgresql
-version: 0.2.11
+version: 0.2.12
 author: Greg Lowe <greg@vis.net.nz>
 description: Postgresql database driver.
 homepage: https://github.com/xxgreg/postgresql
