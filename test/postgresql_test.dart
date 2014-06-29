@@ -40,7 +40,7 @@ main() {
     //AsyncError: 'SocketIOException: OS Error: Connection refused, errno = 111'
     test('Connect failure - incorrect port', () {
       var map = loadSettings().toMap();
-      map['port'] = 565675;
+      map['port'] = 9037;
       var uri = new Settings.fromMap(map).toUri();
 
       connect(uri).then((c) => throw new Exception('Should not be reached.'),
