@@ -99,8 +99,9 @@ _formatDateTime(DateTime datetime, String type) {
       ..write(':')
       ..write(pad(datetime.minute))
       ..write(':')
-      ..write(pad(datetime.second));
-    //TODO Add fractional second datetime.millisecond;
+      ..write(pad(datetime.second))
+      ..write('.')
+      ..write(datetime.millisecond);
   }
 
   if (t == 'timestamptz') {
