@@ -277,14 +277,14 @@ main() {
       );
     });
 
-    test('Select timestamp', () {
-
+    test('Select timestamp with milliseconds', () {
+      final DateTime time = new DateTime(1979, 12, 20, 9, 0, 12);
       conn.execute('create temporary table dart_unit_test (a timestamp)');
-      conn.execute("insert into dart_unit_test values ('1979-12-20 09:00')");
+      conn.execute("insert into dart_unit_test values (@time)", {"time": time});
 
       conn.query('select a from dart_unit_test').toList().then(
         expectAsync1((rows) {
-          expect(rows[0][0], equals(new DateTime(1979, 12, 20, 9)));
+          expect(rows[0][0], equals(time));
         })
       );
     });

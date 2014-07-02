@@ -100,7 +100,15 @@ _formatDateTime(DateTime datetime, String type) {
       ..write(pad(datetime.minute))
       ..write(':')
       ..write(pad(datetime.second));
-    //TODO Add fractional second datetime.millisecond;
+
+    final int ms = datetime.millisecond;
+    if (ms != 0) {
+      sb.write('.');
+      final s = ms.toString();
+      if (s.length == 1) sb.write('00');
+      else if (s.length == 2) sb.write('0');
+      sb.write(s);
+    }
   }
 
   if (t == 'timestamptz') {
