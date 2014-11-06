@@ -8,17 +8,17 @@ import 'package:postgresql/postgresql_pool.dart';
 import 'package:yaml/yaml.dart';
 
 Settings loadSettings(){
-  var map = loadYaml(new File('test/test_config.yaml').readAsStringSync()); 
+  var map = loadYaml(new File('test/test_config.yaml').readAsStringSync());
   return new Settings.fromMap(map);
 }
 
 main() {
-  
+
   Pool pool;
   int tout = 2 * 60 * 1000; // Should be longer than usage
-  
+
   setUp(() => pool = new Pool(loadSettings().toUri(), timeout: tout, min: 2, max: 5));
-  
+
   test('Connect', () {
   	var pass = expectAsync0(() {});
 
@@ -41,7 +41,7 @@ main() {
           .then((_) => conn.close())
           .catchError((err) => print('Query error: $err'));
       })
-      .catchError((err) => print('Connect error: $err')); 
+      .catchError((err) => print('Connect error: $err'));
     }
 
     // Wait for initial connections to be made before starting
@@ -58,7 +58,7 @@ main() {
     });
 
     new Future.delayed(new Duration(seconds: 2), () {
-      timer.cancel();
+      if (timer != null) timer.cancel();
       pool.destroy();
       print('Pool destroyed.');
       pass();
