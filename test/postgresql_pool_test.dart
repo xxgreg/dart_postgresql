@@ -34,7 +34,7 @@ main() {
     slowQuery() {
      pool.connect().then((conn) {
         print(pool);
-        conn.query("select generate_series (1, 1000);").toList()
+        conn.query("select generate_series (1, 100000);").toList()
           .then((_) => print('slow query done.'))
           .then((_) => conn.close())
           .catchError((err) => print('Query error: $err'));
@@ -45,18 +45,20 @@ main() {
     // Wait for initial connections to be made before starting
     var timer;
     pool.start().then((_) {
-      for (var i = 0; i < 10; i++)
-        slowQuery();
-
-      timer = new Timer.periodic(new Duration(milliseconds: 1), testConnect);
+      timer = new Timer.periodic(new Duration(milliseconds: 100), (_) {
+        print(pool);
+        for (var i = 0; i < 10; i++)
+          testConnect(null);
+      });
     }).catchError((err, st) {
       print('Error starting connection pool.');
       print(err);
       print(st);
     });
 
-    new Future.delayed(new Duration(seconds: 2), () {
+    new Future.delayed(new Duration(seconds: 5), () {
       if (timer != null) timer.cancel();
+      print(pool.diagnostics);
       pool.destroy();
       print('Pool destroyed.');
       pass();

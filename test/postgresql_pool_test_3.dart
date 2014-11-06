@@ -13,7 +13,7 @@ Settings loadSettings(){
 main() {
 
   Pool pool;
-  int tout = 2 * 60 * 1000; // Should be longer than usage
+  int tout = 500; // Short to trigger failure.
 
   setUp(() => pool = new Pool(loadSettings().toUri(), timeout: tout, min: 2, max: 2));
 
@@ -21,8 +21,8 @@ main() {
   	var pass = expectAsync0(() {});
 
     testConnect(_) {
-      print(pool.diagnostics);
-    	pool.connect(null, 'testConnect').then((conn) {
+      print(pool);
+    	pool.connect().then((conn) {
     		conn.query("select 'passed';").toList()
     			.then(print)
     			.then((_) => conn.close())
@@ -33,10 +33,10 @@ main() {
 
     slowQuery() {
      print(pool);
-     pool.connect(null, 'testConnect').then((conn) {
+     pool.connect().then((conn) {
         conn.query("select generate_series (1, 1000);").toList()
+          .then((_) => new Future.delayed(new Duration(seconds: 10)))
           .then((_) => print('slow query done.'))
-          .then((_) => new Future.delayed(new Duration(seconds: 1)))
           .then((_) => conn.close())
           .catchError((err) => print('Query error: $err'));
       })
@@ -56,14 +56,13 @@ main() {
       print(st);
     });
 
-    new Future.delayed(new Duration(seconds: 3), () {
-      if (timer != null) timer.cancel();
-      print(pool.diagnostics);
-      pool.destroy();
-      print('Pool destroyed.');
-      pass();
-      exit(0); //FIXME - something is keeping the process alive.
-    });
+//    new Future.delayed(new Duration(seconds: 3), () {
+//      if (timer != null) timer.cancel();
+//      pool.destroy();
+//      print('Pool destroyed.');
+//      pass();
+//      exit(0); //FIXME - something is keeping the process alive.
+//    });
 
   });
 }
