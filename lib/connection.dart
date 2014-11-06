@@ -370,8 +370,8 @@ class _Connection implements Connection {
         sql = _substitute(sql, values);
       var query = _enqueueQuery(sql);
       return query.stream;
-    } on Exception catch (ex) {
-      return new Stream.fromFuture(new Future.error(ex));
+    } on Exception catch (ex, st) {
+      return new Stream.fromFuture(new Future.error(ex, st));
     }
   }
 
@@ -381,8 +381,8 @@ class _Connection implements Connection {
         sql = _substitute(sql, values);
       var query = _enqueueQuery(sql);
       return query.stream.isEmpty.then((_) => query._rowsAffected);
-    } on Exception catch (ex) {
-      return new Future.error(ex);
+    } on Exception catch (ex, st) {
+      return new Future.error(ex, st);
     }
   }
 
@@ -397,9 +397,9 @@ class _Connection implements Connection {
     return execute(begin)
       .then((_) => operation())
       .then((_) => execute('commit'))
-      .catchError((e) {
+      .catchError((e, st) {
         return execute('rollback')
-          .then((_) => new Future.error(e));
+          .then((_) => new Future.error(e, st));
       });
   }
 
