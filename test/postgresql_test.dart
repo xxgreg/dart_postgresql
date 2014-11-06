@@ -1,5 +1,3 @@
-library postgresql_test;
-
 import 'dart:async';
 import 'dart:io';
 import 'package:postgresql/postgresql.dart';

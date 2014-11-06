@@ -1,5 +1,3 @@
-library postgresql_test;
-
 import 'dart:io';
 import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
