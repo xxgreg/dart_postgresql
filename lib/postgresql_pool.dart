@@ -121,10 +121,9 @@ class _Pool implements Pool {
 		 	_available.add(conn);
 		 	_connecting--;
 		 })
-		 .catchError((err) {
+		 .catchError((err, st) {
 		 	_connecting--;
-		 	//FIXME logging.
-		 	print('Pool connect error: $err');
+		 	return new Future.error(err, st);
 		 });
 	}
 
