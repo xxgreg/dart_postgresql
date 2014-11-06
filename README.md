@@ -107,8 +107,8 @@ class ImmutableCrayon {
 }
 
 conn.query('select color, length from crayons')
-  .toList()
-	.map((row) => new ImmutableCrayon(row.color, row.length))
+  .map((row) => new ImmutableCrayon(row.color, row.length))
+     .toList()
 	.then((List<ImmutableCrayon> crayons) {
 		for (var c in crayons) {
 			print(c is ImmutableCrayon);
