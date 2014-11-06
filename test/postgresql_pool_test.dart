@@ -51,6 +51,10 @@ main() {
         slowQuery();
 
       timer = new Timer.periodic(new Duration(milliseconds: 1), testConnect);
+    }).catchError((err, st) {
+      print('Error starting connection pool.');
+      print(err);
+      print(st);
     });
 
     new Future.delayed(new Duration(seconds: 2), () {
