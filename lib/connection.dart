@@ -9,10 +9,12 @@ class _PgClientException implements Exception {
 
 class _Connection implements Connection {
 
-  _Connection(this._socket, Settings settings)
+  _Connection(this._socket, Settings settings, TypeConverter typeConverter)
     : _userName = settings.user,
       _passwordHash = _md5s(settings.password + settings.user),
-      _databaseName = settings.database;
+      _databaseName = settings.database,
+      _typeConverter =
+        typeConverter == null ? new TypeConverter() : typeConverter;
 
   static int _sequence = 1;
   final int connectionId = _sequence++;
@@ -31,6 +33,7 @@ class _Connection implements Connection {
   final String _databaseName;
   final String _userName;
   final String _passwordHash;
+  final TypeConverter _typeConverter;
   final Socket _socket;
   final _Buffer _buffer = new _Buffer();
   bool _hasConnected = false;
@@ -44,7 +47,7 @@ class _Connection implements Connection {
   Stream get messages => _messages.stream;
   final StreamController _messages = new StreamController.broadcast();
 
-  static Future<_Connection> _connect(String uri) {
+  static Future<_Connection> _connect(String uri, TypeConverter typeConverter) {
     return new Future.sync(() {
       var settings = new Settings.fromUri(uri);
 
@@ -53,7 +56,7 @@ class _Connection implements Connection {
         : Socket.connect(settings.host, settings.port);
 
       return future.then((socket) {
-        var conn = new _Connection(socket, settings);
+        var conn = new _Connection(socket, settings, typeConverter);
         socket.listen(conn._readData, onError: conn._handleSocketError, onDone: conn._handleSocketClosed);
         conn._state = _SOCKET_CONNECTED;
         conn._sendStartupMessage();

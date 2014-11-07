@@ -46,7 +46,7 @@ dynamic _formatValue(value, String type) {
   throw new Exception('Unsupported runtime type as query parameter.');
 }
 
-final _escapeRegExp = new RegExp(r"['\r\n\\]");
+//final _escapeRegExp = new RegExp(r"['\r\n\\]");
 
 //TODO test if this works without escaping unicode characters.
 // Uses an string constant E''.

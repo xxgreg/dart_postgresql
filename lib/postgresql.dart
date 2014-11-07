@@ -15,11 +15,13 @@ part 'message_buffer.dart';
 part 'query.dart';
 part 'settings.dart';
 part 'substitute.dart';
+part 'type_converter.dart';
 
 /// Connect to a PostgreSQL database.
 /// A uri has the following format:
 /// 'postgres://testdb:password@localhost:5432/testdb'.
-Future<Connection> connect(String uri) => _Connection._connect(uri);
+Future<Connection> connect(String uri, {TypeConverter typeConverter})
+  => _Connection._connect(uri, typeConverter);
 
 /// A connection to a PostgreSQL database.
 abstract class Connection {
@@ -155,6 +157,23 @@ abstract class ServerMessage extends Message {
   String get allInformation;
 }
 
+abstract class TypeConverter {
+
+  factory TypeConverter() = _DefaultTypeConverter;
+
+  /// Convert an object to a string representation to use in a sql query.
+  /// Be very careful to escape your strings correctly. If you get this wrong
+  /// you will introduce a sql injection vulnerability. Consider using the
+  /// provided [encodeString] function.
+  String encode(value, String type);
+
+  /// Convert a string recieved from the database into a dart object.
+  ///TODO pgType is ... link to pg docs, and table where you can look these up.
+  /// Expose some constants.
+  Object decode(String value, int pgType);
+}
+
+String encodeString(String s) => _encodeString(s);
 
 
 //FIXME hide by using separate package for implementation.
