@@ -8,16 +8,14 @@ const int _backslash = 92;
 final _escapeRegExp = new RegExp(r"['\r\n\\]");
 
 class _DefaultTypeConverter implements TypeConverter {
-
-   String encode(value, String type) {
-     return _encodeValue(value, type);
-   }
-
-   Object decode(String value, int pgType) {
-     throw new UnimplementedError();
-   }
+   String encode(value, String type) => _encodeValue(value, type);
+   Object decode(String value, int pgType) => _decodeValue(value, pgType);
 }
 
+class _RawTypeConverter implements TypeConverter {
+   String encode(value, String type) => _encodeValue(value, type);
+   Object decode(String value, int pgType) => value;
+}
 
 String _encodeString(String s) {
   if (s == null) return ' null ';
@@ -135,3 +133,37 @@ _encodeDateTime(DateTime datetime, String type) {
 //  //var b64String = ...;
 //  //return " decode('$b64String', 'base64') ";
 //}
+
+Object _decodeValue(String value, int pgType) {
+
+  switch (pgType) {
+    case _PG_BOOL:
+      return value == 't';
+
+    case _PG_INT2:
+    case _PG_INT4:
+    case _PG_INT8:
+      return int.parse(value);
+
+    case _PG_FLOAT4:
+    case _PG_FLOAT8:
+      return double.parse(value);
+
+    case _PG_TIMESTAMP:
+    case _PG_DATE:
+      return DateTime.parse(value);
+
+    // Not implemented yet - return a string.
+    case _PG_MONEY:
+    case _PG_TIMESTAMPZ:
+    case _PG_TIMETZ:
+    case _PG_TIME:
+    case _PG_INTERVAL:
+    case _PG_NUMERIC:
+
+    default:
+      // Return a string for unknown types. The end user can parse this.
+      return value;
+  }
+}
+

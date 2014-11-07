@@ -510,6 +510,17 @@ main() {
       .then(cb);
     });
 
+    test('type converter', () {
+      connect(validUri, typeConverter: new TypeConverter.raw())
+        .then((c) {
+            c.query('select true, 42').toList().then((result) {
+              expect(result[0][0], equals('t'));
+              expect(result[0][1], equals('42'));
+              c.close();
+            });
+        });
+    });
+
 /*
     test('isolation', () {
       var cb = expectAsync1((_) { });

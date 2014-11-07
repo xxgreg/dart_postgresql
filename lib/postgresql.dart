@@ -161,6 +161,9 @@ abstract class TypeConverter {
 
   factory TypeConverter() = _DefaultTypeConverter;
 
+  /// Returns all results in the raw postgresql format without conversion.
+  factory TypeConverter.raw() = _RawTypeConverter;
+
   /// Convert an object to a string representation to use in a sql query.
   /// Be very careful to escape your strings correctly. If you get this wrong
   /// you will introduce a sql injection vulnerability. Consider using the

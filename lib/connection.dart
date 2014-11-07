@@ -516,8 +516,11 @@ class _Connection implements Connection {
       // out of the buffer.
       var col = _query._columns[index];
       var data = _buffer.readBytes(colSize);
-      var value = (col.isBinary) ? _decodeBinaryValue(col, data)
-                                  : _decodeStringValue(col, data);
+
+      if (col.isBinary) throw new UnimplementedError(
+          'Binary result set parsing is not implemented.');
+
+      var value = _typeConverter.decode(UTF8.decode(data), col.fieldType);
       _query._rowData[index] = value;
     }
 
@@ -526,42 +529,8 @@ class _Connection implements Connection {
       _query.addRow();
   }
 
-  dynamic _decodeStringValue(_Column col, List<int> data) {
-
-    switch (col.fieldType) {
-      case _PG_BOOL:
-        return data[0] == 116;
-
-      case _PG_INT2:
-      case _PG_INT4:
-      case _PG_INT8:
-        return int.parse(UTF8.decode(data));
-
-      case _PG_FLOAT4:
-      case _PG_FLOAT8:
-        return double.parse(UTF8.decode(data));
-
-      case _PG_TIMESTAMP:
-      case _PG_DATE:
-        return DateTime.parse(UTF8.decode(data));
-
-      // Not implemented yet - return a string.
-      case _PG_MONEY:
-      case _PG_TIMESTAMPZ:
-      case _PG_TIMETZ:
-      case _PG_TIME:
-      case _PG_INTERVAL:
-      case _PG_NUMERIC:
-
-      default:
-        // Return a string for unknown types. The end user can parse this.
-        return UTF8.decode(data);
-    }
-  }
-
   dynamic _decodeBinaryValue(_Column col, List<int> data) {
-    // Not implemented
-    return data;
+    throw new UnimplementedError('Binary data parsing not implemented.');
   }
 
   void _readCommandComplete(int msgType, int length) {
