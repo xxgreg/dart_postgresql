@@ -17,7 +17,8 @@ part 'settings.dart';
 part 'substitute.dart';
 
 /// Connect to a PostgreSQL database.
-/// A postgres uri has the following format: 'postgres://testdb:password@localhost:5432/testdb'.
+/// A uri has the following format:
+/// 'postgres://testdb:password@localhost:5432/testdb'.
 Future<Connection> connect(String uri) => _Connection._connect(uri);
 
 /// A connection to a PostgreSQL database.
@@ -27,8 +28,8 @@ abstract class Connection {
   ///
   /// The data can be fetched from the rows by column name, or by index.
   ///
-  /// Generally it is best to call [toList] on the stream and wait for all of
-  /// the rows to be received.
+  /// Generally it is best to call [Stream.toList] on the stream and wait for
+  /// all of the rows to be received.
   ///
   /// Example:
   ///
@@ -54,12 +55,12 @@ abstract class Connection {
   /// This will never throw an exception.
   void close();
 
-  //FIXME test this properly - I'm not sure if it works.
-  /// Listen for a [PgServerException], [PgServerInformation], or
-  /// [PgClientException], that occur while the connection is idle, or are not
-  /// related to a specific query.
-  Stream get unhandled;
+  /// The server can send notices or the network can cause errors while the
+  /// connection is not being used to make a query. See [ClientMessage] and
+  /// [ServerMessage] for more information.
+  Stream<Message> get messages;
 
+  //FIXME Use Transaction status const class.
   int get transactionStatus;
 
   Future get onClosed;
@@ -75,8 +76,12 @@ abstract class Connection {
 abstract class Row {
   operator[] (int i);
   void forEach(void f(String columnName, columnValue));
+  //TODO toList()
+  //TODO toMap()
 }
 
+/// FIXME use const ctor class instead.
+/// Consider changing case.
 const int TRANSACTION_UNKNOWN = 1;
 const int TRANSACTION_NONE = 2;
 const int TRANSACTION_BEGUN = 3;
@@ -92,36 +97,41 @@ const Isolation READ_COMMITTED = const Isolation('Read committed');
 const Isolation REPEATABLE_READ = const Isolation('Repeatable read');
 const Isolation SERIALIZABLE = const Isolation('Serializable');
 
-/// A marker interface implemented by all postgresql library exceptions.
-abstract class PgException implements Exception {
-}
-
-/// A exception caused by a problem within the postgresql library.
-abstract class PgClientException implements PgException, Exception {
-}
-
-/// A exception representing an error reported by the postgresql server.
-abstract class PgServerException implements
-  PgException, PgServerInformation, Exception {
-}
-
-/// Information returned from the server about an error or a notice.
-abstract class PgServerInformation {
-
-  /// Returns true if this is a server error, otherwise it is a notice.
+abstract class Message {
+  /// Returns true if this is an error, otherwise it is a server-side notice,
+  /// or logging.
   bool get isError;
 
-  /// A PostgreSQL error code.
-  /// See http://www.postgresql.org/docs/9.2/static/errcodes-appendix.html
-  String get code;
-
-  /// For a english localized database the field contents are ERROR, FATAL, or
-  /// PANIC, for an error message. Otherwise in a notice message they are
+  /// For a [ServerMessage] from an English localized database the field
+  /// contents are ERROR, FATAL, or PANIC, for an error message. Otherwise in
+  /// a notice message they are
   /// WARNING, NOTICE, DEBUG, INFO, or LOG.
+  /// FIXME For [ClientMessage] ERROR, WARNING, DEBUG ??
   String get severity;
 
   /// A human readible error message, typically one line.
   String get message;
+}
+
+abstract class ClientMessage extends Message {
+
+  /// If an exception was thrown the body will be here.
+  Exception get exception;
+
+  /// Stack trace may be null if the message does not represent an exception.
+  StackTrace get stackTrace;
+
+  //FIXME move to impl.
+  String toString() => stackTrace == null
+      ? '$severity $message'
+      : '$severity $message\n$stackTrace';
+}
+
+abstract class ServerMessage extends Message {
+
+  /// A PostgreSQL error code.
+  /// See http://www.postgresql.org/docs/9.2/static/errcodes-appendix.html
+  String get code;
 
   /// More detailed information.
   String get detail;
@@ -136,6 +146,9 @@ abstract class PgServerInformation {
   String get allInformation;
 }
 
+
+
+//FIXME hide by using separate package for implementation.
 /// Made public for testing.
 String substitute(String source, values) => _substitute(source, values);
 String formatValue(value, String type) => _formatValue(value, type);

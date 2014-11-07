@@ -272,7 +272,7 @@ class _PoolConnection implements pg.Connection {
 	bool get isClosed => false; //TODO.
 	int get transactionStatus => _conn.transactionStatus;
 
-	Stream<dynamic> get unhandled { throw new UnimplementedError(); }
+	Stream<dynamic> get messages { throw new UnimplementedError(); }
 
 	Future get onClosed { throw new UnimplementedError(); }
 }

@@ -31,8 +31,8 @@ class _Connection implements Connection {
   int _msgType;
   int _msgLength;
 
-  Stream get unhandled => _unhandled.stream;
-  final StreamController _unhandled = new StreamController();
+  Stream get messages => _messages.stream;
+  final StreamController _messages = new StreamController.broadcast();
 
   static Future<_Connection> _connect(String uri) {
     return new Future.sync(() {
@@ -144,12 +144,6 @@ class _Connection implements Connection {
 
     int c = _buffer.readByte();
 
-    // print('Ready for query. Transaction state: ${_itoa(c)}');
-
-    // TODO store transaction state somewhere. Perhaps this needs to be able
-    // to be read via the api. Perhaps Connection.transactionState, or just Connection.state?
-    // which is one of: {BUSY, IDLE, BEGUN, ERROR};
-
     if (c == _I || c == _T || c == _E) {
 
       if (c == _I)
@@ -173,8 +167,7 @@ class _Connection implements Connection {
         _connected.complete(this);
       }
 
-      //FIXME Dear deep thought, what is the idiomatic way to do this?
-      new Future.value(42).then((_) => _processSendQueryQueue());
+      new Future(() => _processSendQueryQueue());
 
     } else {
       _destroy();
@@ -182,31 +175,38 @@ class _Connection implements Connection {
     }
   }
 
-  void _handleSocketError(error) {
+  void _handleSocketError(error, {bool closed: false}) {
 
     if (_state == _CLOSED) {
-      //FIXME logging
-      print('Error after socket closed: $error');
+      _messages.add(new _ClientMessage(
+          severity: 'WARNING',
+          message: 'Socket error after socket closed.',
+          exception: error));
       _destroy();
       return;
     }
 
     _destroy();
 
-    var ex = new _PgClientException('Socket error.', error);
+    var ex = new _ClientMessage(
+        severity: 'ERROR',
+        message: closed
+          ? 'Socket closed unexpectedly.'
+          : 'Socket error.',
+        exception: error);
 
     if (!_hasConnected) {
       _connected.completeError(ex);
     } else if (_query != null) {
       _query.addError(ex);
     } else {
-      _unhandled.add(ex);
+      _messages.add(ex);
     }
   }
 
   void _handleSocketClosed() {
     if (_state != _CLOSED) {
-      _handleSocketError(new _PgClientException('Socket closed.'));
+      _handleSocketError(null, closed: true);
     }
   }
 
@@ -257,9 +257,9 @@ class _Connection implements Connection {
         _readMessage(msgType, length);
       }
 
-    } on Exception catch (e) {
+    } on Exception catch (e) { // FIXME keep stacktrace.
       _destroy();
-      throw new _PgClientException('Error reading data.', e); //TODO test that this will be caught by unhandled stream.
+      throw new _PgClientException('Error reading data.', e);
     }
   }
 
@@ -329,12 +329,11 @@ class _Connection implements Connection {
       errorCode = _buffer.readByte();
     }
 
-    var info = new _PgServerInformation(
+    var ex = new _ServerMessage(
                          msgType == _MSG_ERROR_RESPONSE,
                          map);
 
     if (msgType == _MSG_ERROR_RESPONSE) {
-      var ex = new _PgServerException(info);
       if (!_hasConnected) {
           _state = _CLOSED;
           _socket.destroy();
@@ -342,10 +341,10 @@ class _Connection implements Connection {
       } else if (_query != null) {
         _query.addError(ex);
       } else {
-        _unhandled.add(ex);
+        _messages.add(ex);
       }
     } else {
-      _unhandled.add(info);
+      _messages.add(ex);
     }
   }
 
@@ -573,10 +572,13 @@ class _Connection implements Connection {
       msg.addByte(_MSG_TERMINATE);
       msg.addInt32(0);
       msg.setLength();
-
       _socket.add(msg.buffer);
-    } catch (e) {
-      _unhandled.add(new _PgClientException('Postgresql connection closed without sending terminate message.', e));
+    } on Exception catch (e, st) {
+      _messages.add(new _ClientMessage(
+          severity: 'WARNING',
+          message: 'Exception while closing connection. Closed without sending terminate message.',
+          exception: e,
+          stackTrace: st));
     }
 
     if (prior != _CLOSED)
