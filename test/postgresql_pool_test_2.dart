@@ -15,7 +15,10 @@ main() {
   Pool pool;
   int tout = 2 * 60 * 1000; // Should be longer than usage
 
-  setUp(() => pool = new Pool(loadSettings().toUri(), timeout: tout, min: 2, max: 2));
+  setUp(() {
+    pool = new Pool(loadSettings().toUri(), timeout: tout, min: 2, max: 2);
+    pool.messages.listen(print);
+  });
 
   test('Connect', () {
   	var pass = expectAsync0(() {});

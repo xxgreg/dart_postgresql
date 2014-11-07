@@ -1,11 +1,21 @@
 part of postgresql;
 
+class _PgClientException implements Exception {
+  final String _msg;
+  final dynamic error;
+  _PgClientException(this._msg, [this.error]);
+  String toString() => error == null ? _msg : '$_msg ($error)';
+}
+
 class _Connection implements Connection {
 
   _Connection(this._socket, Settings settings)
     : _userName = settings.user,
       _passwordHash = _md5s(settings.password + settings.user),
       _databaseName = settings.database;
+
+  static int _sequence = 1;
+  final int connectionId = _sequence++;
 
   int __state = _NOT_CONNECTED;
   int get _state => __state;
@@ -181,7 +191,8 @@ class _Connection implements Connection {
       _messages.add(new _ClientMessage(
           severity: 'WARNING',
           message: 'Socket error after socket closed.',
-          exception: error));
+          exception: error,
+          connectionId: connectionId));
       _destroy();
       return;
     }
@@ -193,7 +204,8 @@ class _Connection implements Connection {
         message: closed
           ? 'Socket closed unexpectedly.'
           : 'Socket error.',
-        exception: error);
+        exception: error,
+        connectionId: connectionId);
 
     if (!_hasConnected) {
       _connected.completeError(ex);
@@ -331,7 +343,8 @@ class _Connection implements Connection {
 
     var ex = new _ServerMessage(
                          msgType == _MSG_ERROR_RESPONSE,
-                         map);
+                         map,
+                         connectionId);
 
     if (msgType == _MSG_ERROR_RESPONSE) {
       if (!_hasConnected) {

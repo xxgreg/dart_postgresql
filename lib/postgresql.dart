@@ -9,7 +9,7 @@ import 'dart:convert';
 part 'buffer.dart';
 part 'connection.dart';
 part 'constants.dart';
-part 'exceptions.dart';
+part 'messages.dart';
 part 'format_value.dart';
 part 'message_buffer.dart';
 part 'query.dart';
@@ -64,6 +64,9 @@ abstract class Connection {
   int get transactionStatus;
 
   Future get onClosed;
+
+  /// Each connection is assigned a unique id (Within an isolate).
+  int get connectionId;
 }
 
 /// Row allows field values to be retrieved as if they were getters.
@@ -111,20 +114,26 @@ abstract class Message {
 
   /// A human readible error message, typically one line.
   String get message;
+
+  /// An identifier for the connection. Useful for logging messages in a
+  /// connection pool.
+  int get connectionId;
 }
 
 abstract class ClientMessage extends Message {
 
+  factory ClientMessage({String severity,
+                 String message,
+                 Object exception,
+                 StackTrace stackTrace,
+                 int connectionId}) = _ClientMessage;
+
   /// If an exception was thrown the body will be here.
-  Exception get exception;
+  Object get exception;
 
   /// Stack trace may be null if the message does not represent an exception.
   StackTrace get stackTrace;
 
-  //FIXME move to impl.
-  String toString() => stackTrace == null
-      ? '$severity $message'
-      : '$severity $message\n$stackTrace';
 }
 
 abstract class ServerMessage extends Message {

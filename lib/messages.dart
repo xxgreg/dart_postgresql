@@ -1,18 +1,12 @@
 part of postgresql;
 
-class _PgClientException implements Exception {
-  final String _msg;
-  final dynamic error;
-  _PgClientException(this._msg, [this.error]);
-  String toString() => error == null ? _msg : '$_msg ($error)';
-}
-
 class _ClientMessage implements ClientMessage {
 
   _ClientMessage({severity,
                   this.message,
-                  this.exception: null,
-                  this.stackTrace: null})
+                  this.exception,
+                  this.stackTrace,
+                  this.connectionId})
       : isError = severity == 'ERROR',
         severity = severity {
 
@@ -20,27 +14,30 @@ class _ClientMessage implements ClientMessage {
       throw new ArgumentError();
 
     if (message == null) throw new ArgumentError();
+
+    if (connectionId == null) throw new ArgumentError();
   }
 
   final bool isError;
   final String severity;
   final String message;
+  final int connectionId;
   final Object exception; // May not be an exception type.
   final StackTrace stackTrace;
 
   String toString() {
-    var msg = '$severity $message';
+    var msg = '$connectionId $severity $message';
     if (exception != null)
-      msg += '\n$exception';
+      msg = '$msg\n$exception';
     if (stackTrace != null)
-      msg += '\n$stackTrace';
+      msg = '$msg\n$stackTrace';
     return msg;
   }
 }
 
 class _ServerMessage implements ServerMessage {
 
-  _ServerMessage(this.isError, Map<String,String> map)
+  _ServerMessage(this.isError, Map<String,String> map, this.connectionId)
       : code = map['C'] == null ? '' : map['C'],    //FIXME use map.get(key, default), when implemented. See dart issue #2643.
         severity = map['S'] == null ? '' : map['S'],
         message = map['M'] == null ? '' : map['M'],
@@ -59,8 +56,9 @@ class _ServerMessage implements ServerMessage {
   final String detail;
   final int position;
   final String allInformation;
+  final int connectionId;
 
-  toString() => '$severity $code $message';
+  String toString() => '$connectionId $severity $code $message';
 }
 
 final Map<String,String> _fieldNames = {

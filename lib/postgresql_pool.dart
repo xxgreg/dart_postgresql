@@ -18,6 +18,11 @@ abstract class Pool {
 	/// Timeout overrides the pool set timeout.
 	Future<pg.Connection> connect([int timeout, String debugId]);
 
+  /// The server can send notices or the network can cause errors while the
+  /// connection is not being used to make a query. See [ClientMessage] and
+  /// [ServerMessage] for more information.
+  Stream<pg.Message> get messages;
+
 	// Close all of the connections.
 	void destroy();
 
@@ -64,6 +69,9 @@ class _Pool implements Pool {
 		}
 		return Future.wait(futures).then((_) { return true; });
 	}
+
+  Stream get messages => _messages.stream;
+  final StreamController _messages = new StreamController.broadcast();
 
 	//FIXME Change these to be named parameters. But this is a breaking change.
 	Future<_PoolConnection> connect([int timeout, String debugId]) {
@@ -132,6 +140,7 @@ class _Pool implements Pool {
 		return pg.connect(_uri)
 		 .then((c) {
 		 	var conn = new _PoolConnection(this, c);
+		 	c.messages.listen((msg) => _messages.add(msg));
 		 	c.onClosed.then((_) => _handleUnexpectedClose(conn));
 		 	_connections.add(conn);
 		 	_available.add(conn);
@@ -154,8 +163,11 @@ class _Pool implements Pool {
 			//TODO lifetime expiry.
 			//|| conn._obtained.millis > lifetime
 
-			//TODO logging.
-			print('Connection returned in bad transaction state: $conn.transactionStatus');
+		   _messages.add(new pg.ClientMessage(
+           severity: 'WARNING',
+           message: 'Connection returned in bad transaction state: '
+             '${conn.transactionStatus}. Removing from pool.',
+           connectionId: conn._conn.connectionId));
 
 			_destroy(conn);
 			_incConnections();
@@ -183,7 +195,13 @@ class _Pool implements Pool {
 
 		if (timeout != null) {
 			conn._reaper = new Timer(new Duration(milliseconds: _timeout), () {
-				print('Connection not released within timeout: ${conn._timeout}ms.'); //TODO logging.
+
+		    _messages.add(new pg.ClientMessage(
+            severity: 'WARNING',
+            message: 'Connection not released within timeout: ${conn._timeout}ms. '
+		                 'Closing and removing from pool.',
+            connectionId: conn._conn.connectionId));
+
 				_destroy(conn);
 			});
 		}
@@ -202,7 +220,11 @@ class _Pool implements Pool {
 	void _handleUnexpectedClose(_PoolConnection conn) {
 		if (_destroyed) return; // Expect closes while destroying connections.
 
-		print('Connection closed unexpectedly. Removed from pool.'); //TODO logging.
+		_messages.add(new pg.ClientMessage(
+		    severity: 'WARNING',
+		    message: 'Connection closed unexpectedly. Removing from pool.',
+		    connectionId: conn._conn.connectionId));
+
 		_destroy(conn);
 
 		// TODO consider automatically restarting lost connections.
@@ -249,6 +271,7 @@ class _Pool implements Pool {
 }
 
 class _PoolConnection implements pg.Connection {
+
 	final _Pool _pool;
 	final pg.Connection _conn;
 	final DateTime _connected;
@@ -272,7 +295,13 @@ class _PoolConnection implements pg.Connection {
 	bool get isClosed => false; //TODO.
 	int get transactionStatus => _conn.transactionStatus;
 
+	//FIXME Could pass through messages until connection is released.
 	Stream<dynamic> get messages { throw new UnimplementedError(); }
 
+	//FIXME Consider firing this when the connection is release to the pool.
 	Future get onClosed { throw new UnimplementedError(); }
+
+	//FIXME Probably don't want to just pass connectionId of the underlying connection.
+	int get connectionId { throw new UnimplementedError(); }
+
 }
