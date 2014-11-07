@@ -7,8 +7,8 @@ import 'package:postgresql/postgresql.dart' as pg;
 //TODO implement lifetime. When connection is release if been open for more than lifetime millis, then close the connection, and open another. But need some way to stagger, initial creation, so they don't all expire at the same time.
 
 abstract class Pool {
-	factory Pool(String uri, {int timeout, int min: 2, int max: 10})
-		=> new _Pool(uri, timeout: timeout, min: min, max: max);
+	factory Pool(String uri, {int timeout, int min, int max, pg.TypeConverter typeConverter})
+		= _Pool;
 
 	/// Returns once the specified minimum number of connections have connected successfully.
 	Future start();
@@ -50,6 +50,7 @@ class _Pool implements Pool {
 	final int _timeout;
 	final int _min;
 	final int _max;
+	final pg.TypeConverter _typeConverter;
 	final _connections = new List<_PoolConnection>();
 	final _available = new List<_PoolConnection>();
 	final _waitingForRelease = new Queue<Completer>();
@@ -57,10 +58,14 @@ class _Pool implements Pool {
 	int get _count => _connections.length + _connecting;
 	int _connecting = 0;
 
-	_Pool(this._uri, {int timeout, int min: 2, int max: 10})
+	_Pool(this._uri, {int timeout,
+	                  int min: 2,
+	                  int max: 10,
+	                  pg.TypeConverter typeConverter})
 		: _timeout = timeout,
 		  _min = min,
-		  _max = max;
+		  _max = max,
+		  _typeConverter = typeConverter;
 
 	Future start() {
 		var futures = new List<Future>(_min);
@@ -137,7 +142,7 @@ class _Pool implements Pool {
 	// Establish another connection, add to the list of available connections.
 	Future _incConnections() {
 		_connecting++;
-		return pg.connect(_uri)
+		return pg.connect(_uri, typeConverter: _typeConverter)
 		 .then((c) {
 		 	var conn = new _PoolConnection(this, c);
 		 	c.messages.listen((msg) => _messages.add(msg));
