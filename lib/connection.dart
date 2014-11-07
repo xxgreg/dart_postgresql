@@ -382,7 +382,7 @@ class _Connection implements Connection {
   Stream query(String sql, [values]) {
     try {
       if (values != null)
-        sql = _substitute(sql, values);
+        sql = substitute(sql, values, encodeValue);
       var query = _enqueueQuery(sql);
       return query.stream;
     } on Exception catch (ex, st) {
@@ -393,7 +393,7 @@ class _Connection implements Connection {
   Future<int> execute(String sql, [values]) {
     try {
       if (values != null)
-        sql = _substitute(sql, values);
+        sql = substitute(sql, values, encodeValue);
       var query = _enqueueQuery(sql);
       return query.stream.isEmpty.then((_) => query._rowsAffected);
     } on Exception catch (ex, st) {

@@ -1,4 +1,4 @@
-part of postgresql;
+library substitute;
 
 const int _TOKEN_TEXT = 1;
 const int _TOKEN_AT = 2;
@@ -34,31 +34,31 @@ class ParseException {
   final String message;
   final String source;
   final int index;
-  String toString() => (source == null || index == null) 
+  String toString() => (source == null || index == null)
       ? message
       : '$message At character: $index, in source "$source"';
 }
 
-String _substitute(String source, values) {
-  
+String substitute(String source, values, String encodeValue(value, String)) {
+
   var valueWriter;
-  
+
   if (values is List)
-    valueWriter = _createListValueWriter(values);
+    valueWriter = _createListValueWriter(values, encodeValue);
 
   else if (values is Map)
-    valueWriter = _createMapValueWriter(values);
+    valueWriter = _createMapValueWriter(values, encodeValue);
 
   else if (values == null)
     valueWriter = (_, _1, _2)
         => throw new ParseException('Template contains a parameter, but no values were passed.');
-  
+
   else
     throw new ArgumentError('Unexpected type.');
-  
+
   var buf = new StringBuffer();
   var s = new _Scanner(source);
-  
+
   while (s.hasMore()) {
     var t = s.read();
     if (t.type == _TOKEN_IDENT) {
@@ -66,36 +66,38 @@ String _substitute(String source, values) {
     } else {
       buf.write(t.value);
     }
-  } 
- 
-  return buf.toString();  
+  }
+
+  return buf.toString();
 }
 
-_createListValueWriter(List list) => (StringSink buf, String identifier, String type) {
+_createListValueWriter(List list, String encodeValue(value, String))
+  => (StringSink buf, String identifier, String type) {
 
-  int i = int.parse(identifier, onError: 
+  int i = int.parse(identifier, onError:
     (_) => throw new ParseException('Expected integer parameter.'));
 
   if (i < 0 || i >= list.length)
     throw new ParseException('Substitution token out of range.');
-  
-  var s = _formatValue(list[i], type);
+
+  var s = encodeValue(list[i], type);
   buf.write(s);
 };
 
-_createMapValueWriter(Map map) => (StringSink buf, String identifier, String type) {
-  
+_createMapValueWriter(Map map, String encodeValue(value, String))
+  => (StringSink buf, String identifier, String type) {
+
   var val;
 
   if (isDigit(identifier.codeUnits.first)) {
-    int i = int.parse(identifier, onError: 
+    int i = int.parse(identifier, onError:
       (_) => throw new ParseException('Expected integer parameter.'));
 
     if (i < 0 || i >= map.values.length)
       throw new ParseException("Substitution token out of range.");
 
     val = map.values.elementAt(i);
-  
+
   } else {
 
     if (!map.keys.contains(identifier))
@@ -104,7 +106,7 @@ _createMapValueWriter(Map map) => (StringSink buf, String identifier, String typ
     val = map[identifier];
   }
 
-  var s = _formatValue(val, type);
+  var s = encodeValue(val, type);
   buf.write(s);
 };
 
@@ -112,57 +114,57 @@ class _Scanner {
   _Scanner(String source)
       : _source = source,
         _r = new _CharReader(source) {
-        
+
     if (_r.hasMore())
       _t = _read();
   }
-  
+
   final String _source;
   final _CharReader _r;
   _Token _t;
-  
+
   bool hasMore() => _t != null;
-  
+
   _Token peek() => _t;
-  
+
   _Token read() {
     var t = _t;
     _t = _r.hasMore() ? _read() : null;
     return t;
   }
-  
+
   _Token _read() {
-    
+
     assert(_r.hasMore());
-    
+
     // '@@', '@ident', or '@ident:type'
     if (_r.peek() == _at) {
       _r.read();
-      
+
       if (!_r.hasMore())
         throw new ParseException('Unexpected end of input.');
-      
+
       // Escaped '@' character.
       if (_r.peek() == _at) {
         _r.read();
         return new _Token(_TOKEN_AT, '@');
       }
-      
+
       if (!isIdentifier(_r.peek()))
         throw new ParseException('Expected alphanumeric identifier character after "@".');
 
       // Identifier
-      var ident = _r.readWhile(isIdentifier);      
-      
+      var ident = _r.readWhile(isIdentifier);
+
       // Optional type modifier
       var type;
       if (_r.peek() == _colon) {
         _r.read();
-        type = _r.readWhile(isIdentifier);        
+        type = _r.readWhile(isIdentifier);
       }
       return new _Token(_TOKEN_IDENT, ident, type);
     }
-    
+
     // Read plain text
     var text = _r.readWhile((c) => c != _at);
     return new _Token(_TOKEN_TEXT, text);
@@ -173,24 +175,24 @@ class _CharReader {
   _CharReader(String source)
       : _source = source,
         _itr = source.codeUnits.iterator {
-        
+
     if (source == null)
       throw new ArgumentError('Source is null.');
-    
+
     _i = 0;
-    
+
     if (source != '') {
       _itr.moveNext();
       _c = _itr.current;
     }
   }
-  
+
   String _source;
   Iterator<int> _itr;
   int _i, _c;
-  
+
   bool hasMore() => _i < _source.length;
-  
+
   int read() {
     var c = _c;
     _itr.moveNext();
@@ -198,21 +200,21 @@ class _CharReader {
     _c = _itr.current;
     return c;
   }
-  
+
   int peek() => _c;
-  
+
   String readWhile([bool test(int charCode)]) {
-    
+
     if (!hasMore())
       throw new ParseException('Unexpected end of input.', _source, _i);
-    
+
     int start = _i;
-    
+
     while (hasMore() && test(peek())) {
       read();
     }
-    
-    int end = hasMore() ? _i : _source.length;    
+
+    int end = hasMore() ? _i : _source.length;
     return _source.substring(start, end);
   }
 }

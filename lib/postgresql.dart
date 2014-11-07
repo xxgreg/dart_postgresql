@@ -6,15 +6,15 @@ import 'package:crypto/crypto.dart';
 import 'dart:io';
 import 'dart:convert';
 
+import 'substitute.dart';
+
 part 'buffer.dart';
 part 'connection.dart';
 part 'constants.dart';
 part 'messages.dart';
-part 'format_value.dart';
 part 'message_buffer.dart';
 part 'query.dart';
 part 'settings.dart';
-part 'substitute.dart';
 part 'type_converter.dart';
 
 /// Connect to a PostgreSQL database.
@@ -173,10 +173,8 @@ abstract class TypeConverter {
   Object decode(String value, int pgType);
 }
 
+/// Escape strings to a postgresql string format. i.e. E'string'
 String encodeString(String s) => _encodeString(s);
 
-
-//FIXME hide by using separate package for implementation.
-/// Made public for testing.
-String substitute(String source, values) => _substitute(source, values);
-String formatValue(value, String type) => _formatValue(value, type);
+/// Default object to sql string encoding.
+String encodeValue(value, String type) => _encodeValue(value, type);
