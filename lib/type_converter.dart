@@ -34,105 +34,179 @@ String _encodeString(String s) {
 }
 
 
-//TODO handle int modifiers
 String _encodeValue(value, String type) {
 
-  err(rt, t) => new Exception('Invalid runtime type and type modifier combination ($rt to $t).');
+  if (type == null)
+    return _encodeValueDefault(value);
+
+  throwError() => new Exception('Invalid runtime type and type modifier combination '
+      '(${value.runtimeType} to $type).');
 
   if (value == null)
     return 'null';
 
-  if (value is bool)
-    return value.toString();
-
   if (type != null)
     type = type.toLowerCase();
 
-  if (value is num) {
-    if (type == null || type == 'number')
-      return value.toString(); //TODO test that corner cases of dart.toString() match postgresql number types.
-    else if (type == 'string')
-      return "'$value'";
-    else
-      throw err('num', type);
+  if (type == 'text')
+    return _encodeString(value.toString());
+
+  if (type == 'integer'
+      || type == 'smallint'
+      || type == 'bigint'
+      || type == 'serial'
+      || type == 'bigserial'
+      || type == 'int') {
+    if (value is! int) throwError();
+    //TODO test that corner cases of num.toString() match postgresql number types.
+    return value.toString();
   }
 
-  if (value is String) {
-    if (type == null || type == 'string')
-      return _encodeString(value);
-    else
-      throw err('String', type);
+  if (type == 'real'
+      || type == 'double') {
+    if (value is! num) throwError();
+    //TODO test that corner cases of num.toString() match postgresql number types.
+    return value.toString();
   }
 
-  if (value is DateTime) {
-    //TODO check types.
-    return _encodeDateTime(value, type);
+  // TODO numeric, decimal
+
+  if (type == 'boolean') {
+    if (value is! bool) throwError();
+    return value.toString();
   }
 
-  //if (value is List<int>)
-  // return _formatBinary(value, type);
+  if (type == 'timestamp' || type == 'timestamptz') {
+    if (value is! DateTime) throwError();
+    return _encodeDateTime(value, isDateOnly: false);
+  }
 
-  throw new Exception('Unsupported runtime type as query parameter.');
+  if (type == 'date') {
+    if (value is! DateTime) throwError();
+    return _encodeDateTime(value, isDateOnly: true);
+  }
+
+  if (type == 'json' || type == 'jsonb')
+    return _encodeValueToJson(value);
+
+  if (type == 'bytea') {
+    if (value is! List<int>) throwError();
+    return _encodeBytea(value);
+  }
+
+  throw new Exception('Unknown type name: $type.');
 }
 
+// Unspecified type name. Use default type mapping.
+String _encodeValueDefault(value) {
 
-_encodeDateTime(DateTime datetime, String type) {
+  if (value == null)
+    return 'null';
+
+  //TODO test that corner cases of num.toString() match postgresql number types.
+  if (value is num)
+    return value.toString();
+
+  if (value is String)
+    return _encodeString(value);
+
+  if (value is DateTime)
+    return _encodeDateTime(value, isDateOnly: false);
+
+  if (value is bool)
+    return value.toString();
+
+  if (value is Map)
+    return _encodeString(JSON.encode(value));
+
+  if (value is List)
+    return _encodeArray(value);
+
+  throw new Exception('Unsupported runtime type as query parameter (${value.runtimeType}).');
+}
+
+String _encodeValueToJson(value) {
+  if (value == null)
+    return "'null'";
+
+  if (value is Map || value is List)
+    return _encodeString(JSON.encode(value));
+
+  if (value is String)
+    return _encodeString('"$value"');
+
+  if (value is num)
+    return value.toString();
+
+  try {
+    var map = value.toJson();
+    return _encodeString(JSON.encode(value));
+  } catch (e) {
+    // Error actually swallowed
+    throw new FormatException('Could not convert object to JSON. '
+        'No toJson() method was implemented on the object.');
+  }
+}
+
+String _encodeArray(List value) {
+  //TODO
+  throw new UnimplementedError('Postgresql array types not implemented yet.');
+}
+
+String _encodeDateTime(DateTime datetime, {bool isDateOnly}) {
 
   if (datetime == null)
     return 'null';
 
-  String escaped;
-  var t = (type == null) ? 'timestamp' : type.toLowerCase();
+  // 2004-10-19 10:23:54.445 BC PST
+  var year = datetime.year.abs().toString().padLeft(4, '0');
+  var month = datetime.month.toString().padLeft(2,'0');
+  var day = datetime.day.toString().padLeft(2,'0');
 
-  if (t != 'date' && t != 'timestamp' && t != 'timestamptz') {
-    throw new Exception('Unexpected type: $type.'); //TODO exception type
-  }
+  var hour = datetime.hour.toString().padLeft(2,'0');
+  var minute = datetime.minute.toString().padLeft(2,'0');
+  var second = datetime.second.toString().padLeft(2,'0');
+  var millisecond = datetime.millisecond.toString().padLeft(3,'0');
 
-  pad(i) {
-    var s = i.toString();
-    return s.length == 1 ? '0$s' : s;
-  }
+  var bc = datetime.year < 0 ? 'BC' : '';
 
-  //2004-10-19 10:23:54.4455+02
-  var sb = new StringBuffer()
-    ..write(datetime.year)
-    ..write('-')
-    ..write(pad(datetime.month))
-    ..write('-')
-    ..write(pad(datetime.day));
+  var tz = datetime.timeZoneName;
 
-  if (t == 'timestamp' || t == 'timestamptz') {
-    sb..write(' ')
-      ..write(pad(datetime.hour))
-      ..write(':')
-      ..write(pad(datetime.minute))
-      ..write(':')
-      ..write(pad(datetime.second));
+  if (isDateOnly)
+    return '$year-$month-$day $bc';
+  else
+    return "'$year-$month-$day $hour:$minute:$second.$millisecond $bc $tz'";
 
-    final int ms = datetime.millisecond;
-    if (ms != 0) {
-      sb.write('.');
-      final s = ms.toString();
-      if (s.length == 1) sb.write('00');
-      else if (s.length == 2) sb.write('0');
-      sb.write(s);
-    }
-  }
+  // TODO Consider providing an option to pass the timezone offset instead of
+  // timezone name. This means that we are relying on the Dart application's
+  // host computer's timezone data. If we pass the timezone name, then the
+  // Postgresql database's host's timezone data is used to make the conversion.
+  //  String tz;
+  //  if (datetime.isUtc) {
+  //    tz = 'UTC';
+  //  } else {
+  //    // Construct localtime offset '+12:00:00';
+  //    var offset = datetime.timeZoneOffset;
+  //    var sign = offset.isNegative ? '-' : '+';
+  //    var totalSeconds = offset.inSeconds;
+  //    var hours = (totalSeconds ~/ 3600).toString().padLeft(2,'0');
+  //    var minutes = ((totalSeconds % 3600) ~/ 60).toString().padLeft(2,'0');
+  //    var seconds = (totalSeconds % 60).toString().padLeft(2,'0');
+  //    // Note milliseconds are truncated. Could round them when calculating seconds.
+  //    tz = '$sign$hours:$minutes:$seconds';
+  //  }
 
-  if (t == 'timestamptz') {
-    // Add timezone offset.
-    throw new Exception('Not implemented'); //TODO
-  }
-
-  return "'${sb.toString()}'";
 }
 
-////TODO
-//// See http://www.postgresql.org/docs/9.0/static/sql-syntax-lexical.html#SQL-SYNTAX-STRINGS-ESCAPE
-//_formatBinary(List<int> buffer) {
-//  //var b64String = ...;
-//  //return " decode('$b64String', 'base64') ";
-//}
+// See http://www.postgresql.org/docs/9.0/static/sql-syntax-lexical.html#SQL-SYNTAX-STRINGS-ESCAPE
+_encodeBytea(List<int> value) {
+
+  //var b64String = ...;
+  //return " decode('$b64String', 'base64') ";
+
+  //TODO
+  throw new UnimplementedError('bytea encoding not implemented.');
+}
 
 Object _decodeValue(String value, int pgType) {
 
@@ -140,30 +214,101 @@ Object _decodeValue(String value, int pgType) {
     case _PG_BOOL:
       return value == 't';
 
-    case _PG_INT2:
-    case _PG_INT4:
-    case _PG_INT8:
+    case _PG_INT2: // smallint
+    case _PG_INT4: // integer
+    case _PG_INT8: // bigint
+    //TODO serial
+    //TODO bigserial
       return int.parse(value);
 
-    case _PG_FLOAT4:
-    case _PG_FLOAT8:
+    case _PG_FLOAT4: // real
+    case _PG_FLOAT8: // double precision
+      //TODO Test that dart will parse postgresql's number format.
+      // Consider infinity, -infinity, NaN, 0, -0, exponential notation.
       return double.parse(value);
 
     case _PG_TIMESTAMP:
+    case _PG_TIMESTAMPZ:
     case _PG_DATE:
-      return DateTime.parse(value);
+      return _decodeDateTime(value, isDateOnly: pgType == _PG_DATE);
 
     // Not implemented yet - return a string.
     case _PG_MONEY:
-    case _PG_TIMESTAMPZ:
     case _PG_TIMETZ:
     case _PG_TIME:
-    case _PG_INTERVAL:
+    case _PG_INTERVAL: //TODO return a dart core.Duration type.
     case _PG_NUMERIC:
+
+    //TODO JSON, and JSONB
+    //TODO arrays
+    //TODO binary bytea
 
     default:
       // Return a string for unknown types. The end user can parse this.
       return value;
   }
+}
+
+
+
+final _timestampRegexp = new RegExp(r'(\d{4,10})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)( BC)?');
+
+final _dateRegexp = new RegExp(r'^(\d{4,10})-(\d\d)-(\d\d)( BC)?$');
+
+DateTime _decodeDateTime(String value, {bool isDateOnly}) {
+
+  //TODO Figure out how to represent postgresql's quirky 'infinity' and
+  // '-infinity' date values. Could use sentinals, null, or throw an exception.
+  //return DateTime.parse(value);
+
+  // Notes
+
+  // When Postgresql stores a timestamptz field it converts the timestamp to utc
+  // time using the servers current timezone setting. When the server returns a
+  // timestamptz it converts it from utc into the local timezone set in the
+  // server configuration. (Timezone information is not stored in a timestamptz
+  // field)
+
+  // Dart [DateTime] objects are in the host's local timezone by default. (They
+  // can also be constructed in the utc timezone).
+
+  // There is currently not a Dart library to create [DateTime]s in an arbitrary
+  // non-local timezone. (As of 2014/11. But keep an eye on the intl package.)
+
+  // So... for timestamptz fields to work correctly the host on which the client
+  // is running must be set to the same local timezone as the postgresql server.
+
+  //TODO write code to check the server timezone on start up. If it differs
+  // from the local timezone then issue a warning.
+
+  // TODO Some people run their servers set to the UTC timezone. It is possible
+  // to detect this at start up and then return UTC [DateTime]s here.
+
+  var m = isDateOnly
+       ? _dateRegexp.firstMatch(value)
+       : _timestampRegexp.firstMatch(value);
+
+  if (m == null)
+    throw new FormatException(
+      'Unexpected ${isDateOnly ? 'date' : 'timestamp'} '
+      'format returned from server: "$value".');
+
+  int year = int.parse(m[1]);
+  int month = int.parse(m[2]);
+  int day = int.parse(m[3]);
+
+  int hour = 0, minute = 0, second = 0;
+
+  if (!isDateOnly) {
+    hour = int.parse(m[4]);
+    minute = int.parse(m[5]);
+    second = int.parse(m[6]);
+  }
+
+  if ((isDateOnly && m[4] != null)
+      || (!isDateOnly && m[7] != null))
+    year = -year;
+
+  return new DateTime(year, month, day, hour, minute, second);
 }
 
