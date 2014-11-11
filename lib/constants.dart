@@ -6,7 +6,7 @@ const int _AUTHENTICATING = 3;
 const int _AUTHENTICATED = 4;
 const int _IDLE = 5;
 const int _BUSY = 6;
-const int _STREAMING = 7; // state is called "ready" in libpq. Doesn't make sense in a non-blocking impl. 
+const int _STREAMING = 7; // state is called "ready" in libpq. Doesn't make sense in a non-blocking impl.
 const int _CLOSED = 8;
 
 String _stateToString(int s) {
@@ -83,8 +83,8 @@ String _messageName(int msg) {
     case _MSG_NOTIFICATION_RESPONSE: return 'NotificationResponse';
     case _MSG_BIND: return 'Bind';
     case _MSG_BIND_COMPLETE: return 'BindComplete';
-    case _MSG_CLOSE_COMPLETE: return 'CloseComplete'; 
-    case _MSG_COMMAND_COMPLETE: return 'CommandComplete'; 
+    case _MSG_CLOSE_COMPLETE: return 'CloseComplete';
+    case _MSG_COMMAND_COMPLETE: return 'CommandComplete';
     case _MSG_COPY_DATA: return 'CopyData';
     case _MSG_COPY_DONE: return 'CopyDone';
     case _MSG_COPY_IN_RESPONSE: return 'CopyInResponse';
@@ -150,9 +150,14 @@ const int _PG_TIMESTAMP = 1114;
 const int _PG_TIMESTAMPZ = 1184;
 const int _PG_TIMETZ = 1266;
 const int _PG_NUMERIC = 1700;
+const int _PG_JSON = 114;
+const int _PG_JSONB = 3802;
 
+//  select oid, typname from pg_type;
 String _pgTypeToString(int pgType) {
   switch(pgType) {
+    case 114: return 'json';
+    case 3802: return 'jsonb';
     case 16: return 'bool';
     case 17: return 'bytea';
     case 18: return 'char';

@@ -211,6 +211,7 @@ _encodeBytea(List<int> value) {
 Object _decodeValue(String value, int pgType) {
 
   switch (pgType) {
+
     case _PG_BOOL:
       return value == 't';
 
@@ -232,6 +233,11 @@ Object _decodeValue(String value, int pgType) {
     case _PG_DATE:
       return _decodeDateTime(value, isDateOnly: pgType == _PG_DATE);
 
+    case _PG_JSON:
+    case _PG_JSONB:
+      //TODO make the JSON reviver plugable.
+      return JSON.decode(value);
+
     // Not implemented yet - return a string.
     case _PG_MONEY:
     case _PG_TIMETZ:
@@ -239,7 +245,6 @@ Object _decodeValue(String value, int pgType) {
     case _PG_INTERVAL: //TODO return a dart core.Duration type.
     case _PG_NUMERIC:
 
-    //TODO JSON, and JSONB
     //TODO arrays
     //TODO binary bytea
 
