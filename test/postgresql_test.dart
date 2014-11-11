@@ -200,6 +200,13 @@ main() {
       );
     });
 
+    // Postgresql database doesn't allow null bytes in strings.
+    test('Select String with null character.', () {
+      conn.query("select '(\u0000)'").toList()
+        .then((r) => fail('Expected query failure.'))
+        .catchError(expectAsync1((e) => expect(e, isException)));
+    });
+
     test('Select UTF8 String', () {
       conn.query("select '☺'").toList().then(
         expectAsync1((list) => expect(list[0][0], equals('☺')))

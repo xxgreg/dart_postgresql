@@ -423,6 +423,9 @@ class _Connection implements Connection {
     if (sql == null || sql == '')
       throw new _PgClientException('SQL query is null or empty.');
 
+    if (sql.contains('\u0000'))
+      throw new _PgClientException('Sql query contains a null character.');
+
     if (_state == _CLOSED)
       throw new _PgClientException('Connection is closed, cannot execute query.');
 
