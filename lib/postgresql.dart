@@ -54,6 +54,7 @@ abstract class Connection {
 
   /// Allow multiple queries to be run in a transaction. The user must wait for
   /// runInTransaction() to complete before making any further queries.
+  //FIXME move default to impl.
   Future runInTransaction(Future operation(), [Isolation isolation = READ_COMMITTED]);
 
 
