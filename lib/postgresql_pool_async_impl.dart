@@ -171,13 +171,12 @@ class PoolImpl implements Pool {
         (i) => _establishConnection());
 
     await Future.wait(futures)
-      .timeout(settings.startTimeout, onTimeout: onTimeout);
+      .timeout(settings.startTimeout); //FIXME, onTimeout: onTimeout);
 
     // If something bad happened and there are not enough connecitons.
     while (_connections.length < settings.minConnections) {
       await _establishConnection()
-        .timeout(settings.startTimeout - stopwatch.elapsed,
-            onTimeout: onTimeout);
+        .timeout(settings.startTimeout - stopwatch.elapsed); //FIXME,onTimeout: onTimeout);
     }
 
     _state = started;
@@ -198,7 +197,7 @@ class PoolImpl implements Pool {
     });
 
     //FIXME timeout setting
-    var row = await conn.query('select pg_backend_pid();').single();
+    var row = await conn.query('select pg_backend_pid()').single;
     pconn.backendPid = row[0];
 
     _connections.add(pconn);
