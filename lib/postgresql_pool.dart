@@ -163,7 +163,7 @@ class _Pool implements Pool {
 			return;
 		}
 
-		if (conn.isClosed || conn.transactionStatus != pg.TRANSACTION_NONE) {
+		if (conn.state == pg.CLOSED || conn.transactionStatus != pg.TRANSACTION_NONE) {
 
 			//TODO lifetime expiry.
 			//|| conn._obtained.millis > lifetime
@@ -172,7 +172,7 @@ class _Pool implements Pool {
            severity: 'WARNING',
            message: 'Connection returned in bad transaction state: '
              '${conn.transactionStatus}. Removing from pool.',
-           connectionId: conn._conn.connectionId));
+           connectionName: conn._conn.connectionId.toString()));
 
 			_destroy(conn);
 			_incConnections();
@@ -204,8 +204,7 @@ class _Pool implements Pool {
 		    _messages.add(new pg.ClientMessage(
             severity: 'WARNING',
             message: 'Connection not released within timeout: ${conn._timeout}ms. '
-		                 'Closing and removing from pool.',
-            connectionId: conn._conn.connectionId));
+		                 'Closing and removing from pool.'));
 
 				_destroy(conn);
 			});
@@ -227,8 +226,7 @@ class _Pool implements Pool {
 
 		_messages.add(new pg.ClientMessage(
 		    severity: 'WARNING',
-		    message: 'Connection closed unexpectedly. Removing from pool.',
-		    connectionId: conn._conn.connectionId));
+		    message: 'Connection closed unexpectedly. Removing from pool.'));
 
 		_destroy(conn);
 
@@ -297,7 +295,8 @@ class _PoolConnection implements pg.Connection {
 	Future runInTransaction(Future operation(), [pg.Isolation isolation = pg.READ_COMMITTED])
 		=> _conn.runInTransaction(operation, isolation);
 
-	bool get isClosed => false; //TODO.
+	int get state => _conn.state;
+
 	int get transactionStatus => _conn.transactionStatus;
 
 	//FIXME Could pass through messages until connection is released.
@@ -308,5 +307,6 @@ class _PoolConnection implements pg.Connection {
 
 	//FIXME Probably don't want to just pass connectionId of the underlying connection.
 	int get connectionId { throw new UnimplementedError(); }
+
 
 }

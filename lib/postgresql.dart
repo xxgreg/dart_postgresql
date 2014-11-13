@@ -20,8 +20,12 @@ part 'type_converter.dart';
 /// Connect to a PostgreSQL database.
 /// A uri has the following format:
 /// 'postgres://testdb:password@localhost:5432/testdb'.
-Future<Connection> connect(String uri, {TypeConverter typeConverter})
-  => _Connection._connect(uri, typeConverter);
+//FIXME timeout setting
+Future<Connection> connect(
+    String uri, {
+    Duration connectionTimeout, //TODO actually use this.
+    String connectionName, //TODO actually use this. Default to conn + increasing number.
+    TypeConverter typeConverter}) => _Connection._connect(uri, typeConverter);
 
 /// A connection to a PostgreSQL database.
 abstract class Connection {
@@ -62,11 +66,17 @@ abstract class Connection {
   /// [ServerMessage] for more information.
   Stream<Message> get messages;
 
+  //FIXME Use ConnectionState const class.
+  int get state;
+
   //FIXME Use Transaction status const class.
+  //TODO rename to state.
   int get transactionStatus;
 
+  //FIXME remove this.
   Future get onClosed;
 
+  //FIXME remove this.
   /// Each connection is assigned a unique id (Within an isolate).
   int get connectionId;
 }
@@ -84,6 +94,17 @@ abstract class Row {
   //TODO toList()
   //TODO toMap()
 }
+
+
+const int NOT_CONNECTED = 1;
+const int SOCKET_CONNECTED = 2;
+const int AUTHENTICATING = 3;
+const int AUTHENTICATED = 4;
+const int IDLE = 5;
+const int BUSY = 6;
+const int STREAMING = 7; // state is called "ready" in libpq. Doesn't make sense in a non-blocking impl.
+const int CLOSED = 8;
+
 
 /// FIXME use const ctor class instead.
 /// Consider changing case.
@@ -119,7 +140,7 @@ abstract class Message {
 
   /// An identifier for the connection. Useful for logging messages in a
   /// connection pool.
-  int get connectionId;
+  String get connectionName;
 }
 
 abstract class ClientMessage extends Message {
@@ -128,7 +149,7 @@ abstract class ClientMessage extends Message {
                  String message,
                  Object exception,
                  StackTrace stackTrace,
-                 int connectionId}) = _ClientMessage;
+                 String connectionName}) = _ClientMessage;
 
   /// If an exception was thrown the body will be here.
   Object get exception;

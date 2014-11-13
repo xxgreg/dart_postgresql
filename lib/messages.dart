@@ -6,7 +6,7 @@ class _ClientMessage implements ClientMessage {
                   this.message,
                   this.exception,
                   this.stackTrace,
-                  this.connectionId})
+                  this.connectionName})
       : isError = severity == 'ERROR',
         severity = severity {
 
@@ -14,19 +14,19 @@ class _ClientMessage implements ClientMessage {
       throw new ArgumentError();
 
     if (message == null) throw new ArgumentError();
-
-    if (connectionId == null) throw new ArgumentError();
   }
 
   final bool isError;
   final String severity;
   final String message;
-  final int connectionId;
+  final String connectionName;
   final Object exception; // May not be an exception type.
   final StackTrace stackTrace;
 
   String toString() {
-    var msg = '$connectionId $severity $message';
+    var msg = connectionName == null
+        ? '$severity $message'
+        : '$connectionName $severity $message';
     if (exception != null)
       msg = '$msg\n$exception';
     if (stackTrace != null)
@@ -37,7 +37,7 @@ class _ClientMessage implements ClientMessage {
 
 class _ServerMessage implements ServerMessage {
 
-  _ServerMessage(this.isError, Map<String,String> map, this.connectionId)
+  _ServerMessage(this.isError, Map<String,String> map, [this.connectionName])
       : code = map['C'] == null ? '' : map['C'],    //FIXME use map.get(key, default), when implemented. See dart issue #2643.
         severity = map['S'] == null ? '' : map['S'],
         message = map['M'] == null ? '' : map['M'],
@@ -56,9 +56,11 @@ class _ServerMessage implements ServerMessage {
   final String detail;
   final int position;
   final String allInformation;
-  final int connectionId;
+  final String connectionName;
 
-  String toString() => '$connectionId $severity $code $message';
+  String toString() => connectionName == null
+      ? '$severity $code $message'
+      : '$connectionName $severity $code $message';
 }
 
 final Map<String,String> _fieldNames = {

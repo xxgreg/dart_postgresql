@@ -28,7 +28,7 @@ class _Query {
   
   void addRowDescription() {
     if (_state == _QUEUED)
-      _state = _STREAMING;
+      _state = STREAMING;
     
     _columnNames = _columns.map((c) => c.name).toList();
     

@@ -1,14 +1,5 @@
 part of postgresql;
 
-const int _NOT_CONNECTED = 1;
-const int _SOCKET_CONNECTED = 2;
-const int _AUTHENTICATING = 3;
-const int _AUTHENTICATED = 4;
-const int _IDLE = 5;
-const int _BUSY = 6;
-const int _STREAMING = 7; // state is called "ready" in libpq. Doesn't make sense in a non-blocking impl.
-const int _CLOSED = 8;
-
 String _stateToString(int s) {
   if (s < 0 || s > 8)
     return '?';
