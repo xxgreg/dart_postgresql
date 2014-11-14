@@ -18,7 +18,7 @@ main() {
   setUp(() => pool = new Pool(loadSettings().toUri(), timeout: tout, min: 2, max: 5));
 
   test('Connect', () {
-  	var pass = expectAsync0(() {});
+  	var pass = expectAsync(() {});
 
     testConnect(_) {
     	pool.connect().then((conn) {

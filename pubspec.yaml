@@ -8,5 +8,5 @@ environment:
 dependencies:
   crypto: ">=0.9.0 <0.10.0"
 dev_dependencies:
-  unittest: ">=0.9.0 <0.10.0"
+  unittest: ">=0.9.0 <0.12.0"
   yaml: ">=0.9.0 <0.10.0"

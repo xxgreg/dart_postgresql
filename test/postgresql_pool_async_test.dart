@@ -13,7 +13,7 @@ main() {
 
   test('Test pool', () {
     testPool()
-      .then(expectAsync1((v) { print('done'); }));
+      .then(expectAsync((v) { print('done'); }));
   });
 }
 

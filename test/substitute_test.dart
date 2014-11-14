@@ -58,8 +58,8 @@ main() {
     });
 
     test('Substitute 10', () {
-      var result = substitute('@id:string', {'id': 20, 'bob': 13}, encodeValue);
-      expect(result, equals("'20'"));
+      var result = substitute('@id:text', {'id': 20, 'bob': 13}, encodeValue);
+      expect(result, equals(" E'20' "));
     });
 
     test('Substitute 11', () {
@@ -105,8 +105,8 @@ main() {
 
     test('Substitution', () {
       conn.query(
-          'select @num, @num:string, @num:number, '
-          '@int, @int:string, @int:number, '
+          'select @num, @num:text, @num:real, '
+          '@int, @int:text, @int:int, '
           '@string, '
           '@datetime, @datetime:date, @datetime:timestamp, '
           '@boolean, @boolean_false, @boolean_null',
@@ -118,7 +118,7 @@ main() {
             'boolean_false' : false,
             'boolean_null' : null,
           }).toList()
-            .then(expectAsync1((rows) {}));
+            .then(expectAsync((rows) {}));
     });
 
   });

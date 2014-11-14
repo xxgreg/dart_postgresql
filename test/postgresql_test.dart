@@ -20,7 +20,7 @@ main() {
 
     test('Connect', () {
       connect(validUri)
-        .then(expectAsync1((c) {
+        .then(expectAsync((c) {
           c.close();
         }));
     });
@@ -31,7 +31,7 @@ main() {
       var uri = new Settings.fromMap(map).toUri();
 
       connect(uri).then((c) => throw new Exception('Should not be reached.'),
-        onError: expectAsync1((err) { /* boom! */ }));
+        onError: expectAsync((err) { /* boom! */ }));
     });
 
     //Should fail with a message like:settings.toUri()
@@ -42,13 +42,13 @@ main() {
       var uri = new Settings.fromMap(map).toUri();
 
       connect(uri).then((c) => throw new Exception('Should not be reached.'),
-        onError: expectAsync1((err) { /* boom! */ }));
+        onError: expectAsync((err) { /* boom! */ }));
     });
 
     test('Connect failure - connect to http server', () {
       var uri = 'postgresql://user:pwd@google.com:80/database';
       connect(uri).then((c) => throw new Exception('Should not be reached.'),
-        onError: expectAsync1((err) { /* boom! */ }));
+        onError: expectAsync((err) { /* boom! */ }));
     });
 
   });
@@ -64,7 +64,7 @@ main() {
     });
 
     test('Query on closed connection.', () {
-      var cb = expectAsync1((e) {});
+      var cb = expectAsync((e) {});
       connect(validUri).then((conn) {
         conn.close();
         conn.query("select 'blah'").toList()
@@ -74,7 +74,7 @@ main() {
     });
 
     test('Execute on closed connection.', () {
-      var cb = expectAsync1((e) {});
+      var cb = expectAsync((e) {});
       connect(validUri).then((conn) {
         conn.close();
         conn.execute("select 'blah'")
@@ -100,24 +100,24 @@ main() {
     test('Invalid sql statement', () {
       conn.query('elect 1').toList().then(
           (rows) => throw new Exception('Should not be reached.'),
-          onError: expectAsync1((err) { /* boom! */ }));
+          onError: expectAsync((err) { /* boom! */ }));
     });
 
     test('Null sql statement', () {
       conn.query(null).toList().then(
           (rows) => throw new Exception('Should not be reached.'),
-          onError: expectAsync1((err) { /* boom! */ }));
+          onError: expectAsync((err) { /* boom! */ }));
     });
 
     test('Empty sql statement', () {
       conn.query('').toList().then(
           (rows) => throw new Exception('Should not be reached.'),
-          onError: expectAsync1((err) { /* boom! */ }));
+          onError: expectAsync((err) { /* boom! */ }));
     });
 
     test('Whitespace only sql statement', () {
       conn.query('  ').toList().then(
-          expectAsync1((rows) => expect(rows.length, 0)),
+          expectAsync((rows) => expect(rows.length, 0)),
           onError: (err) { throw new Exception('Should not be reached.'); });
     });
 
@@ -127,26 +127,26 @@ main() {
         ;
         select 'jim';
       ''').toList().then(
-          expectAsync1((rows) => expect(rows.length, 2)),
+          expectAsync((rows) => expect(rows.length, 2)),
           onError: (err) { throw new Exception('Should not be reached.'); });
     });
 
     test('Query queueing', () {
 
       conn.query('select 1').toList().then(
-          expectAsync1((rows) {
+          expectAsync((rows) {
             expect(rows[0][0], equals(1));
           })
       );
 
       conn.query('select 2').toList().then(
-          expectAsync1((rows) {
+          expectAsync((rows) {
             expect(rows[0][0], equals(2));
           })
       );
 
       conn.query('select 3').toList().then(
-          expectAsync1((rows) {
+          expectAsync((rows) {
             expect(rows[0][0], equals(3));
           })
       );
@@ -156,16 +156,16 @@ main() {
 
       conn.query('elect 1').toList().then(
           (rows) => throw new Exception('Should not be reached.'),
-          onError: expectAsync1((err) { /* boom! */ }));
+          onError: expectAsync((err) { /* boom! */ }));
 
       conn.query('select 2').toList().then(
-          expectAsync1((rows) {
+          expectAsync((rows) {
             expect(rows[0][0], equals(2));
           })
       );
 
       conn.query('select 3').toList().then(
-          expectAsync1((rows) {
+          expectAsync((rows) {
             expect(rows[0][0], equals(3));
           })
       );
@@ -173,7 +173,7 @@ main() {
 
     test('Multiple queries in a single sql statement', () {
       conn.query('select 1; select 2; select 3;').toList().then(
-        expectAsync1((rows) {
+        expectAsync((rows) {
           expect(rows[0][0], equals(1));
           expect(rows[1][0], equals(2));
           expect(rows[2][0], equals(3));
@@ -196,7 +196,7 @@ main() {
 
     test('Select String', () {
       conn.query("select 'blah'").toList().then(
-        expectAsync1((list) => expect(list[0][0], equals('blah')))
+        expectAsync((list) => expect(list[0][0], equals('blah')))
       );
     });
 
@@ -204,18 +204,18 @@ main() {
     test('Select String with null character.', () {
       conn.query("select '(\u0000)'").toList()
         .then((r) => fail('Expected query failure.'))
-        .catchError(expectAsync1((e) => expect(e, isException)));
+        .catchError(expectAsync((e) => expect(e, isException)));
     });
 
     test('Select UTF8 String', () {
       conn.query("select '☺'").toList().then(
-        expectAsync1((list) => expect(list[0][0], equals('☺')))
+        expectAsync((list) => expect(list[0][0], equals('☺')))
       );
     });
 
     test('Select int', () {
       conn.query('select 1, -1').toList().then(
-        expectAsync1((rows) {
+        expectAsync((rows) {
           expect(rows[0][0], equals(1));
           expect(rows[0][1], equals(-1));
         })
@@ -225,13 +225,13 @@ main() {
     //FIXME Decimals not implemented yet.
     test('Select number', () {
       conn.query('select 1.1').toList().then(
-        expectAsync1((rows) => expect(rows[0][0], equals('1.1')))
+        expectAsync((rows) => expect(rows[0][0], equals('1.1')))
       );
     });
 
     test('Select boolean', () {
       conn.query('select true, false').toList().then(
-        expectAsync1((rows) {
+        expectAsync((rows) {
           expect(rows[0][0], equals(true));
           expect(rows[0][1], equals(false));
         })
@@ -240,7 +240,7 @@ main() {
 
     test('Select null', () {
       conn.query('select null').toList().then(
-        expectAsync1((rows) {
+        expectAsync((rows) {
           expect(rows[0][0], equals(null));
         })
       );
@@ -254,7 +254,7 @@ main() {
       conn.execute('insert into dart_unit_test values (null, null, null)');
 
       conn.query('select a, b, c from dart_unit_test').toList().then(
-        expectAsync1((rows) {
+        expectAsync((rows) {
           expect(rows[0][0], equals(1));
           expect(rows[0][1], equals(2));
           expect(rows[0][2], equals(3));
@@ -276,7 +276,7 @@ main() {
       conn.execute("insert into dart_unit_test values ('1979-12-20 09:00')");
 
       conn.query('select a from dart_unit_test').toList().then(
-        expectAsync1((rows) {
+        expectAsync((rows) {
           expect(rows[0][0], equals(new DateTime(1979, 12, 20, 9)));
         })
       );
@@ -297,7 +297,7 @@ main() {
       conn.execute(insert, {"time": t3});
 
       conn.query('select a from dart_unit_test').toList().then(
-        expectAsync1((rows) {
+        expectAsync((rows) {
           expect(rows[0][0], equals(t0));
           expect(rows[1][0], equals(t1));
           expect(rows[2][0], equals(t2));
@@ -312,7 +312,7 @@ main() {
       conn.execute("insert into dart_unit_test values ('1979-12-20')");
 
       conn.query('select a from dart_unit_test').toList().then(
-        expectAsync1((rows) {
+        expectAsync((rows) {
           expect(rows[0][0], equals(new DateTime(1979, 12, 20)));
         })
       );
@@ -324,7 +324,7 @@ main() {
       conn.execute("insert into dart_unit_test values (1.1, 2.2)");
 
       conn.query('select a, b from dart_unit_test').toList().then(
-        expectAsync1((rows) {
+        expectAsync((rows) {
           expect(rows[0][0], equals(1.1.toDouble()));
           expect(rows[0][1], equals(2.2.toDouble()));
         })
@@ -355,25 +355,25 @@ main() {
       conn.execute('create temporary table dart_unit_test (a int)');
 
       conn.execute('insert into dart_unit_test values (1), (2), (3)').then(
-          expectAsync1((rowsAffected) {
+          expectAsync((rowsAffected) {
             expect(rowsAffected, equals(3));
           })
       );
 
       conn.execute('update dart_unit_test set a = 5 where a = 1').then(
-          expectAsync1((rowsAffected) {
+          expectAsync((rowsAffected) {
             expect(rowsAffected, equals(1));
           })
       );
 
       conn.execute('delete from dart_unit_test where a > 2').then(
-          expectAsync1((rowsAffected) {
+          expectAsync((rowsAffected) {
             expect(rowsAffected, equals(2));
           })
       );
 
       conn.execute('create temporary table bob (a int)').then(
-          expectAsync1((rowsAffected) {
+          expectAsync((rowsAffected) {
             expect(rowsAffected, equals(null));
           })
       );
@@ -383,7 +383,7 @@ main() {
         create temporary table jim (a int);
         create temporary table sally (a int);
       ''').then(
-          expectAsync1((rowsAffected) {
+          expectAsync((rowsAffected) {
             expect(rowsAffected, equals(null));
           })
       );
@@ -408,7 +408,7 @@ main() {
     test('Error information for invalid sql statement', () {
       conn.query('elect 1').toList().then(
           (rows) => throw new Exception('Should not be reached.'),
-          onError: expectAsync1((err) {
+          onError: expectAsync((err) {
             expect(err.severity, equals('ERROR'));
             expect(err.code, equals('42601'));
             expect(err.position, equals(1));
@@ -437,7 +437,7 @@ main() {
                             ..firstname = row.firstname
                             ..lastname = row.lastname)
         .toList()
-        .then(expectAsync1((result) { }));
+        .then(expectAsync((result) { }));
     });
 
     test('Map person immutable.', () {
@@ -447,7 +447,7 @@ main() {
       ''')
         .map((row) => new ImmutablePerson(row.firstname, row.lastname))
         .toList()
-        .then(expectAsync1((result) { }));
+        .then(expectAsync((result) { }));
     });
   });
 
@@ -470,7 +470,7 @@ main() {
     });
 
     test('simple query', () {
-      var cb = expectAsync1((_) { });
+      var cb = expectAsync((_) { });
       conn1.runInTransaction(() {
         return conn1.query("select 'oi'").toList()
           .then((result) { expect(result[0][0], equals('oi')); });
@@ -478,7 +478,7 @@ main() {
     });
 
     test('simple query read committed', () {
-      var cb = expectAsync1((_) { });
+      var cb = expectAsync((_) { });
       conn1.runInTransaction(() {
         return conn1.query("select 'oi'").toList()
           .then((result) { expect(result[0][0], equals('oi')); });
@@ -486,7 +486,7 @@ main() {
     });
 
     test('simple query repeatable read', () {
-      var cb = expectAsync1((_) { });
+      var cb = expectAsync((_) { });
       conn1.runInTransaction(() {
         return conn1.query("select 'oi'").toList()
           .then((result) { expect(result[0][0], equals('oi')); });
@@ -494,7 +494,7 @@ main() {
     });
 
     test('simple query serializable', () {
-      var cb = expectAsync1((_) { });
+      var cb = expectAsync((_) { });
       conn1.runInTransaction(() {
         return conn1.query("select 'oi'").toList()
           .then((result) { expect(result[0][0], equals('oi')); });
@@ -503,7 +503,7 @@ main() {
 
 
     test('rollback', () {
-      var cb = expectAsync1((_) { });
+      var cb = expectAsync((_) { });
 
       conn1.runInTransaction(() {
         return conn1.execute('insert into tx values (42)')
@@ -530,8 +530,8 @@ main() {
 
 /*
     test('isolation', () {
-      var cb = expectAsync1((_) { });
-      var cb2 = expectAsync1((_) { });
+      var cb = expectAsync((_) { });
+      var cb2 = expectAsync((_) { });
 
       print('isolation');
 

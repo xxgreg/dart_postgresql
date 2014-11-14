@@ -21,7 +21,7 @@ main() {
   });
 
   test('Connect', () {
-  	var pass = expectAsync0(() {});
+  	var pass = expectAsync(() {});
 
     testConnect(_) {
       print(pool.diagnostics);
