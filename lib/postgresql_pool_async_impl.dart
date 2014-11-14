@@ -129,8 +129,11 @@ class PooledConnection {
   /// A unique id that upated whenever the connection is obtained.
   int useId;
 
-  String get name => '${pool.settings.poolName}:$backendPid:$useId'
+  String get name => '${pool.settings.poolName}:$backendPid'
+      + (useId == null ? '' : ':$useId')
       + (debugId == null ? '' : ':$debugId');
+
+  String toString() => '$name $state est: $established obt: $obtained';
 }
 
 
@@ -210,9 +213,12 @@ class PoolImpl implements Pool {
   Future<pg.Connection> connect({String debugId}) async {
     _processWaitQueue();
     var pconn = await _connect(settings.connectionTimeout);
-    pconn.obtained = new DateTime.now();
-    pconn.useId = _sequence++;
-    pconn.debugId = debugId;
+
+    pconn..state = inUse
+      ..obtained = new DateTime.now()
+      ..useId = _sequence++
+      ..debugId = debugId;
+
     return pconn.adapter;
   }
 
@@ -232,11 +238,11 @@ class PoolImpl implements Pool {
     if (conn == null) {
       var c = new Completer();
       _waitQueue.add(c);
-      conn = await c.future.timeout(timeout, onTimeout: onTimeout);
+      conn = await c.future.timeout(timeout); //FIXME, onTimeout: onTimeout);
       _waitQueue.remove(c);
     }
 
-    if (!await _testConnection(conn).timeout(timeout - stopwatch.elapsed, onTimeout: onTimeout)) {
+    if (!await _testConnection(conn).timeout(timeout - stopwatch.elapsed)) { //FIXME, onTimeout: onTimeout)) {
       _destroyConnection(conn);
       // Get another connection out of the pool and test again.
       conn = _connect(timeout - stopwatch.elapsed);
@@ -267,7 +273,7 @@ class PoolImpl implements Pool {
     bool ok;
     Exception exception;
     try {
-      var row = await conn.connection.query('select true;').single;
+      var row = await conn.connection.query('select true').single;
       ok = row[0];
     } on Exception catch (ex) {
       ok = false;
@@ -347,5 +353,7 @@ class PoolImpl implements Pool {
     }
   }
 
+  //FIXME just here for testing. Figure out a better way.
+  List<PooledConnection> getConnections() => _connections;
 }
 
