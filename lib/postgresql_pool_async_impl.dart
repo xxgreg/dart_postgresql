@@ -141,7 +141,9 @@ class PooledConnection {
 class PoolImpl implements Pool {
 
   PoolImpl(this.databaseUri,
-      [this.settings, this._connectionFactory = _defaultConnectionFactory]);
+      [PoolSettings settings,
+       this._connectionFactory = _defaultConnectionFactory])
+      : settings = settings == null ? new PoolSettings() : settings;
 
   PoolState _state = initial;
   PoolState get state => _state;
@@ -154,6 +156,8 @@ class PoolImpl implements Pool {
   final Queue<Completer<pg.Connection>> _waitQueue = new Queue<Completer<pg.Connection>>();
   final StreamController<pg.Message> _messages = new StreamController<pg.Message>.broadcast();
 
+  //TODO pass connection messages through to pool.
+  Stream<pg.Message> get messages => _messages.stream;
 
   Future start() async {
     //TODO consider allowing moving from state stopped to starting.

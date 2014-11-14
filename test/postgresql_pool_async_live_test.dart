@@ -5,30 +5,29 @@ import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/postgresql_pool_async.dart';
 import 'package:postgresql/postgresql_pool_async_impl.dart';
+import 'package:yaml/yaml.dart';
 import 'postgresql_mock.dart';
-
 
 main() {
   mockLogger = (msg) => print(msg);
 
-  test('Test pool', () {
+  test('Test pool live', () {
     testPool()
       .then(expectAsync((v) { print('done'); }));
   });
 }
 
+String loadDatabaseUri(){
+  var map = loadYaml(new File('test/test_config.yaml').readAsStringSync());
+  return new pg.Settings.fromMap(map).toUri();
+}
+
 
 Future testPool() async {
-    var mockConnection = new MockConnection()
-      ..onQuery = (sql, values) {
-        if (sql == 'select pg_backend_pid()') return queryResults([[42]]);
-        if (sql == 'select true') return queryResults([[true]]);
-        print('other query: $sql');
-      };
-    var mockConnect = (uri, settings) => new Future.value(mockConnection);
+
     int minConnections = 2;
     var settings = new PoolSettings(minConnections: minConnections);
-    var pool = new PoolImpl('foo', settings, mockConnect);
+    var pool = new PoolImpl(loadDatabaseUri(), settings);
 
     try {
       print('created');

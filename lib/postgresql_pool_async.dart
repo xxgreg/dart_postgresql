@@ -36,4 +36,5 @@ abstract class Pool {
   Future start();
   Future stop();
   Future<pg.Connection> connect({String debugId});
+  Stream<pg.Message> get messages;
 }

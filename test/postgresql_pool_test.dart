@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
-import 'package:postgresql/postgresql_pool.dart';
+import 'package:postgresql/postgresql_pool_async.dart';
 import 'package:yaml/yaml.dart';
 
 Settings loadSettings(){
@@ -15,7 +15,7 @@ main() {
   Pool pool;
   int tout = 2 * 60 * 1000; // Should be longer than usage
 
-  setUp(() => pool = new Pool(loadSettings().toUri(), timeout: tout, min: 2, max: 5));
+  setUp(() => pool = new Pool(loadSettings().toUri()));
 
   test('Connect', () {
   	var pass = expectAsync(() {});
@@ -58,8 +58,8 @@ main() {
 
     new Future.delayed(new Duration(seconds: 5), () {
       if (timer != null) timer.cancel();
-      print(pool.diagnostics);
-      pool.destroy();
+      //print(pool.diagnostics);
+      pool.stop();
       print('Pool destroyed.');
       pass();
       exit(0); //FIXME - something is keeping the process alive.
