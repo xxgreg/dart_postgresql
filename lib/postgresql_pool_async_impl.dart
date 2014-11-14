@@ -153,7 +153,7 @@ class PoolImpl implements Pool {
   final ConnectionFactory _connectionFactory;
 
   final List<PooledConnection> _connections = new List<PooledConnection>();
-  final Queue<Completer<pg.Connection>> _waitQueue = new Queue<Completer<pg.Connection>>();
+  final Queue<Completer<PooledConnection>> _waitQueue = new Queue<Completer<PooledConnection>>();
   final StreamController<pg.Message> _messages = new StreamController<pg.Message>.broadcast();
 
   //TODO pass connection messages through to pool.
@@ -234,12 +234,13 @@ class PoolImpl implements Pool {
       'Connect timeout exceeded: ${settings.connectionTimeout}.',
           settings.connectionTimeout);
 
-    var conn = _getFirstAvailable();
+    PooledConnection conn = _getFirstAvailable();
 
     // If there are currently no available connections then
     // add the current connection request at the end of the
     // wait queue.
     if (conn == null) {
+      print('Add to wait queue');
       var c = new Completer();
       _waitQueue.add(c);
       conn = await c.future.timeout(timeout); //FIXME, onTimeout: onTimeout);
@@ -249,7 +250,7 @@ class PoolImpl implements Pool {
     if (!await _testConnection(conn).timeout(timeout - stopwatch.elapsed)) { //FIXME, onTimeout: onTimeout)) {
       _destroyConnection(conn);
       // Get another connection out of the pool and test again.
-      conn = _connect(timeout - stopwatch.elapsed);
+      return _connect(timeout - stopwatch.elapsed);
     }
 
     return conn;
@@ -259,16 +260,17 @@ class PoolImpl implements Pool {
     => _connections.where((c) => c.state == available).toList();
 
   PooledConnection _getFirstAvailable()
-    => _connections.firstWhere((c) => c.state == available, orElse: null);
+    => _connections.firstWhere((c) => c.state == available, orElse: () => null);
 
   /// If connections are available, return them to waiting clients.
   _processWaitQueue() {
     if (_waitQueue.isEmpty) return;
 
+    print('process wait queue');
     for (var conn in _getAvailable()) {
       if (_waitQueue.isEmpty) return;
       var completer = _waitQueue.removeFirst();
-      completer.complete(conn.adapter);
+      completer.complete(conn);
     }
   }
 

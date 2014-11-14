@@ -16,6 +16,8 @@ Stream<pg.Row> queryResults(List rows) => new Stream.fromIterable(
       throw 'Expected list or map, got: ${row.runtimeType}.';
     }));
 
+int _sequence = 1;
+
 class MockConnection implements pg.Connection {
 
   int state = pg.IDLE;
@@ -23,6 +25,15 @@ class MockConnection implements pg.Connection {
 
   Stream query(String sql, [values]) {
     _log('query("$sql")');
+    if (sql == 'select pg_backend_pid()') return queryResults([[_sequence++]]);
+    if (sql == 'select true') return queryResults([[true]]);
+    if (sql.startsWith('mock timeout')) {
+      var re = new RegExp(r'mock timeout (\d+)');
+      var match = re.firstMatch(sql);
+      int delay = match == null ? 10 : int.parse(match[1]);
+      return new Stream.fromFuture(
+          new Future.delayed(new Duration(seconds: delay)));
+    }
     return onQuery(sql, values);
   }
 
