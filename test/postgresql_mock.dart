@@ -27,6 +27,7 @@ class MockConnection implements pg.Connection {
     _log('query("$sql")');
     if (sql == 'select pg_backend_pid()') return queryResults([[_sequence++]]);
     if (sql == 'select true') return queryResults([[true]]);
+    // TODO allow adding json query results. i.e. [[42]]
     if (sql.startsWith('mock timeout')) {
       var re = new RegExp(r'mock timeout (\d+)');
       var match = re.firstMatch(sql);
@@ -37,14 +38,14 @@ class MockConnection implements pg.Connection {
     return onQuery(sql, values);
   }
 
-  Function onQuery;
+  Function onQuery = (sql, values) {};
 
   Future<int> execute(String sql, [values]) {
     _log('execute("$sql")');
     return onExecute(sql, values);
   }
 
-  Function onExecute;
+  Function onExecute = (sql, values) {};
 
 
   void close() {
@@ -52,7 +53,7 @@ class MockConnection implements pg.Connection {
     onClose();
   }
 
-  Function onClose;
+  Function onClose = () {};
 
 
   Stream<pg.Message> get messages => messagesController.stream;

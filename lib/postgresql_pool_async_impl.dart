@@ -48,9 +48,10 @@ class PoolState {
   toString() => name;
 }
 
+//TODO make these public
 const initial = const PoolState('inital');
 const starting = const PoolState('starting');
-const started = const PoolState('started');
+const running = const PoolState('running');
 const stopping = const PoolState('stopping');
 const stopped = const PoolState('stopped');
 
@@ -65,7 +66,6 @@ const connecting = const PooledConnectionState('connecting');
 const testing = const PooledConnectionState('testing');
 const available = const PooledConnectionState('available');
 const inUse = const PooledConnectionState('inUse');
-const returned = const PooledConnectionState('returned');
 const closed = const PooledConnectionState('closed');
 
 
@@ -159,6 +159,16 @@ class PoolImpl implements Pool {
   //TODO pass connection messages through to pool.
   Stream<pg.Message> get messages => _messages.stream;
 
+  /// Note includes connections which are currently connecting/testing.
+  int get totalConnections => _connections.length;
+
+  int get availableConnections =>
+    _connections.where((c) => c.state == available).length;
+
+  int get inUseConnections =>
+    _connections.where((c) => c.state == inUse).length;
+
+
   Future start() async {
     //TODO consider allowing moving from state stopped to starting.
     //Need to carefully clear out all state.
@@ -186,7 +196,7 @@ class PoolImpl implements Pool {
         .timeout(settings.startTimeout - stopwatch.elapsed); //FIXME,onTimeout: onTimeout);
     }
 
-    _state = started;
+    _state = running;
   }
 
   Future _establishConnection() async {
@@ -240,7 +250,6 @@ class PoolImpl implements Pool {
     // add the current connection request at the end of the
     // wait queue.
     if (conn == null) {
-      print('Add to wait queue');
       var c = new Completer();
       _waitQueue.add(c);
       conn = await c.future.timeout(timeout); //FIXME, onTimeout: onTimeout);
@@ -266,7 +275,6 @@ class PoolImpl implements Pool {
   _processWaitQueue() {
     if (_waitQueue.isEmpty) return;
 
-    print('process wait queue');
     for (var conn in _getAvailable()) {
       if (_waitQueue.isEmpty) return;
       var completer = _waitQueue.removeFirst();
@@ -340,23 +348,23 @@ class PoolImpl implements Pool {
     //TODO if (state == stopping)
     // wait for stopping process to finish.
 
+    _state = stopping;
+
     // Close connections as they are returned to the pool.
     // If stop timeout is reached then close connections even if still in use.
 
     var stopwatch = new Stopwatch()..start();
     while (_connections.isNotEmpty) {
-      for (var pconn in _getAvailable()) {
-        _destroyConnection(pconn);
-      }
+      _getAvailable().forEach(_destroyConnection);
+
       await new Future.delayed(new Duration(milliseconds: 100), () => null);
 
       //TODO log stopTimeout exceeded. Closing connections.
       if (stopwatch.elapsed > settings.stopTimeout ) {
-        for (var pconn in _connections) {
-          _destroyConnection(pconn);
-        }
+        _connections.forEach(_destroyConnection);
       }
     }
+    _state = stopped;
   }
 
   //FIXME just here for testing. Figure out a better way.
