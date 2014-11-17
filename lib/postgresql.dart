@@ -54,8 +54,7 @@ abstract class Connection {
 
   /// Allow multiple queries to be run in a transaction. The user must wait for
   /// runInTransaction() to complete before making any further queries.
-  //FIXME move default to impl.
-  Future runInTransaction(Future operation(), [Isolation isolation = readCommitted]);
+  Future runInTransaction(Future operation(), [Isolation isolation]);
 
 
   /// Close the current [Connection]. It is safe to call this multiple times.
@@ -79,6 +78,12 @@ abstract class Connection {
 ///     c.query("select 'blah' as my_field")
 ///        .single
 ///        .then((row) => print(row.my_field));
+///
+/// Or by index.
+///
+///     c.query("select 'blah'")
+///        .single
+///        .then((row) => print(row[0]));
 ///
 @proxy
 abstract class Row {
