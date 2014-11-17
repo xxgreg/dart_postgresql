@@ -93,46 +93,6 @@ abstract class Row {
   //TODO toMap()
 }
 
-
-//TODO docs do these correspond to libpq names?
-class ConnectionState {
-  final String _name;
-  const ConnectionState(this._name);
-  String toString() => _name;
-
-  static const ConnectionState notConnected = const ConnectionState('notConnected');
-  static const ConnectionState socketConnected = const ConnectionState('socketConnected');
-  static const ConnectionState authenticating = const ConnectionState('authenticating');
-  static const ConnectionState authenticated = const ConnectionState('authenticated');
-  static const ConnectionState idle = const ConnectionState('idle');
-  static const ConnectionState busy = const ConnectionState('busy');
-
-  // state is called "ready" in libpq. Doesn't make sense in a non-blocking impl.
-  static const ConnectionState streaming = const ConnectionState('streaming');
-  static const ConnectionState closed = const ConnectionState('closed');
-}
-
-class TransactionState {
-  final String _name;
-  const TransactionState(this._name);
-  String toString() => _name;
-
-  static const TransactionState unknown = const TransactionState('unknown');
-  static const TransactionState none = const TransactionState('none');
-  static const TransactionState begun = const TransactionState('begun');
-  static const TransactionState error = const TransactionState('error');
-}
-
-class Isolation {
-  final String _name;
-  const Isolation(this._name);
-  String toString() => _name;
-
-  static const Isolation readCommitted = const Isolation('readCommitted');
-  static const Isolation repeatableRead = const Isolation('repeatableRead');
-  static const Isolation serializable = const Isolation('serializable');
-}
-
 abstract class Message {
   /// Returns true if this is an error, otherwise it is a server-side notice,
   /// or logging.
@@ -212,3 +172,45 @@ String encodeString(String s) => _encodeString(s);
 
 /// Default object to sql string encoding.
 String encodeValue(value, String type) => _encodeValue(value, type);
+
+//TODO docs do these correspond to libpq names?
+//TODO change to enum once implemented.
+class ConnectionState {
+  final String _name;
+  const ConnectionState(this._name);
+  String toString() => _name;
+
+  static const ConnectionState notConnected = const ConnectionState('notConnected');
+  static const ConnectionState socketConnected = const ConnectionState('socketConnected');
+  static const ConnectionState authenticating = const ConnectionState('authenticating');
+  static const ConnectionState authenticated = const ConnectionState('authenticated');
+  static const ConnectionState idle = const ConnectionState('idle');
+  static const ConnectionState busy = const ConnectionState('busy');
+
+  // state is called "ready" in libpq. Doesn't make sense in a non-blocking impl.
+  static const ConnectionState streaming = const ConnectionState('streaming');
+  static const ConnectionState closed = const ConnectionState('closed');
+}
+
+//TODO change to enum once implemented.
+class TransactionState {
+  final String _name;
+  const TransactionState(this._name);
+  String toString() => _name;
+
+  static const TransactionState unknown = const TransactionState('unknown');
+  static const TransactionState none = const TransactionState('none');
+  static const TransactionState begun = const TransactionState('begun');
+  static const TransactionState error = const TransactionState('error');
+}
+
+//TODO change to enum once implemented.
+class Isolation {
+  final String _name;
+  const Isolation(this._name);
+  String toString() => _name;
+
+  static const Isolation readCommitted = const Isolation('readCommitted');
+  static const Isolation repeatableRead = const Isolation('repeatableRead');
+  static const Isolation serializable = const Isolation('serializable');
+}

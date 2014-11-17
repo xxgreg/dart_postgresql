@@ -15,31 +15,6 @@ abstract class Pool {
   Stream<pg.Message> get messages;
 }
 
-class PoolState {
-  const PoolState(this.name);
-  final String name;
-  toString() => name;
-
-  static const PoolState initial = const PoolState('inital');
-  static const PoolState starting = const PoolState('starting');
-  static const PoolState running = const PoolState('running');
-  static const PoolState stopping = const PoolState('stopping');
-  static const PoolState stopped = const PoolState('stopped');
-}
-
-
-class PooledConnectionState {
-  const PooledConnectionState(this.name);
-  final String name;
-  toString() => name;
-
-  static const PooledConnectionState connecting = const PooledConnectionState('connecting');
-  static const PooledConnectionState testing = const PooledConnectionState('testing');
-  static const PooledConnectionState available = const PooledConnectionState('available');
-  static const PooledConnectionState inUse = const PooledConnectionState('inUse');
-  static const PooledConnectionState closed = const PooledConnectionState('closed');
-}
-
 abstract class PoolSettings {
 
   factory PoolSettings({String poolName,
@@ -64,4 +39,30 @@ abstract class PoolSettings {
   Duration get maxLifetime;
   Duration get leakDetectionThreshold;
   bool get testConnections;
+}
+
+//TODO change to enum once implemented.
+class PoolState {
+  const PoolState(this.name);
+  final String name;
+  toString() => name;
+
+  static const PoolState initial = const PoolState('inital');
+  static const PoolState starting = const PoolState('starting');
+  static const PoolState running = const PoolState('running');
+  static const PoolState stopping = const PoolState('stopping');
+  static const PoolState stopped = const PoolState('stopped');
+}
+
+//TODO change to enum once implemented.
+class PooledConnectionState {
+  const PooledConnectionState(this.name);
+  final String name;
+  toString() => name;
+
+  static const PooledConnectionState connecting = const PooledConnectionState('connecting');
+  static const PooledConnectionState testing = const PooledConnectionState('testing');
+  static const PooledConnectionState available = const PooledConnectionState('available');
+  static const PooledConnectionState inUse = const PooledConnectionState('inUse');
+  static const PooledConnectionState closed = const PooledConnectionState('closed');
 }

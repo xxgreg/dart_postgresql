@@ -1,10 +1,11 @@
 part of postgresql;
 
 class _PgClientException implements Exception {
+  _PgClientException(this._msg, [this.exception, this.stackTrace]);
   final String _msg;
-  final dynamic error;
-  _PgClientException(this._msg, [this.error]);
-  String toString() => error == null ? _msg : '$_msg ($error)';
+  final dynamic exception;
+  final StackTrace stackTrace;
+  String toString() => exception == null ? _msg : '$_msg ($exception)';
 }
 
 class _Connection implements Connection {
@@ -264,9 +265,9 @@ class _Connection implements Connection {
         _readMessage(msgType, length);
       }
 
-    } on Exception catch (e) { // FIXME keep stacktrace.
+    } on Exception catch (e, st) { // FIXME keep stacktrace.
       _destroy();
-      throw new _PgClientException('Error reading data.', e);
+      throw new _PgClientException('Error reading data.', e, st);
     }
   }
 
@@ -423,8 +424,7 @@ class _Connection implements Connection {
     var query = new _Query(sql);
     _sendQueryQueue.addLast(query);
 
-    //FIXME What is the idiomatic way to do this?
-    new Future.value(42).then((_) => _processSendQueryQueue());
+    new Future(() => _processSendQueryQueue());
 
     return query;
   }
@@ -566,6 +566,7 @@ class _Connection implements Connection {
   void _destroy() {
     _state = closed;
     _socket.destroy();
+    new Future(() => _messages.close());
   }
 
 }
