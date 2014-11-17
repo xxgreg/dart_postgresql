@@ -40,7 +40,6 @@ class _Connection implements Connection {
   final _Buffer _buffer = new _Buffer();
   bool _hasConnected = false;
   final Completer _connected = new Completer();
-  final Completer _closed = new Completer();
   final Queue<_Query> _sendQueryQueue = new Queue<_Query>();
   _Query _query;
   int _msgType;
@@ -568,9 +567,6 @@ class _Connection implements Connection {
           stackTrace: st));
     }
 
-    if (prior != CLOSED)
-      _closed.complete(null);
-
     _destroy();
   }
 
@@ -579,5 +575,4 @@ class _Connection implements Connection {
     _socket.destroy();
   }
 
-  Future get onClosed => _closed.future;
 }

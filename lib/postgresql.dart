@@ -74,9 +74,6 @@ abstract class Connection {
   int get transactionStatus;
 
   //FIXME remove this.
-  Future get onClosed;
-
-  //FIXME remove this.
   /// Each connection is assigned a unique id (Within an isolate).
   int get connectionId;
 }
