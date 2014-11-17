@@ -3,6 +3,7 @@ library postgresql.mock;
 
 import 'dart:async';
 import 'dart:collection';
+import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart' as pg;
 
 void _log(msg) => mockLogger(msg);
@@ -19,8 +20,8 @@ int _sequence = 1;
 
 class MockConnection implements pg.Connection {
 
-  int state = pg.IDLE;
-  int transactionStatus = pg.TRANSACTION_NONE;
+  pg.ConnectionState state = pg.ConnectionState.idle;
+  pg.TransactionState transactionState = none;
 
   Stream query(String sql, [values]) {
     _log('query("$sql")');
@@ -61,12 +62,6 @@ class MockConnection implements pg.Connection {
   Future runInTransaction(Future operation(), [pg.Isolation isolation])
     => throw new UnimplementedError();
 
-  //TODO remove these.
-  @override
-  Future get onClosed => null;
-
-  @override
-  int get connectionId => null;
 }
 
 

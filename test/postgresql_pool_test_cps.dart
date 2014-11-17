@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:postgresql/postgresql.dart' as pg;
+import 'package:postgresql/constants.dart';
 import 'package:postgresql/src/mock.dart';
 import 'package:postgresql/pool.dart';
 import 'package:postgresql/src/pool_impl_cps.dart';
@@ -240,7 +241,7 @@ Future testWaitQueue() {
                   new Future.value(pool.connect()).then((x3) {
                     try {
                       var c3 = x3;
-                      expect(c3.state, equals(pg.IDLE));
+                      expect(c3.state, equals(idle));
                       c3.close();
                       completer0.complete();
                     } catch (e0, s0) {

@@ -2,8 +2,19 @@ library postgresql.pool.impl;
 
 import 'dart:async';
 import 'dart:collection';
+import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/pool.dart';
+
+
+const PooledConnectionState connecting = PooledConnectionState.connecting;
+const PooledConnectionState testing = PooledConnectionState.testing;
+const PooledConnectionState available = PooledConnectionState.available;
+const PooledConnectionState inUse = PooledConnectionState.inUse;
+
+//FIXME better name?
+const PooledConnectionState closed2 = PooledConnectionState.closed;
+
 
 // Allow for mocking the pg connection.
 typedef Future<pg.Connection> ConnectionFactory(String uri, settings);
@@ -56,23 +67,15 @@ class ConnectionAdapter implements pg.Connection {
 
   Future<int> execute(String sql, [values]) => _conn.execute(sql, values);
 
-  Future runInTransaction(Future operation(), [pg.Isolation isolation = pg.READ_COMMITTED])
+  Future runInTransaction(Future operation(), [pg.Isolation isolation = readCommitted])
     => _conn.runInTransaction(operation, isolation);
 
-  int get state => _conn.state;
-  int get transactionStatus => _conn.transactionStatus;
+  pg.ConnectionState get state => _conn.state;
+  pg.TransactionState get transactionState => _conn.transactionState;
 
   //FIXME Could pass through messages until connection is released.
   // Need to unsubscribe listeners on close.
   Stream<dynamic> get messages { throw new UnimplementedError(); }
-
-  //FIXME get rid of this.
-  //FIXME Consider firing this when the connection is release to the pool.
-  Future get onClosed { throw new UnimplementedError(); }
-
-  //FIXME get rid of this.
-  //FIXME Probably don't want to just pass connectionId of the underlying connection.
-  int get connectionId { throw new UnimplementedError(); }
 
 }
 
@@ -282,13 +285,13 @@ class PoolImpl implements Pool {
     //}
 
     // If connection still in transaction or busy with query then destroy.
-    if (conn.state != pg.IDLE && conn.transactionStatus != pg.TRANSACTION_NONE) {
+    if (conn.state != idle && conn.transactionState != none) {
         _messages.add(new pg.ClientMessage(
             severity: 'WARNING',
             connectionName: pconn.name,
             message: 'Connection returned in bad state. Removing from pool. '
               'state: ${conn.state} '
-              'transactionState: ${conn.transactionStatus}.'));
+              'transactionState: ${conn.transactionState}.'));
 
         _destroyConnection(pconn);
         _establishConnection();
@@ -308,7 +311,7 @@ class PoolImpl implements Pool {
 
   _destroyConnection(PooledConnection pconn) {
     pconn.connection.close();
-    pconn.state = closed;
+    pconn.state = closed2;
     _connections.remove(pconn);
 
     //FIXME unsubscribe.

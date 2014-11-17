@@ -7,8 +7,8 @@ String _stateToString(int s) {
 }
 
 const int _QUEUED = 1;
-//const int _BUSY = 6;
-//const int _STREAMING = 7;
+const int _BUSY = 6;
+const int _STREAMING = 7;
 const int _DONE = 8;
 
 String _queryStateToString(int s) {

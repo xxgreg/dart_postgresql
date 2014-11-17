@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
-import 'package:postgresql/src/substitute.dart';
 import 'package:yaml/yaml.dart';
 
 Settings loadSettings(){
@@ -134,4 +133,6 @@ main() {
     expect(tc.encode({"fo'o": "ba'r"}, 'json'), equals(' E\'{"fo\\\'o":"ba\\\'r"}\' '));
   });
 
+  //TODO test array
+  //TODO test bytea
 }

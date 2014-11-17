@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart';
 import 'package:unittest/unittest.dart';
 import 'package:yaml/yaml.dart';
@@ -501,7 +502,7 @@ main() {
       conn1.runInTransaction(() {
         return conn1.query("select 'oi'").toList()
           .then((result) { expect(result[0][0], equals('oi')); });
-      }, READ_COMMITTED).then(cb);
+      }, readCommitted).then(cb);
     });
 
     test('simple query repeatable read', () {
@@ -509,7 +510,7 @@ main() {
       conn1.runInTransaction(() {
         return conn1.query("select 'oi'").toList()
           .then((result) { expect(result[0][0], equals('oi')); });
-      }, REPEATABLE_READ).then(cb);
+      }, readCommitted).then(cb);
     });
 
     test('simple query serializable', () {
@@ -517,7 +518,7 @@ main() {
       conn1.runInTransaction(() {
         return conn1.query("select 'oi'").toList()
           .then((result) { expect(result[0][0], equals('oi')); });
-      }, SERIALIZABLE).then(cb);
+      }, serializable).then(cb);
     });
 
 

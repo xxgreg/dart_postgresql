@@ -18,29 +18,26 @@ class PoolState {
   const PoolState(this.name);
   final String name;
   toString() => name;
-}
 
-//TODO Maybe export these as statics, so not to screw up peoples namespaces.
-const initial = const PoolState('inital');
-const starting = const PoolState('starting');
-const running = const PoolState('running');
-const stopping = const PoolState('stopping');
-const stopped = const PoolState('stopped');
+  static const PoolState initial = const PoolState('inital');
+  static const PoolState starting = const PoolState('starting');
+  static const PoolState running = const PoolState('running');
+  static const PoolState stopping = const PoolState('stopping');
+  static const PoolState stopped = const PoolState('stopped');
+}
 
 
 class PooledConnectionState {
   const PooledConnectionState(this.name);
   final String name;
   toString() => name;
+
+  static const PooledConnectionState connecting = const PooledConnectionState('connecting');
+  static const PooledConnectionState testing = const PooledConnectionState('testing');
+  static const PooledConnectionState available = const PooledConnectionState('available');
+  static const PooledConnectionState inUse = const PooledConnectionState('inUse');
+  static const PooledConnectionState closed = const PooledConnectionState('closed');
 }
-
-//TODO Maybe export these as statics, so not to screw up peoples namespaces.
-const connecting = const PooledConnectionState('connecting');
-const testing = const PooledConnectionState('testing');
-const available = const PooledConnectionState('available');
-const inUse = const PooledConnectionState('inUse');
-const closed = const PooledConnectionState('closed');
-
 
 abstract class PoolSettings {
 

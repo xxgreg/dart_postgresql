@@ -5,6 +5,7 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
+import 'package:postgresql/constants.dart';
 import 'package:postgresql/src/substitute.dart';
 
 part 'src/postgresql/buffer.dart';
@@ -54,7 +55,7 @@ abstract class Connection {
   /// Allow multiple queries to be run in a transaction. The user must wait for
   /// runInTransaction() to complete before making any further queries.
   //FIXME move default to impl.
-  Future runInTransaction(Future operation(), [Isolation isolation = READ_COMMITTED]);
+  Future runInTransaction(Future operation(), [Isolation isolation = readCommitted]);
 
 
   /// Close the current [Connection]. It is safe to call this multiple times.
@@ -66,16 +67,11 @@ abstract class Connection {
   /// [ServerMessage] for more information.
   Stream<Message> get messages;
 
-  //FIXME Use ConnectionState const class.
-  int get state;
 
-  //FIXME Use Transaction status const class.
-  //TODO rename to state.
-  int get transactionStatus;
+  ConnectionState get state;
 
-  //FIXME remove this.
-  /// Each connection is assigned a unique id (Within an isolate).
-  int get connectionId;
+
+  TransactionState get transactionState;
 }
 
 /// Row allows field values to be retrieved as if they were getters.
@@ -93,32 +89,44 @@ abstract class Row {
 }
 
 
-const int NOT_CONNECTED = 1;
-const int SOCKET_CONNECTED = 2;
-const int AUTHENTICATING = 3;
-const int AUTHENTICATED = 4;
-const int IDLE = 5;
-const int BUSY = 6;
-const int STREAMING = 7; // state is called "ready" in libpq. Doesn't make sense in a non-blocking impl.
-const int CLOSED = 8;
+//TODO docs do these correspond to libpq names?
+class ConnectionState {
+  final String _name;
+  const ConnectionState(this._name);
+  String toString() => _name;
 
+  static const ConnectionState notConnected = const ConnectionState('notConnected');
+  static const ConnectionState socketConnected = const ConnectionState('socketConnected');
+  static const ConnectionState authenticating = const ConnectionState('authenticating');
+  static const ConnectionState authenticated = const ConnectionState('authenticated');
+  static const ConnectionState idle = const ConnectionState('idle');
+  static const ConnectionState busy = const ConnectionState('busy');
 
-/// FIXME use const ctor class instead.
-/// Consider changing case.
-const int TRANSACTION_UNKNOWN = 1;
-const int TRANSACTION_NONE = 2;
-const int TRANSACTION_BEGUN = 3;
-const int TRANSACTION_ERROR = 4;
-
-class Isolation {
-  final String name;
-  const Isolation(this.name);
-  String toString() => name;
+  // state is called "ready" in libpq. Doesn't make sense in a non-blocking impl.
+  static const ConnectionState streaming = const ConnectionState('streaming');
+  static const ConnectionState closed = const ConnectionState('closed');
 }
 
-const Isolation READ_COMMITTED = const Isolation('Read committed');
-const Isolation REPEATABLE_READ = const Isolation('Repeatable read');
-const Isolation SERIALIZABLE = const Isolation('Serializable');
+class TransactionState {
+  final String _name;
+  const TransactionState(this._name);
+  String toString() => _name;
+
+  static const TransactionState unknown = const TransactionState('unknown');
+  static const TransactionState none = const TransactionState('none');
+  static const TransactionState begun = const TransactionState('begun');
+  static const TransactionState error = const TransactionState('error');
+}
+
+class Isolation {
+  final String _name;
+  const Isolation(this._name);
+  String toString() => _name;
+
+  static const Isolation readCommitted = const Isolation('readCommitted');
+  static const Isolation repeatableRead = const Isolation('repeatableRead');
+  static const Isolation serializable = const Isolation('serializable');
+}
 
 abstract class Message {
   /// Returns true if this is an error, otherwise it is a server-side notice,

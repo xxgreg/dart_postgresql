@@ -19,11 +19,11 @@ class _Connection implements Connection {
   static int _sequence = 1;
   final int connectionId = _sequence++;
 
-  int get state => _state;
-  int _state = NOT_CONNECTED;
+  ConnectionState get state => _state;
+  ConnectionState _state = notConnected;
 
-  int _transactionStatus = TRANSACTION_UNKNOWN;
-  int get transactionStatus => _transactionStatus;
+  TransactionState _transactionState = unknown;
+  TransactionState get transactionState => _transactionState;
 
   final String _databaseName;
   final String _userName;
@@ -52,7 +52,7 @@ class _Connection implements Connection {
       return future.then((socket) {
         var conn = new _Connection(socket, settings, typeConverter);
         socket.listen(conn._readData, onError: conn._handleSocketError, onDone: conn._handleSocketClosed);
-        conn._state = SOCKET_CONNECTED;
+        conn._state = socketConnected;
         conn._sendStartupMessage();
         return conn._connected.future;
       });
@@ -95,7 +95,7 @@ class _Connection implements Connection {
   }
 
   void _sendStartupMessage() {
-    if (_state != SOCKET_CONNECTED)
+    if (_state != socketConnected)
       throw new StateError('Invalid state during startup.');
 
     var msg = new _MessageBuffer();
@@ -111,19 +111,19 @@ class _Connection implements Connection {
 
     _socket.add(msg.buffer);
 
-    _state = AUTHENTICATING;
+    _state = authenticating;
   }
 
   void _readAuthenticationRequest(int msgType, int length) {
     assert(_buffer.bytesAvailable >= length);
 
-    if (_state != AUTHENTICATING)
+    if (_state != authenticating)
       throw new StateError('Invalid connection state while authenticating.');
 
     int authType = _buffer.readInt32();
 
     if (authType == _AUTH_TYPE_OK) {
-      _state = AUTHENTICATED;
+      _state = authenticated;
       return;
     }
 
@@ -154,22 +154,22 @@ class _Connection implements Connection {
     if (c == _I || c == _T || c == _E) {
 
       if (c == _I)
-        _transactionStatus = TRANSACTION_NONE;
+        _transactionState = none;
       else if (c == _T)
-        _transactionStatus = TRANSACTION_BEGUN;
+        _transactionState = begun;
       else if (c == _E)
-        _transactionStatus = TRANSACTION_ERROR;
+        _transactionState = error;
 
       var was = _state;
 
-      _state = IDLE;
+      _state = idle;
 
       if (_query != null) {
         _query.close();
         _query = null;
       }
 
-      if (was == AUTHENTICATED) {
+      if (was == authenticated) {
         _hasConnected = true;
         _connected.complete(this);
       }
@@ -184,7 +184,7 @@ class _Connection implements Connection {
 
   void _handleSocketError(error, {bool closed: false}) {
 
-    if (_state == CLOSED) {
+    if (_state == closed) {
       _messages.add(new _ClientMessage(
           severity: 'WARNING',
           message: 'Socket error after socket closed.',
@@ -212,7 +212,7 @@ class _Connection implements Connection {
   }
 
   void _handleSocketClosed() {
-    if (_state != CLOSED) {
+    if (_state != closed) {
       _handleSocketError(null, closed: true);
     }
   }
@@ -221,7 +221,7 @@ class _Connection implements Connection {
 
     try {
 
-      if (_state == CLOSED)
+      if (_state == closed)
         return;
 
       _buffer.append(data);
@@ -238,7 +238,7 @@ class _Connection implements Connection {
       }
 
       // Main message loop.
-      while (_state != CLOSED) {
+      while (_state != closed) {
 
         if (_buffer.bytesAvailable < 5)
           return; // Wait for more data.
@@ -272,7 +272,7 @@ class _Connection implements Connection {
 
   bool _checkMessageLength(int msgType, int msgLength) {
 
-    if (_state == AUTHENTICATING) {
+    if (_state == authenticating) {
       if (msgLength < 8) return false;
       if (msgType == _MSG_AUTH_REQUEST && msgLength > 2000) return false;
       if (msgType == _MSG_ERROR_RESPONSE && msgLength > 30000) return false;
@@ -342,7 +342,7 @@ class _Connection implements Connection {
 
     if (msgType == _MSG_ERROR_RESPONSE) {
       if (!_hasConnected) {
-          _state = CLOSED;
+          _state = closed;
           _socket.destroy();
           _connected.completeError(ex);
       } else if (_query != null) {
@@ -392,12 +392,12 @@ class _Connection implements Connection {
     }
   }
 
-  Future runInTransaction(Future operation(), [Isolation isolation = READ_COMMITTED]) {
+  Future runInTransaction(Future operation(), [Isolation isolation = readCommitted]) {
 
     var begin = 'begin';
-    if (isolation == REPEATABLE_READ)
+    if (isolation == repeatableRead)
       begin = 'begin; set transaction isolation level repeatable read;';
-    else if (isolation == SERIALIZABLE)
+    else if (isolation == serializable)
       begin = 'begin; set transaction isolation level serializable;';
 
     return execute(begin)
@@ -417,7 +417,7 @@ class _Connection implements Connection {
     if (sql.contains('\u0000'))
       throw new _PgClientException('Sql query contains a null character.');
 
-    if (_state == CLOSED)
+    if (_state == closed)
       throw new _PgClientException('Connection is closed, cannot execute query.');
 
     var query = new _Query(sql);
@@ -437,10 +437,10 @@ class _Connection implements Connection {
     if (_query != null)
       return;
 
-    if (_state == CLOSED)
+    if (_state == closed)
       return;
 
-    assert(_state == IDLE);
+    assert(_state == idle);
 
     _query = _sendQueryQueue.removeFirst();
 
@@ -452,16 +452,16 @@ class _Connection implements Connection {
 
     _socket.add(msg.buffer);
 
-    _state = BUSY;
-    _query._state = BUSY;
-    _transactionStatus = TRANSACTION_UNKNOWN;
+    _state = busy;
+    _query._state = _BUSY;
+    _transactionState = unknown;
   }
 
   void _readRowDescription(int msgType, int length) {
 
     assert(_buffer.bytesAvailable >= length);
 
-    _state = STREAMING;
+    _state = streaming;
 
     int count = _buffer.readInt16();
     var list = new List<_Column>(count);
@@ -540,11 +540,11 @@ class _Connection implements Connection {
   }
 
   void close() {
-    if (_state == CLOSED)
+    if (_state == closed)
       return;
 
     var prior = _state;
-    _state = CLOSED;
+    _state = closed;
 
     try {
       var msg = new _MessageBuffer();
@@ -564,7 +564,7 @@ class _Connection implements Connection {
   }
 
   void _destroy() {
-    _state = CLOSED;
+    _state = closed;
     _socket.destroy();
   }
 
