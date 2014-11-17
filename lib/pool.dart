@@ -5,6 +5,7 @@ import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/src/pool_impl_cps.dart';
 
 //TODO docs
+//TODO expose more getters from PoolImpl
 abstract class Pool {
   factory Pool(String databaseUri, [PoolSettings settings])
     => new PoolImpl(databaseUri, settings);

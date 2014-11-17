@@ -192,7 +192,7 @@ abstract class TypeConverter {
 
   factory TypeConverter() = _DefaultTypeConverter;
 
-  /// Returns all results in the raw postgresql format without conversion.
+  /// Returns all results in the raw postgresql string format without conversion.
   factory TypeConverter.raw() = _RawTypeConverter;
 
   /// Convert an object to a string representation to use in a sql query.
@@ -207,7 +207,7 @@ abstract class TypeConverter {
   Object decode(String value, int pgType);
 }
 
-/// Escape strings to a postgresql string format. i.e. E'string'
+/// Escape strings to a postgresql string format. i.e. E'str\'ing'
 String encodeString(String s) => _encodeString(s);
 
 /// Default object to sql string encoding.
