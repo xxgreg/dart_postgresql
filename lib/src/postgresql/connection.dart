@@ -19,15 +19,8 @@ class _Connection implements Connection {
   static int _sequence = 1;
   final int connectionId = _sequence++;
 
-  //FIXME clean this up
-  int get state => __state;
-  int __state = NOT_CONNECTED;
-  int get _state => __state;
-  set _state(int s) {
-    var was = __state;
-    __state = s;
-    //print('Connection state change: ${_stateToString(was)} => ${_stateToString(s)}.');
-  }
+  int get state => _state;
+  int _state = NOT_CONNECTED;
 
   int _transactionStatus = TRANSACTION_UNKNOWN;
   int get transactionStatus => _transactionStatus;
