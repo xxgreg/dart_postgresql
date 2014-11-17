@@ -39,7 +39,8 @@ String _encodeValue(value, String type) {
   if (type == null)
     return _encodeValueDefault(value);
 
-  throwError() => new Exception('Invalid runtime type and type modifier combination '
+  //TODO exception type. PgException
+  throwError() => throw new Exception('Invalid runtime type and type modifier combination '
       '(${value.runtimeType} to $type).');
 
   if (value == null)
@@ -48,7 +49,7 @@ String _encodeValue(value, String type) {
   if (type != null)
     type = type.toLowerCase();
 
-  if (type == 'text')
+  if (type == 'text' || type == 'string')
     return _encodeString(value.toString());
 
   if (type == 'integer'
@@ -58,25 +59,24 @@ String _encodeValue(value, String type) {
       || type == 'bigserial'
       || type == 'int') {
     if (value is! int) throwError();
-    //TODO test that corner cases of num.toString() match postgresql number types.
-    return value.toString();
+    return _encodeNumber(value);
   }
 
   if (type == 'real'
-      || type == 'double') {
+      || type == 'double'
+      || type == 'num') {
     if (value is! num) throwError();
-    //TODO test that corner cases of num.toString() match postgresql number types.
-    return value.toString();
+    return _encodeNumber(value);
   }
 
   // TODO numeric, decimal
 
-  if (type == 'boolean') {
+  if (type == 'boolean' || type == 'bool') {
     if (value is! bool) throwError();
     return value.toString();
   }
 
-  if (type == 'timestamp' || type == 'timestamptz') {
+  if (type == 'timestamp' || type == 'timestamptz' || type == 'datetime') {
     if (value is! DateTime) throwError();
     return _encodeDateTime(value, isDateOnly: false);
   }
@@ -89,10 +89,15 @@ String _encodeValue(value, String type) {
   if (type == 'json' || type == 'jsonb')
     return _encodeValueToJson(value);
 
-  if (type == 'bytea') {
-    if (value is! List<int>) throwError();
-    return _encodeBytea(value);
-  }
+//  if (type == 'bytea') {
+//    if (value is! List<int>) throwError();
+//    return _encodeBytea(value);
+//  }
+//
+//  if (type == 'array') {
+//    if (value is! List) throwError();
+//    return _encodeArray(value);
+//  }
 
   throw new Exception('Unknown type name: $type.');
 }
@@ -103,9 +108,8 @@ String _encodeValueDefault(value) {
   if (value == null)
     return 'null';
 
-  //TODO test that corner cases of num.toString() match postgresql number types.
   if (value is num)
-    return value.toString();
+    return _encodeNumber(value);
 
   if (value is String)
     return _encodeString(value);
@@ -125,6 +129,8 @@ String _encodeValueDefault(value) {
   throw new Exception('Unsupported runtime type as query parameter (${value.runtimeType}).');
 }
 
+//FIXME can probably simplify this, as in postgresql json type must take
+// map or array at top level, not string or number. (I think???)
 String _encodeValueToJson(value) {
   if (value == null)
     return "'null'";
@@ -135,8 +141,14 @@ String _encodeValueToJson(value) {
   if (value is String)
     return _encodeString('"$value"');
 
-  if (value is num)
+  if (value is num) {
+    // These are not valid JSON numbers, so encode them as strings.
+    //TODO test this
+    if (value.isNaN) return '"nan"';
+    if (value == double.INFINITY) return '"infinity"';
+    if (value == double.NEGATIVE_INFINITY) return '"-infinity"';
     return value.toString();
+  }
 
   try {
     var map = value.toJson();
@@ -146,6 +158,13 @@ String _encodeValueToJson(value) {
     throw new FormatException('Could not convert object to JSON. '
         'No toJson() method was implemented on the object.');
   }
+}
+
+String _encodeNumber(num n) {
+  if (n.isNaN) return "'nan'";
+  if (n == double.INFINITY) return "'infinity'";
+  if (n == double.NEGATIVE_INFINITY) return "'-infinity'";
+  return "${n.toString()}";
 }
 
 String _encodeArray(List value) {
@@ -168,14 +187,14 @@ String _encodeDateTime(DateTime datetime, {bool isDateOnly}) {
   var second = datetime.second.toString().padLeft(2,'0');
   var millisecond = datetime.millisecond.toString().padLeft(3,'0');
 
-  var bc = datetime.year < 0 ? 'BC' : '';
+  var bc = datetime.year < 0 ? ' BC' : '';
 
   var tz = datetime.timeZoneName;
 
   if (isDateOnly)
-    return '$year-$month-$day $bc';
+    return "'$year-$month-$day$bc'";
   else
-    return "'$year-$month-$day $hour:$minute:$second.$millisecond $bc $tz'";
+    return "'$year-$month-$day $hour:$minute:$second.$millisecond$bc $tz'";
 
   // TODO Consider providing an option to pass the timezone offset instead of
   // timezone name. This means that we are relying on the Dart application's

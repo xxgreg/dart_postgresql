@@ -80,47 +80,4 @@ main() {
 //    });
   });
 
-
-  test('Format value', () {
-    expect(encodeValue('bob', null), equals(" E'bob' "));
-    expect(encodeValue('bo\nb', null), equals(r" E'bo\nb' "));
-    expect(encodeValue('bo\rb', null), equals(r" E'bo\rb' "));
-    expect(encodeValue(r'bo\b', null), equals(r" E'bo\\b' "));
-
-    expect(encodeValue(r"'", null), equals(r" E'\'' "));
-    expect(encodeValue(r" '' ", null), equals(r" E' \'\' ' "));
-    expect(encodeValue(r"\''", null), equals(r" E'\\\'\'' "));
-  });
-
-
-  group('Query', () {
-
-    Connection conn;
-
-    setUp(() => connect(loadSettings().toUri()).then((c) => conn = c));
-
-    tearDown(() {
-      if (conn != null) conn.close();
-    });
-
-    test('Substitution', () {
-      conn.query(
-          'select @num, @num:text, @num:real, '
-          '@int, @int:text, @int:int, '
-          '@string, '
-          '@datetime, @datetime:date, @datetime:timestamp, '
-          '@boolean, @boolean_false, @boolean_null',
-          { 'num': 1.2,
-            'int': 3,
-            'string': 'bob\njim',
-            'datetime': new DateTime(2013, 1, 1),
-            'boolean' : true,
-            'boolean_false' : false,
-            'boolean_null' : null,
-          }).toList()
-            .then(expectAsync((rows) {}));
-    });
-
-  });
-
 }
