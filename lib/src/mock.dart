@@ -1,6 +1,5 @@
+/// Library used for testing the postgresql connection pool.
 library postgresql.mock;
-
-//FIXME shift this file into lib.
 
 import 'dart:async';
 import 'dart:collection';

@@ -1,4 +1,4 @@
-library substitute;
+library postgresql.substitute;
 
 const int _TOKEN_TEXT = 1;
 const int _TOKEN_AT = 2;

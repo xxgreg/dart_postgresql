@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
-import 'package:postgresql/substitute.dart';
+import 'package:postgresql/src/substitute.dart';
 import 'package:yaml/yaml.dart';
 
 Settings loadSettings(){

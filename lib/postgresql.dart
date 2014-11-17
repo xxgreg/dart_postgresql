@@ -2,20 +2,19 @@ library postgresql;
 
 import 'dart:async';
 import 'dart:collection';
-import 'package:crypto/crypto.dart';
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
+import 'package:crypto/crypto.dart';
+import 'package:postgresql/src/substitute.dart';
 
-import 'substitute.dart';
-
-part 'buffer.dart';
-part 'connection.dart';
-part 'constants.dart';
-part 'messages.dart';
-part 'message_buffer.dart';
-part 'query.dart';
-part 'settings.dart';
-part 'type_converter.dart';
+part 'src/postgresql/buffer.dart';
+part 'src/postgresql/connection.dart';
+part 'src/postgresql/constants.dart';
+part 'src/postgresql/messages.dart';
+part 'src/postgresql/message_buffer.dart';
+part 'src/postgresql/query.dart';
+part 'src/postgresql/settings.dart';
+part 'src/postgresql/type_converter.dart';
 
 /// Connect to a PostgreSQL database.
 /// A uri has the following format:

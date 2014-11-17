@@ -1,10 +1,9 @@
-library postgresql.pool_async.impl;
+library postgresql.pool.impl;
 
 import 'dart:async';
 import 'dart:collection';
-
 import 'package:postgresql/postgresql.dart' as pg;
-import 'package:postgresql/postgresql_pool_async.dart';
+import 'package:postgresql/pool.dart';
 
 // Allow for mocking the pg connection.
 typedef Future<pg.Connection> ConnectionFactory(String uri, settings);
@@ -41,32 +40,6 @@ class PoolSettingsImpl implements PoolSettings {
   final bool testConnections;
   final pg.TypeConverter typeConverter;
 }
-
-class PoolState {
-  const PoolState(this.name);
-  final String name;
-  toString() => name;
-}
-
-//TODO make these public
-const initial = const PoolState('inital');
-const starting = const PoolState('starting');
-const running = const PoolState('running');
-const stopping = const PoolState('stopping');
-const stopped = const PoolState('stopped');
-
-
-class PooledConnectionState {
-  const PooledConnectionState(this.name);
-  final String name;
-  toString() => name;
-}
-
-const connecting = const PooledConnectionState('connecting');
-const testing = const PooledConnectionState('testing');
-const available = const PooledConnectionState('available');
-const inUse = const PooledConnectionState('inUse');
-const closed = const PooledConnectionState('closed');
 
 
 class ConnectionAdapter implements pg.Connection {

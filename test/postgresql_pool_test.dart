@@ -1,69 +1,148 @@
 import 'dart:async';
-import 'dart:io';
+import 'package:postgresql/postgresql.dart' as pg;
+import 'package:postgresql/src/mock.dart';
+import 'package:postgresql/pool.dart';
+import 'package:postgresql/src/pool_impl_cps.dart';
 import 'package:unittest/unittest.dart';
-import 'package:postgresql/postgresql.dart';
-import 'package:postgresql/postgresql_pool_async.dart';
-import 'package:yaml/yaml.dart';
 
-Settings loadSettings(){
-  var map = loadYaml(new File('test/test_config.yaml').readAsStringSync());
-  return new Settings.fromMap(map);
-}
+
+//_log(msg) => print(msg);
+_log(msg) { }
 
 main() {
+  mockLogger = _log;
 
-  Pool pool;
-  int tout = 2 * 60 * 1000; // Should be longer than usage
+  test('Test pool', testPool);
+  test('Test start timeout', testStartTimeout);
+  test('Test connect timeout', testConnectTimeout);
+  test('Test wait queue', testWaitQueue);
+}
 
-  setUp(() => pool = new Pool(loadSettings().toUri()));
+PoolImpl createPool(PoolSettings settings) {
+  var mockConnect = (uri, settings) => new Future.value(new MockConnection());
+  int minConnections = 2;
+  return new PoolImpl('postgresql://fakeuri', settings, mockConnect);
+}
 
-  test('Connect', () {
-  	var pass = expectAsync(() {});
+expectState(PoolImpl pool, {int total, int available, int inUse}) {
+  if (total != null) expect(pool.totalConnections, equals(total));
+  if (available != null) expect(pool.availableConnections, equals(available));
+  if (inUse != null) expect(pool.inUseConnections, equals(inUse));
+}
 
-    testConnect(_) {
-    	pool.connect().then((conn) {
-        print(pool);
-    		conn.query("select 'oi';").toList()
-    			.then(print)
-    			.then((_) => conn.close())
-          .catchError((err) => print('Query error: $err'));
-    	})
-      .catchError((err) => print('Connect error: $err'));
-    }
+Future testPool() async {
+  var pool = createPool(new PoolSettings(minConnections: 2));
 
-    slowQuery() {
-     pool.connect().then((conn) {
-        print(pool);
-        conn.query("select generate_series (1, 100000);").toList()
-          .then((_) => print('slow query done.'))
-          .then((_) => conn.close())
-          .catchError((err) => print('Query error: $err'));
-      })
-      .catchError((err) => print('Connect error: $err'));
-    }
+  var v = await pool.start();
+  expect(v, isNull);
+  expectState(pool, total: 2, available: 2, inUse: 0);
 
-    // Wait for initial connections to be made before starting
-    var timer;
-    pool.start().then((_) {
-      timer = new Timer.periodic(new Duration(milliseconds: 100), (_) {
-        print(pool);
-        for (var i = 0; i < 10; i++)
-          testConnect(null);
-      });
-    }).catchError((err, st) {
-      print('Error starting connection pool.');
-      print(err);
-      print(st);
-    });
+  var c = await pool.connect();
+  expectState(pool, total: 2, available: 1, inUse: 1);
 
-    new Future.delayed(new Duration(seconds: 5), () {
-      if (timer != null) timer.cancel();
-      //print(pool.diagnostics);
-      pool.stop();
-      print('Pool destroyed.');
-      pass();
-      exit(0); //FIXME - something is keeping the process alive.
-    });
+  c.close();
 
-  });
+  // Wait for next event loop.
+  await new Future(() {});
+  expectState(pool, total: 2, available: 2, inUse: 0);
+
+  var stopFuture = pool.stop();
+  await new Future(() {});
+  expect(pool.state, equals(stopping));
+
+  var v2 = await stopFuture;
+  expect(v2, isNull);
+  expect(pool.state, equals(stopped));
+  expectState(pool, total: 0, available: 0, inUse: 0);
+}
+
+
+Future testStartTimeout() async {
+  var mockConnect = (uri, settings) => new Future.delayed(new Duration(seconds: 10));
+  var settings = new PoolSettings(
+      startTimeout: new Duration(seconds: 2),
+      minConnections: 2);
+  var pool = new PoolImpl('postgresql://fakeuri', settings, mockConnect);
+
+  try {
+    expect(pool.getConnections(), isEmpty);
+    var v = await pool.start();
+    fail('Pool started, but should have timed out.');
+  } catch (ex, st) {
+    expect(ex, new isInstanceOf<TimeoutException>());
+
+    //TODO check the state of pool. What state should it be in now? "start-failed"?
+  }
+}
+
+
+Future testConnectTimeout() async {
+  var settings = new PoolSettings(
+      minConnections: 2,
+      maxConnections: 2,
+      connectionTimeout: new Duration(seconds: 2));
+  var pool = createPool(settings);
+
+  expect(pool.getConnections(), isEmpty);
+
+  var v = await pool.start();
+
+  expect(v, isNull);
+  //TODO totalConnections getter;
+  expect(pool.getConnections().length, equals(settings.minConnections));
+  expect(pool.getConnections().where((c) => c.state == available).length,
+      equals(settings.minConnections));
+
+  // Obtain all of the connections from the pool.
+  //TODO for i..minConnections
+  var c1 = await pool.connect();
+  var c2 = await pool.connect();
+
+  try {
+    // All connections are in use, this should timeout.
+    var c = await pool.connect();
+    fail('connect() should have timed out.');
+  } on TimeoutException catch (ex, st) {
+    expect(ex, new isInstanceOf<TimeoutException>());
+    //TODO check the state of the pool.
+  }
+}
+
+
+Future testWaitQueue() async {
+  var settings = new PoolSettings(
+      minConnections: 2,
+      maxConnections: 2);
+  var pool = createPool(settings);
+
+  expect(pool.getConnections(), isEmpty);
+
+  var v = await pool.start();
+
+  expect(v, isNull);
+  //TODO getter totalConnections;
+  expect(pool.getConnections().length, equals(2));
+
+  //TODO expose getter availableConnections
+  expect(pool.getConnections().where((c) => c.state == available).length,
+      equals(2));
+
+  var c1 = await pool.connect();
+  var c2 = await pool.connect();
+
+  c1.query('mock timeout 5').toList().then((r) => c1.close());
+  c2.query('mock timeout 10').toList().then((r) => c2.close());
+
+  var conns = pool.getConnections();
+  expect(conns.length, equals(2));
+  expect(conns.where((c) => c.state == available).length, equals(0));
+  expect(conns.where((c) => c.state == inUse).length, equals(2));
+
+  var c3 = await pool.connect();
+
+  expect(c3.state, equals(pg.IDLE));
+
+  c3.close();
+
+  //TODO check state of pool.
 }
