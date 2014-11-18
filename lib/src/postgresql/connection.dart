@@ -91,7 +91,7 @@ class _Connection implements Connection {
     if (_state != socketConnected)
       throw new PostgresqlException('Invalid state during startup.');
 
-    var msg = new _MessageBuffer();
+    var msg = new MessageBuffer();
     msg.addInt32(0); // Length padding.
     msg.addInt32(_PROTOCOL_VERSION);
     msg.addString('user');
@@ -130,7 +130,7 @@ class _Connection implements Connection {
     var md5 = 'md5' + _md5s('${_passwordHash}$salt');
 
     // Build message.
-    var msg = new _MessageBuffer();
+    var msg = new MessageBuffer();
     msg.addByte(_MSG_PASSWORD);
     msg.addInt32(0);
     msg.addString(md5);
@@ -436,7 +436,7 @@ class _Connection implements Connection {
 
     _query = _sendQueryQueue.removeFirst();
 
-    var msg = new _MessageBuffer();
+    var msg = new MessageBuffer();
     msg.addByte(_MSG_QUERY);
     msg.addInt32(0); // Length padding.
     msg.addString(_query.sql);
@@ -535,7 +535,7 @@ class _Connection implements Connection {
     _state = closed;
 
     try {
-      var msg = new _MessageBuffer();
+      var msg = new MessageBuffer();
       msg.addByte(_MSG_TERMINATE);
       msg.addInt32(0);
       msg.setLength();

@@ -12,7 +12,6 @@ import 'package:postgresql/src/buffer.dart';
 part 'src/postgresql/connection.dart';
 part 'src/postgresql/constants.dart';
 part 'src/postgresql/messages.dart';
-part 'src/postgresql/message_buffer.dart';
 part 'src/postgresql/query.dart';
 part 'src/postgresql/settings.dart';
 part 'src/postgresql/type_converter.dart';
