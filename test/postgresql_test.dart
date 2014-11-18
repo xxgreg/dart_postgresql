@@ -548,6 +548,8 @@ main() {
         });
     });
 
+    //TODO test Row.toList() and Row.toMap()
+
 /*
     test('isolation', () {
       var cb = expectAsync((_) { });

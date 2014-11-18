@@ -60,7 +60,6 @@ class ConnectionAdapter implements pg.Connection {
 
   final pg.Connection _conn;
   final Function _onClose;
-
   void close() => _onClose();
 
   Stream query(String sql, [values]) => _conn.query(sql, values);
@@ -71,11 +70,11 @@ class ConnectionAdapter implements pg.Connection {
     => _conn.runInTransaction(operation, isolation);
 
   pg.ConnectionState get state => _conn.state;
+
   pg.TransactionState get transactionState => _conn.transactionState;
 
-  //FIXME Could pass through messages until connection is released.
-  // Need to unsubscribe listeners on close.
-  Stream<dynamic> get messages { throw new UnimplementedError(); }
+  //FIXME Test this to make sure it doesn't cause memory leaks.
+  Stream<pg.Message> get messages => _conn.messages;
 
 }
 

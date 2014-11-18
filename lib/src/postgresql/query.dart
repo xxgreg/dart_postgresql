@@ -101,6 +101,10 @@ class _Row implements Row {
   }
 
   String toString() => _columnValues.toString();
+
+  List toList() => new UnmodifiableListView(_columnValues);
+
+  Map toMap() => new Map.fromIterables(_columnNames, _columnValues);
 }
 
 

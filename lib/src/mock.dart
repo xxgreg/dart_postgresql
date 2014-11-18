@@ -99,9 +99,14 @@ class _MapMockRow implements MockRow {
 
 class _ListMockRow implements MockRow {
 
-  _ListMockRow(this._values);
+  _ListMockRow(List values, [List<String> columnNames])
+      : _values = values,
+        _columnNames = columnNames == null
+          ? new Iterable.generate(values.length, (i) => i.toString()).toList()
+          : columnNames;
 
-  List _values;
+  final List _values;
+  final List<String> _columnNames;
 
   operator [](int i) {
     return _values.elementAt(i);
@@ -109,9 +114,13 @@ class _ListMockRow implements MockRow {
 
   @override
   void forEach(void f(String columnName, columnValue)) {
-    _values.forEach((v) => f('?', v));
+    toMap().forEach(f);
   }
 
   String toString() => _values.toString();
+  
+  List toList() => new UnmodifiableListView(_values);
+  
+  Map toMap() => new Map.fromIterables(_columnNames, _values);
 }
 

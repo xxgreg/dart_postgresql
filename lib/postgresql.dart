@@ -88,8 +88,8 @@ abstract class Connection {
 abstract class Row {
   operator[] (int i);
   void forEach(void f(String columnName, columnValue));
-  //TODO toList()
-  //TODO toMap()
+  List toList();
+  Map toMap();
 }
 
 abstract class Message {
