@@ -332,7 +332,7 @@ class _Connection implements Connection {
     var map = new Map<String, String>();
     int errorCode = _buffer.readByte();
     while (errorCode != 0) {
-      var msg = _buffer.readString(length); //TODO check length remaining.
+      var msg = _buffer.readUtf8String(length); //TODO check length remaining.
       map[new String.fromCharCode(errorCode)] = msg;
       errorCode = _buffer.readByte();
     }
@@ -467,7 +467,7 @@ class _Connection implements Connection {
     var list = new List<_Column>(count);
 
     for (int i = 0; i < count; i++) {
-      var name = _buffer.readString(length); //FIXME better maxSize.
+      var name = _buffer.readUtf8String(length); //TODO better maxSize.
       int fieldId = _buffer.readInt32();
       int tableColNo = _buffer.readInt16();
       int fieldType = _buffer.readInt32();
@@ -506,15 +506,11 @@ class _Connection implements Connection {
     if (colSize == -1) {
       _query._rowData[index] = null;
     } else {
-      //TODO Optimisation. Don't always need to copy this data. Can read directly
-      // out of the buffer.
       var col = _query._columns[index];
-      var data = _buffer.readBytes(colSize);
-
       if (col.isBinary) throw new UnimplementedError(
           'Binary result set parsing is not implemented.');
-
-      var value = _typeConverter.decode(UTF8.decode(data), col.fieldType);
+      var str = _buffer.readUtf8StringN(colSize);
+      var value = _typeConverter.decode(str, col.fieldType);
       _query._rowData[index] = value;
     }
 
@@ -531,7 +527,7 @@ class _Connection implements Connection {
 
     assert(_buffer.bytesAvailable >= length);
 
-    var commandString = _buffer.readString(length);
+    var commandString = _buffer.readUtf8String(length);
     int rowsAffected =
         int.parse(commandString.split(' ').last, onError: (_) => null);
 
