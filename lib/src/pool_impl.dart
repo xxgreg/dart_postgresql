@@ -112,7 +112,6 @@ class PooledConnection {
 }
 
 
-//FIXME consistent use of pconn and conn.
 class PoolImpl implements Pool {
 
   PoolImpl(this.databaseUri,
@@ -219,25 +218,25 @@ class PoolImpl implements Pool {
       'Connect timeout exceeded: ${settings.connectionTimeout}.',
           settings.connectionTimeout);
 
-    PooledConnection conn = _getFirstAvailable();
+    PooledConnection pconn = _getFirstAvailable();
 
     // If there are currently no available connections then
     // add the current connection request at the end of the
     // wait queue.
-    if (conn == null) {
+    if (pconn == null) {
       var c = new Completer();
       _waitQueue.add(c);
-      conn = await c.future.timeout(timeout); //FIXME, onTimeout: onTimeout);
+      pconn = await c.future.timeout(timeout); //FIXME, onTimeout: onTimeout);
       _waitQueue.remove(c);
     }
 
-    if (!await _testConnection(conn).timeout(timeout - stopwatch.elapsed)) { //FIXME, onTimeout: onTimeout)) {
-      _destroyConnection(conn);
+    if (!await _testConnection(pconn).timeout(timeout - stopwatch.elapsed)) { //FIXME, onTimeout: onTimeout)) {
+      _destroyConnection(pconn);
       // Get another connection out of the pool and test again.
       return _connect(timeout - stopwatch.elapsed);
     }
 
-    return conn;
+    return pconn;
   }
 
   List<PooledConnection> _getAvailable()
@@ -250,19 +249,19 @@ class PoolImpl implements Pool {
   _processWaitQueue() {
     if (_waitQueue.isEmpty) return;
 
-    for (var conn in _getAvailable()) {
+    for (var pconn in _getAvailable()) {
       if (_waitQueue.isEmpty) return;
       var completer = _waitQueue.removeFirst();
-      completer.complete(conn);
+      completer.complete(pconn);
     }
   }
 
   /// Perfom a query to check the state of the connection.
-  Future<bool> _testConnection(PooledConnection conn) async {
+  Future<bool> _testConnection(PooledConnection pconn) async {
     bool ok;
     Exception exception;
     try {
-      var row = await conn.connection.query('select true').single;
+      var row = await pconn.connection.query('select true').single;
       ok = row[0];
     } on Exception catch (ex) {
       ok = false;
@@ -342,7 +341,5 @@ class PoolImpl implements Pool {
     _state = stopped;
   }
 
-  //FIXME just here for testing. Figure out a better way.
-  List<PooledConnection> getConnections() => _connections;
 }
 
