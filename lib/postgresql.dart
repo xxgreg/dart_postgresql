@@ -7,8 +7,8 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:postgresql/constants.dart';
 import 'package:postgresql/src/substitute.dart';
+import 'package:postgresql/src/buffer.dart';
 
-part 'src/postgresql/buffer.dart';
 part 'src/postgresql/connection.dart';
 part 'src/postgresql/constants.dart';
 part 'src/postgresql/messages.dart';
@@ -213,4 +213,12 @@ class Isolation {
   static const Isolation readCommitted = const Isolation('readCommitted');
   static const Isolation repeatableRead = const Isolation('repeatableRead');
   static const Isolation serializable = const Isolation('serializable');
+}
+
+class PostgresqlException implements Exception {
+  PostgresqlException(this._msg, [this.exception, this.stackTrace]);
+  final String _msg;
+  final dynamic exception;
+  final StackTrace stackTrace;
+  String toString() => exception == null ? _msg : '$_msg ($exception)';
 }

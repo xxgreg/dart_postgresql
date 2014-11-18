@@ -1,13 +1,5 @@
 part of postgresql;
 
-class _PgClientException implements Exception {
-  _PgClientException(this._msg, [this.exception, this.stackTrace]);
-  final String _msg;
-  final dynamic exception;
-  final StackTrace stackTrace;
-  String toString() => exception == null ? _msg : '$_msg ($exception)';
-}
-
 class _Connection implements Connection {
 
   _Connection(this._socket, Settings settings, TypeConverter typeConverter)
@@ -31,7 +23,7 @@ class _Connection implements Connection {
   final String _passwordHash;
   final TypeConverter _typeConverter;
   final Socket _socket;
-  final _Buffer _buffer = new _Buffer();
+  final Buffer _buffer = new Buffer();
   bool _hasConnected = false;
   final Completer _connected = new Completer();
   final Queue<_Query> _sendQueryQueue = new Queue<_Query>();
@@ -97,7 +89,7 @@ class _Connection implements Connection {
 
   void _sendStartupMessage() {
     if (_state != socketConnected)
-      throw new StateError('Invalid state during startup.');
+      throw new PostgresqlException('Invalid state during startup.');
 
     var msg = new _MessageBuffer();
     msg.addInt32(0); // Length padding.
@@ -119,7 +111,7 @@ class _Connection implements Connection {
     assert(_buffer.bytesAvailable >= length);
 
     if (_state != authenticating)
-      throw new StateError('Invalid connection state while authenticating.');
+      throw new PostgresqlException('Invalid connection state while authenticating.');
 
     int authType = _buffer.readInt32();
 
@@ -130,7 +122,7 @@ class _Connection implements Connection {
 
     // Only MD5 authentication is supported.
     if (authType != _AUTH_TYPE_MD5) {
-      throw new _PgClientException('Unsupported or unknown authentication type: ${_authTypeAsString(authType)}, only MD5 authentication is supported.');
+      throw new PostgresqlException('Unsupported or unknown authentication type: ${_authTypeAsString(authType)}, only MD5 authentication is supported.');
     }
 
     var bytes = _buffer.readBytes(4);
@@ -179,7 +171,7 @@ class _Connection implements Connection {
 
     } else {
       _destroy();
-      throw new _PgClientException('Unknown ReadyForQuery transaction status: ${_itoa(c)}.');
+      throw new PostgresqlException('Unknown ReadyForQuery transaction status: ${_itoa(c)}.');
     }
   }
 
@@ -251,7 +243,7 @@ class _Connection implements Connection {
         int length = _buffer.readInt32() - 4;
 
         if (!_checkMessageLength(msgType, length + 4)) {
-          throw new _PgClientException('Lost message sync.');
+          throw new PostgresqlException('Lost message sync.');
         }
 
         if (length > _buffer.bytesAvailable) {
@@ -265,9 +257,9 @@ class _Connection implements Connection {
         _readMessage(msgType, length);
       }
 
-    } on Exception catch (e, st) { // FIXME keep stacktrace.
+    } on Exception catch (e, st) {
       _destroy();
-      throw new _PgClientException('Error reading data.', e, st);
+      throw new PostgresqlException('Error reading data.', e, st);
     }
   }
 
@@ -319,11 +311,11 @@ class _Connection implements Connection {
       case _MSG_COMMAND_COMPLETE: _readCommandComplete(msgType, length); break;
 
       default:
-        throw new _PgClientException("Unknown, or unimplemented message: ${UTF8.decode([msgType])}.");
+        throw new PostgresqlException("Unknown, or unimplemented message: ${UTF8.decode([msgType])}.");
     }
 
     if (pos + length != _buffer.bytesRead)
-      throw new _PgClientException('Lost message sync.');
+      throw new PostgresqlException('Lost message sync.');
   }
 
   void _readErrorOrNoticeResponse(int msgType, int length) {
@@ -413,13 +405,13 @@ class _Connection implements Connection {
   _Query _enqueueQuery(String sql) {
 
     if (sql == null || sql == '')
-      throw new _PgClientException('SQL query is null or empty.');
+      throw new PostgresqlException('SQL query is null or empty.');
 
     if (sql.contains('\u0000'))
-      throw new _PgClientException('Sql query contains a null character.');
+      throw new PostgresqlException('Sql query contains a null character.');
 
     if (_state == closed)
-      throw new _PgClientException('Connection is closed, cannot execute query.');
+      throw new PostgresqlException('Connection is closed, cannot execute query.');
 
     var query = new _Query(sql);
     _sendQueryQueue.addLast(query);
