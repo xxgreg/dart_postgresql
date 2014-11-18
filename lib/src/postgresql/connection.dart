@@ -94,10 +94,10 @@ class _Connection implements Connection {
     var msg = new MessageBuffer();
     msg.addInt32(0); // Length padding.
     msg.addInt32(_PROTOCOL_VERSION);
-    msg.addString('user');
-    msg.addString(_userName);
-    msg.addString('database');
-    msg.addString(_databaseName);
+    msg.addUtf8String('user');
+    msg.addUtf8String(_userName);
+    msg.addUtf8String('database');
+    msg.addUtf8String(_databaseName);
     //TODO write params list.
     msg.addByte(0);
     msg.setLength(startup: true);
@@ -133,7 +133,7 @@ class _Connection implements Connection {
     var msg = new MessageBuffer();
     msg.addByte(_MSG_PASSWORD);
     msg.addInt32(0);
-    msg.addString(md5);
+    msg.addUtf8String(md5);
     msg.setLength();
 
     _socket.add(msg.buffer);
@@ -439,7 +439,7 @@ class _Connection implements Connection {
     var msg = new MessageBuffer();
     msg.addByte(_MSG_QUERY);
     msg.addInt32(0); // Length padding.
-    msg.addString(_query.sql);
+    msg.addUtf8String(_query.sql);
     msg.setLength();
 
     _socket.add(msg.buffer);
