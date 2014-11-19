@@ -30,9 +30,11 @@ class PoolSettingsImpl implements PoolSettings {
       this.stopTimeout: const Duration(seconds: 30),
       this.establishTimeout: const Duration(seconds: 30),
       this.connectionTimeout: const Duration(seconds: 30),
+      this.idleTimeout: const Duration(minutes: 10), //FIXME not sure what this default should be
       this.maxLifetime: const Duration(hours: 1),
       this.leakDetectionThreshold,
       this.testConnections: true,
+      this.restartIfAllConnectionsLeaked: false,
       this.typeConverter})
         : poolName = poolName != null ? poolName : 'pgpool${_sequence++}';
 
@@ -46,9 +48,11 @@ class PoolSettingsImpl implements PoolSettings {
   final Duration stopTimeout;
   final Duration establishTimeout;
   final Duration connectionTimeout;
+  final Duration idleTimeout;
   final Duration maxLifetime;
   final Duration leakDetectionThreshold;
   final bool testConnections;
+  final bool restartIfAllConnectionsLeaked;
   final pg.TypeConverter typeConverter;
 }
 
@@ -79,6 +83,7 @@ class ConnectionAdapter implements pg.Connection {
 }
 
 //FIXME option to store stacktrace for leak detection.
+//TODO make setters private, and expose this information.
 class PooledConnection {
 
   PooledConnection(this.pool);
@@ -95,6 +100,9 @@ class PooledConnection {
   /// Time at which the connection was last obtained by a client.
   DateTime obtained;
 
+  /// Time at which the connection was last released by a client.
+  DateTime released;
+  
   /// The pid of the postgresql handler.
   int backendPid;
 
@@ -103,6 +111,10 @@ class PooledConnection {
 
   /// A unique id that upated whenever the connection is obtained.
   int useId;
+  
+  /// If a leak detection threshold is set, then this flag will be set on leaked
+  /// connections.
+  bool isLeaked;
 
   String get name => '${pool.settings.poolName}:$backendPid'
       + (useId == null ? '' : ':$useId')
@@ -127,8 +139,14 @@ class PoolImpl implements Pool {
   final ConnectionFactory _connectionFactory;
 
   final List<PooledConnection> _connections = new List<PooledConnection>();
-  final Queue<Completer<PooledConnection>> _waitQueue = new Queue<Completer<PooledConnection>>();
-  final StreamController<pg.Message> _messages = new StreamController<pg.Message>.broadcast();
+  
+  final Queue<Completer<PooledConnection>> _waitQueue =
+      new Queue<Completer<PooledConnection>>();
+
+  Timer _heartbeatTimer;
+  
+  final StreamController<pg.Message> _messages =
+      new StreamController<pg.Message>.broadcast();
 
   //TODO pass connection messages through to pool.
   Stream<pg.Message> get messages => _messages.stream;
@@ -142,6 +160,8 @@ class PoolImpl implements Pool {
   int get inUseConnections =>
     _connections.where((c) => c.state == inUse).length;
 
+  int get leakedConnections =>
+    _connections.where((c) => c.isLeaked).length;
 
   Future start() async {
     //TODO consider allowing moving from state stopped to starting.
@@ -170,6 +190,9 @@ class PoolImpl implements Pool {
         .timeout(settings.startTimeout - stopwatch.elapsed); //FIXME,onTimeout: onTimeout);
     }
 
+    _heartbeatTimer = 
+        new Timer.periodic(new Duration(seconds: 1), (_) => _heartbeat());
+    
     _state = running;
   }
 
@@ -194,7 +217,60 @@ class PoolImpl implements Pool {
     _connections.add(pconn);
     pconn.state = available;
   }
+  
+  void _heartbeat() {    
+    for (var pconn in _connections) {
+      _checkIfLeaked(pconn);
+      _checkIdleTimeout(pconn);
+      
+      // This shouldn't be necessary, but could potentially help fault tolerance.
+      //FIXME This is causing the connect timeout to fail. 
+      //_processWaitQueue();
+    }
+    
+    _checkIfAllConnectionsLeaked();
+  }
 
+  _checkIdleTimeout(PooledConnection pconn) {
+    if (totalConnections > settings.minConnections) {
+      if (pconn.state == available
+          && pconn.released != null
+          && pconn.released.difference(new DateTime.now()) > settings.idleTimeout) {
+        //TODO debug logging
+        _destroyConnection(pconn);
+      }
+    }
+  }
+  
+  _checkIfLeaked(PooledConnection pconn) {
+    if (settings.leakDetectionThreshold != null
+        && !pconn.isLeaked
+        && pconn.state != available
+        && pconn.obtained != null
+        && pconn.obtained.difference(new DateTime.now()) > settings.leakDetectionThreshold) {
+      _leakDetected(pconn);
+    }
+  }
+  
+  _leakDetected(PooledConnection pconn) {
+    //FIXME implement
+    print('Leak detected');
+  }
+  
+  /// If all connections are in leaked state, then destroy them all, and
+  /// restart the minimum required number of connections.
+  _checkIfAllConnectionsLeaked() {
+    if (settings.restartIfAllConnectionsLeaked
+        && leakedConnections >= settings.maxConnections) {
+      _connections.where((c) => c.isLeaked).forEach(_destroyConnection);
+    }
+    
+    // Start new connections in parallel.
+    for (int i = 0; i < settings.minConnections; i++) {
+      _establishConnection();
+    }
+  }
+  
   // Used to generate unique ids (well... unique for this isolate at least).
   static int _sequence = 1;
 
@@ -302,6 +378,7 @@ class PoolImpl implements Pool {
       _establishConnection();
 
     } else {
+      pconn.released = new DateTime.now();
       pconn.state = available;
       _processWaitQueue();
     }
@@ -317,11 +394,14 @@ class PoolImpl implements Pool {
   }
 
   Future stop() async {
-    if (state == stopped) return null;
+    
+    if (state == stopped || state == initial) return null;
 
     //TODO if (state == stopping)
     // wait for stopping process to finish.
 
+    if (_heartbeatTimer != null) _heartbeatTimer.cancel();
+    
     _state = stopping;
 
     // Close connections as they are returned to the pool.
@@ -341,5 +421,7 @@ class PoolImpl implements Pool {
     _state = stopped;
   }
 
+  //FIXME just exposed for testing. Expose in a safer way.
+  List<PooledConnection> getConnections() => _connections;
 }
 

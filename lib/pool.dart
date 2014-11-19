@@ -24,9 +24,11 @@ abstract class PoolSettings {
       Duration stopTimeout,
       Duration establishTimeout,
       Duration connectionTimeout,
+      Duration idleTimeout,
       Duration maxLifetime,
       Duration leakDetectionThreshold,
       bool testConnections,
+      bool restartIfAllConnectionsLeaked,
       pg.TypeConverter typeConverter}) = PoolSettingsImpl;
 
   String get poolName;
@@ -36,9 +38,12 @@ abstract class PoolSettings {
   Duration get stopTimeout;
   Duration get establishTimeout; //TODO better name
   Duration get connectionTimeout; //TODO better name
+  Duration get idleTimeout;
   Duration get maxLifetime;
   Duration get leakDetectionThreshold;
   bool get testConnections;
+  bool get restartIfAllConnectionsLeaked;
+  pg.TypeConverter get typeConverter;
 }
 
 //TODO change to enum once implemented.
