@@ -32,7 +32,7 @@ class PoolSettingsImpl implements PoolSettings {
       this.connectionTimeout: const Duration(seconds: 30),
       this.idleTimeout: const Duration(minutes: 10), //FIXME not sure what this default should be
       this.maxLifetime: const Duration(hours: 1),
-      this.leakDetectionThreshold,
+      this.leakDetectionThreshold: null, // Disabled by default.
       this.testConnections: true,
       this.restartIfAllConnectionsLeaked: false,
       this.typeConverter})
@@ -116,6 +116,9 @@ class PooledConnection {
   /// connections.
   bool isLeaked;
 
+  /// The stacktrace at the time pool.connect() was last called.
+  StackTrace stackTrace;
+  
   String get name => '${pool.settings.poolName}:$backendPid'
       + (useId == null ? '' : ':$useId')
       + (debugId == null ? '' : ':$debugId');
@@ -280,7 +283,7 @@ class PoolImpl implements Pool {
     if (totalConnections > settings.minConnections) {
       if (pconn.state == available
           && pconn.released != null
-          && pconn.released.difference(new DateTime.now()) > settings.idleTimeout) {
+          && _isExpired(pconn.released, settings.idleTimeout)) {
         //TODO debug logging
         _destroyConnection(pconn);
       }
@@ -292,14 +295,16 @@ class PoolImpl implements Pool {
         && !pconn.isLeaked
         && pconn.state != available
         && pconn.obtained != null
-        && pconn.obtained.difference(new DateTime.now()) > settings.leakDetectionThreshold) {
-      _leakDetected(pconn);
+        && _isExpired(pconn.obtained, settings.leakDetectionThreshold)) {
+      pconn.isLeaked = true;
+      _messages.add(new pg.ClientMessage(
+          severity: 'WARNING',
+          connectionName: pconn.name,
+          message: 'Leak detected. '
+            'state: ${pconn.connection.state} '
+            'transactionState: ${pconn.connection.transactionState}',
+          stackTrace: pconn.stackTrace));
     }
-  }
-  
-  _leakDetected(PooledConnection pconn) {
-    //FIXME implement
-    print('Leak detected');
   }
   
   /// If all connections are in leaked state, then destroy them all, and
@@ -323,20 +328,44 @@ class PoolImpl implements Pool {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
-      _processWaitQueue();
-      new Future.value(_connect(settings.connectionTimeout)).then((x0) {
-        try {
-          var pconn = x0;
-          pconn
-              ..state = inUse
-              ..obtained = new DateTime.now()
-              ..useId = _sequence++
-              ..debugId = debugId;
-          completer0.complete(pconn.adapter);
-        } catch (e0, s0) {
-          completer0.completeError(e0, s0);
+      StackTrace stackTrace = null;
+      join0() {
+        new Future.value(_connect(settings.connectionTimeout)).then((x0) {
+          try {
+            var pconn = x0;
+            pconn
+                ..state = inUse
+                ..obtained = new DateTime.now()
+                ..useId = _sequence++
+                ..debugId = debugId
+                ..stackTrace = stackTrace;
+            completer0.complete(pconn.adapter);
+          } catch (e0, s0) {
+            completer0.completeError(e0, s0);
+          }
+        }, onError: completer0.completeError);
+      }
+      if (settings.leakDetectionThreshold != null) {
+        join1() {
+          join0();
         }
-      }, onError: completer0.completeError);
+        catch0(ex, st) {
+          try {
+            stackTrace = st;
+            join1();
+          } catch (ex, st) {
+            completer0.completeError(ex, st);
+          }
+        }
+        try {
+          throw "Generate stacktrace.";
+          join1();
+        } catch (e1, s1) {
+          catch0(e1, s1);
+        }
+      } else {
+        join0();
+      }
     } catch (e, s) {
       completer0.completeError(e, s);
     }
@@ -358,13 +387,13 @@ class PoolImpl implements Pool {
         new Future.value(_testConnection(pconn).timeout(timeout - stopwatch.elapsed)).then((x0) {
           try {
             join1() {
-              completer0.complete(pconn);
+              completer0.complete();
             }
             if (!x0) {
               _destroyConnection(pconn);
               completer0.complete(_connect(timeout - stopwatch.elapsed));
             } else {
-              join1();
+              completer0.complete(pconn);
             }
           } catch (e0, s0) {
             completer0.completeError(e0, s0);
@@ -424,8 +453,9 @@ class PoolImpl implements Pool {
         try {
           if (ex is Exception) {
             ok = false;
-            print('Connection test failed.');
-            print(exception);
+            _leakDetected(PooledConnection pconn) {
+              _messages.add(new pg.ClientMessage(severity: 'WARNING', connectionName: pconn.name, message: 'Connection test failed.', exception: ex, stackTrace: pconn.stackTrace));
+            }
             join0();
           } else {
             throw ex;
@@ -477,8 +507,7 @@ class PoolImpl implements Pool {
         _establishConnection();
 
     // If connection older than lifetime setting then destroy.
-    } else if (new DateTime.now().difference(pconn.established) >
-                 settings.maxLifetime) {
+    } else if (_isExpired(pconn.established, settings.maxLifetime)) {
 
       _destroyConnection(pconn);
       _establishConnection();
@@ -489,7 +518,10 @@ class PoolImpl implements Pool {
       _processWaitQueue();
     }
   }
-
+  
+  bool _isExpired(DateTime time, Duration timeout) 
+    => new DateTime.now().difference(time) > timeout;
+  
   _destroyConnection(PooledConnection pconn) {
     pconn.connection.close();
     pconn.state = closed2;
