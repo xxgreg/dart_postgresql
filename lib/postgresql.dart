@@ -19,12 +19,11 @@ part 'src/postgresql/type_converter.dart';
 /// Connect to a PostgreSQL database.
 /// A uri has the following format:
 /// 'postgres://testdb:password@localhost:5432/testdb'.
-//FIXME timeout setting
 Future<Connection> connect(
-    String uri, {
-    Duration connectionTimeout, //TODO actually use this.
-    String connectionName, //TODO actually use this. Default to conn + increasing number.
-    TypeConverter typeConverter}) => _Connection._connect(uri, typeConverter);
+    String uri, 
+    { Duration connectionTimeout,
+      TypeConverter typeConverter}) => 
+        _Connection._connect(uri, connectionTimeout, typeConverter);
 
 /// A connection to a PostgreSQL database.
 abstract class Connection {

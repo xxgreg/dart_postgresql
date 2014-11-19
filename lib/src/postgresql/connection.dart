@@ -34,17 +34,31 @@ class _Connection implements Connection {
   Stream get messages => _messages.stream;
   final StreamController _messages = new StreamController.broadcast();
 
-  static Future<_Connection> _connect(String uri, TypeConverter typeConverter) {
+  static Future<_Connection> _connect(String uri, Duration timeout, TypeConverter typeConverter) {
     return new Future.sync(() {
       var settings = new Settings.fromUri(uri);
 
+      //FIXME Currently this timeout doesn't cancel the socket connection 
+      // process.
+      // There is a bug open about adding a real socket connect timeout
+      // parameter to Socket.connect() if this happens then start using it.
+      // http://code.google.com/p/dart/issues/detail?id=19120
+      if (timeout == null) timeout = new Duration(seconds: 180);
+      
+      var onTimeout = 
+          () => throw new TimeoutException(
+              'Postgresql connection timed out. $timeout', timeout);
+      
       var future = settings.requireSsl
-        ? _connectSsl(settings)
-        : Socket.connect(settings.host, settings.port);
+        ? _connectSsl(settings, timeout, onTimeout)
+        : Socket.connect(settings.host, settings.port)
+            .timeout(timeout, onTimeout: onTimeout);
 
       return future.then((socket) {
         var conn = new _Connection(socket, settings, typeConverter);
-        socket.listen(conn._readData, onError: conn._handleSocketError, onDone: conn._handleSocketClosed);
+        socket.listen(conn._readData, 
+            onError: conn._handleSocketError,
+            onDone: conn._handleSocketClosed);
         conn._state = socketConnected;
         conn._sendStartupMessage();
         return conn._connected.future;
@@ -58,7 +72,9 @@ class _Connection implements Connection {
     return CryptoUtils.bytesToHex(hash.close());
   }
 
-  static Future<SecureSocket> _connectSsl(Settings settings) {
+  //TODO yuck - this needs a rewrite.
+  static Future<SecureSocket> _connectSsl(
+      Settings settings, Duration timeout, onTimeout()) {
 
     var completer = new Completer<SecureSocket>();
 
@@ -80,6 +96,7 @@ class _Connection implements Connection {
       socket.add([0, 0, 0, 8, 4, 210, 22, 47]);
 
     })
+    .timeout(timeout, onTimeout: onTimeout)
     .catchError((e) {
       completer.completeError(e);
     });

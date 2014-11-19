@@ -17,10 +17,15 @@ const PooledConnectionState closed2 = PooledConnectionState.closed;
 
 
 // Allow for mocking the pg connection.
-typedef Future<pg.Connection> ConnectionFactory(String uri, settings);
+typedef Future<pg.Connection> ConnectionFactory(
+    String uri, 
+    { Duration timeout,
+      pg.TypeConverter typeConverter});
 
-// TODO pass through required settings such as the type converter
-_defaultConnectionFactory(uri, settings) => pg.connect(uri);
+_defaultConnectionFactory(
+    String uri,
+    { Duration timeout,
+      pg.TypeConverter typeConverter}) => pg.connect(uri);
 
 class PoolSettingsImpl implements PoolSettings {
   PoolSettingsImpl({String poolName,
@@ -208,15 +213,10 @@ class PoolImpl implements Pool {
     var pconn = new PooledConnection(this);
     pconn.state = connecting;
 
-    var onTimeout = () => throw new TimeoutException(
-      'Connection pool connection established timed out. '
-        'establishTimeout: ${settings.establishTimeout}).',
-          settings.establishTimeout);
-    
-    //FIXME timeout setting - implement in connection??, and pass through here.
-    //TODO pass more settings
-    var conn = await _connectionFactory(databaseUri, null)
-      .timeout(settings.establishTimeout, onTimeout: onTimeout);
+    var conn = await _connectionFactory(
+      databaseUri,
+      timeout: settings.establishTimeout,
+      typeConverter: settings.typeConverter);
     
     // Pass this connection's messages through to the pool messages stream.
     conn.messages.listen((msg) => _messages.add(
@@ -237,7 +237,9 @@ class PoolImpl implements Pool {
     try {
       row = await conn.query('select pg_backend_pid()').single
           .timeout(settings.establishTimeout - stopwatch.elapsed,
-                   onTimeout: onTimeout);
+                   onTimeout: () => throw new TimeoutException(
+                       'Connection establishment timed out. '
+                       '${settings.establishTimeout}', settings.establishTimeout));
     } on Exception {
       conn.close();
       rethrow;
