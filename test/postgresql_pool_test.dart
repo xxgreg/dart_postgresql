@@ -66,7 +66,7 @@ Future testStartTimeout() async {
   var pool = new PoolImpl('postgresql://fakeuri', settings, mockConnect);
 
   try {
-    expect(pool.getConnections(), isEmpty);
+    expect(pool.connections, isEmpty);
     var v = await pool.start();
     fail('Pool started, but should have timed out.');
   } catch (ex, st) {
@@ -84,14 +84,14 @@ Future testConnectTimeout() async {
       connectionTimeout: new Duration(seconds: 2));
   var pool = createPool(settings);
 
-  expect(pool.getConnections(), isEmpty);
+  expect(pool.connections, isEmpty);
 
   var v = await pool.start();
 
   expect(v, isNull);
   //TODO totalConnections getter;
-  expect(pool.getConnections().length, equals(settings.minConnections));
-  expect(pool.getConnections().where((c) => c.state == available).length,
+  expect(pool.connections.length, equals(settings.minConnections));
+  expect(pool.connections.where((c) => c.state == available).length,
       equals(settings.minConnections));
 
   // Obtain all of the connections from the pool.
@@ -116,16 +116,16 @@ Future testWaitQueue() async {
       maxConnections: 2);
   var pool = createPool(settings);
 
-  expect(pool.getConnections(), isEmpty);
+  expect(pool.connections, isEmpty);
 
   var v = await pool.start();
 
   expect(v, isNull);
   //TODO getter totalConnections;
-  expect(pool.getConnections().length, equals(2));
+  expect(pool.connections.length, equals(2));
 
   //TODO expose getter availableConnections
-  expect(pool.getConnections().where((c) => c.state == available).length,
+  expect(pool.connections.where((c) => c.state == available).length,
       equals(2));
 
   var c1 = await pool.connect();
@@ -134,7 +134,7 @@ Future testWaitQueue() async {
   c1.query('mock timeout 5').toList().then((r) => c1.close());
   c2.query('mock timeout 10').toList().then((r) => c2.close());
 
-  var conns = pool.getConnections();
+  var conns = pool.connections;
   expect(conns.length, equals(2));
   expect(conns.where((c) => c.state == available).length, equals(0));
   expect(conns.where((c) => c.state == inUse).length, equals(2));

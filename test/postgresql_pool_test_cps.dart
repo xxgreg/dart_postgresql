@@ -113,7 +113,7 @@ Future testStartTimeout() {
         }
       }
       try {
-        expect(pool.getConnections(), isEmpty);
+        expect(pool.connections, isEmpty);
         new Future.value(pool.start()).then((x0) {
           try {
             var v = x0;
@@ -140,13 +140,13 @@ Future testConnectTimeout() {
     try {
       var settings = new PoolSettings(minConnections: 2, maxConnections: 2, connectionTimeout: new Duration(seconds: 2));
       var pool = createPool(settings);
-      expect(pool.getConnections(), isEmpty);
+      expect(pool.connections, isEmpty);
       new Future.value(pool.start()).then((x0) {
         try {
           var v = x0;
           expect(v, isNull);
-          expect(pool.getConnections().length, equals(settings.minConnections));
-          expect(pool.getConnections().where(((c) {
+          expect(pool.connections.length, equals(settings.minConnections));
+          expect(pool.connections.where(((c) {
             return c.state == available;
           })).length, equals(settings.minConnections));
           new Future.value(pool.connect()).then((x1) {
@@ -209,13 +209,13 @@ Future testWaitQueue() {
     try {
       var settings = new PoolSettings(minConnections: 2, maxConnections: 2);
       var pool = createPool(settings);
-      expect(pool.getConnections(), isEmpty);
+      expect(pool.connections, isEmpty);
       new Future.value(pool.start()).then((x0) {
         try {
           var v = x0;
           expect(v, isNull);
-          expect(pool.getConnections().length, equals(2));
-          expect(pool.getConnections().where(((c) {
+          expect(pool.connections.length, equals(2));
+          expect(pool.connections.where(((c) {
             return c.state == available;
           })).length, equals(2));
           new Future.value(pool.connect()).then((x1) {
@@ -230,7 +230,7 @@ Future testWaitQueue() {
                   c2.query('mock timeout 10').toList().then(((r) {
                     return c2.close();
                   }));
-                  var conns = pool.getConnections();
+                  var conns = pool.connections;
                   expect(conns.length, equals(2));
                   expect(conns.where(((c) {
                     return c.state == available;

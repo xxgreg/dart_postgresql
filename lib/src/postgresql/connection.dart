@@ -33,12 +33,21 @@ class _Connection implements Connection {
   int _secretKey;
   
   int _backendPid;
+  
   int get backendPid => _backendPid;
   
-  final Map<String,String> _parameters = new Map<String, String>();  
-  Map<String,String> get parameters => new UnmodifiableMapView(_parameters);
+  final Map<String,String> _parameters = new Map<String, String>();
+  
+  Map<String,String> _parametersView;
+  
+  Map<String,String> get parameters {
+    if (_parametersView = null)
+      _parametersView = new UnmodifiableMapView(_parameters);
+    return _parametersView;
+  }
   
   Stream get messages => _messages.stream;
+
   final StreamController _messages = new StreamController.broadcast();
 
   static Future<_Connection> _connect(String uri, Duration timeout, TypeConverter typeConverter) {

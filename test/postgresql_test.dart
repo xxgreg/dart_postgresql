@@ -16,8 +16,6 @@ Settings loadSettings(){
 main() {
 
   String validUri = loadSettings().toUri();
-
-  print(validUri);
   
   group('Connect', () {
 

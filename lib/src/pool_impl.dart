@@ -89,47 +89,56 @@ class ConnectionAdapter implements pg.Connection {
   int get backendPid => _conn.backendPid;
 }
 
-//TODO make setters private, and expose this information.
+
 class PooledConnection {
 
-  PooledConnection(this.pool);
+  PooledConnection(this._pool);
 
-  final PoolImpl pool;
-  pg.Connection connection;
-  ConnectionAdapter adapter;
-
-  PooledConnectionState state;
+  final PoolImpl _pool;
+  pg.Connection _connection;
+  ConnectionAdapter _adapter;
+  PooledConnectionState _state;
+  DateTime _established;
+  DateTime _obtained;
+  DateTime _released;
+  String _debugId;
+  int _useId;
+  bool _isLeaked;
+  StackTrace _stackTrace;
+  
+  /// The state of connection in the pool, available, closed
+  PooledConnectionState get state => _state;
 
   /// Time at which the physical connection to the database was established.
-  DateTime established;
+  DateTime get established => _established;
 
   /// Time at which the connection was last obtained by a client.
-  DateTime obtained;
+  DateTime get obtained => _obtained;
 
   /// Time at which the connection was last released by a client.
-  DateTime released;
+  DateTime get released => _released;
   
   /// The pid of the postgresql handler.
-  int get backendPid => connection == null ? null : connection.backendPid;
+  int get backendPid => _connection == null ? null : _connection.backendPid;
 
   /// The id passed to connect for debugging.
-  String debugId;
+  String get debugId => _debugId;
 
-  /// A unique id that upated whenever the connection is obtained.
-  int useId;
+  /// A unique id that updated whenever the connection is obtained.
+  int get useId => _useId;
   
   /// If a leak detection threshold is set, then this flag will be set on leaked
   /// connections.
-  bool isLeaked;
+  bool get isLeaked => _isLeaked;
 
   /// The stacktrace at the time pool.connect() was last called.
-  StackTrace stackTrace;
+  StackTrace get stackTrace => _stackTrace;
   
-  String get name => '${pool.settings.poolName}:$backendPid'
-      + (useId == null ? '' : ':$useId')
-      + (debugId == null ? '' : ':$debugId');
+  String get name => '${_pool.settings.poolName}:$backendPid'
+      + (_useId == null ? '' : ':$_useId')
+      + (_debugId == null ? '' : ':$_debugId');
 
-  String toString() => '$name $state est: $established obt: $obtained';
+  String toString() => '$name $_state est: $_established obt: $_obtained';
 }
 
 _debug(msg) => print(msg);
@@ -147,8 +156,6 @@ class PoolImpl implements Pool {
   final String databaseUri;
   final PoolSettings settings;
   final ConnectionFactory _connectionFactory;
-
-  final List<PooledConnection> _connections = new List<PooledConnection>();
   
   final Queue<Completer<PooledConnection>> _waitQueue =
       new Queue<Completer<PooledConnection>>();
@@ -159,19 +166,29 @@ class PoolImpl implements Pool {
   final StreamController<pg.Message> _messages =
       new StreamController<pg.Message>.broadcast();
 
+  final List<PooledConnection> _connections = new List<PooledConnection>();
+  
+  List<PooledConnection> _connectionsView; 
+  
+  List<PooledConnection> get connections {
+    if (_connectionsView == null)
+      _connectionsView = new UnmodifiableListView(_connections);
+    return _connectionsView;
+  }
+  
   Stream<pg.Message> get messages => _messages.stream;
 
   /// Note includes connections which are currently connecting/testing.
   int get totalConnections => _connections.length;
 
   int get availableConnections =>
-    _connections.where((c) => c.state == available).length;
+    _connections.where((c) => c._state == available).length;
 
   int get inUseConnections =>
-    _connections.where((c) => c.state == inUse).length;
+    _connections.where((c) => c._state == inUse).length;
 
   int get leakedConnections =>
-    _connections.where((c) => c.isLeaked).length;
+    _connections.where((c) => c._isLeaked).length;
 
   Future start() async {
     _debug('start');
@@ -213,7 +230,7 @@ class PoolImpl implements Pool {
     var stopwatch = new Stopwatch()..start();
     
     var pconn = new PooledConnection(this);
-    pconn.state = connecting;
+    pconn._state = connecting;
 
     var conn = await _connectionFactory(
       databaseUri,
@@ -226,13 +243,13 @@ class PoolImpl implements Pool {
         onError: (msg) => _messages.addError(
             new pg.Message.from(msg, connectionName: pconn.name)));
 
-    pconn.connection = conn;
-    pconn.established = new DateTime.now();
-    pconn.adapter = new ConnectionAdapter(conn, onClose: () {
+    pconn._connection = conn;
+    pconn._established = new DateTime.now();
+    pconn._adapter = new ConnectionAdapter(conn, onClose: () {
       _releaseConnection(pconn);
     });
 
-    pconn.state = available;
+    pconn._state = available;
     _connections.add(pconn);
     
     _debug('Established connection. ${pconn.name}');
@@ -252,9 +269,9 @@ class PoolImpl implements Pool {
 
   _checkIdleTimeout(PooledConnection pconn) {
     if (totalConnections > settings.minConnections) {
-      if (pconn.state == available
-          && pconn.released != null
-          && _isExpired(pconn.released, settings.idleTimeout)) {
+      if (pconn._state == available
+          && pconn._released != null
+          && _isExpired(pconn._released, settings.idleTimeout)) {
         _debug('Idle connection ${pconn.name}.');
         _destroyConnection(pconn);
       }
@@ -263,18 +280,18 @@ class PoolImpl implements Pool {
   
   _checkIfLeaked(PooledConnection pconn) {
     if (settings.leakDetectionThreshold != null
-        && !pconn.isLeaked
-        && pconn.state != available
-        && pconn.obtained != null
-        && _isExpired(pconn.obtained, settings.leakDetectionThreshold)) {
-      pconn.isLeaked = true;
+        && !pconn._isLeaked
+        && pconn._state != available
+        && pconn._obtained != null
+        && _isExpired(pconn._obtained, settings.leakDetectionThreshold)) {
+      pconn._isLeaked = true;
       _messages.add(new pg.ClientMessage(
           severity: 'WARNING',
           connectionName: pconn.name,
           message: 'Leak detected. '
-            'state: ${pconn.connection.state} '
-            'transactionState: ${pconn.connection.transactionState}',
-          stackTrace: pconn.stackTrace));
+            'state: ${pconn._connection.state} '
+            'transactionState: ${pconn._connection.transactionState}',
+          stackTrace: pconn._stackTrace));
     }
   }
   
@@ -290,7 +307,7 @@ class PoolImpl implements Pool {
             'These will be closed and new connections started.'));
       
       // Forcefully close leaked connections.
-      _connections.where((c) => c.isLeaked).forEach(_destroyConnection);
+      _connections.where((c) => c._isLeaked).forEach(_destroyConnection);
       
       // Start new connections in parallel.
       for (int i = 0; i < settings.minConnections; i++) {
@@ -317,15 +334,15 @@ class PoolImpl implements Pool {
     
     var pconn = await _connect(settings.connectionTimeout);
 
-    pconn..state = inUse
-      ..obtained = new DateTime.now()
-      ..useId = _sequence++
-      ..debugId = debugId
-      ..stackTrace = stackTrace;
+    pconn.._state = inUse
+      .._obtained = new DateTime.now()
+      .._useId = _sequence++
+      .._debugId = debugId
+      .._stackTrace = stackTrace;
 
     _debug('Connected. ${pconn.name}');
     
-    return pconn.adapter;
+    return pconn._adapter;
   }
 
   Future<PooledConnection> _connect(Duration timeout) async {
@@ -361,10 +378,10 @@ class PoolImpl implements Pool {
   }
 
   List<PooledConnection> _getAvailable()
-    => _connections.where((c) => c.state == available).toList();
+    => _connections.where((c) => c._state == available).toList();
 
   PooledConnection _getFirstAvailable()
-    => _connections.firstWhere((c) => c.state == available, orElse: () => null);
+    => _connections.firstWhere((c) => c._state == available, orElse: () => null);
 
   /// If connections are available, return them to waiting clients.
   _processWaitQueue() {
@@ -382,7 +399,7 @@ class PoolImpl implements Pool {
     bool ok;
     Exception exception;
     try {
-      var row = await pconn.connection.query('select true').single;
+      var row = await pconn._connection.query('select true').single;
       ok = row[0];
     } on Exception catch (ex) {
       ok = false;
@@ -391,7 +408,7 @@ class PoolImpl implements Pool {
           connectionName: pconn.name,
           message: 'Connection test failed.',
           exception: ex,
-          stackTrace: pconn.stackTrace));
+          stackTrace: pconn._stackTrace));
     }
     return ok;
   }
@@ -399,7 +416,7 @@ class PoolImpl implements Pool {
   _releaseConnection(PooledConnection pconn) {
     _debug('release ${pconn.name}');
     
-    pg.Connection conn = pconn.connection;
+    pg.Connection conn = pconn._connection;
     
     // If connection still in transaction or busy with query then destroy.
     // Note this means connections which are returned with an un-committed 
@@ -419,14 +436,14 @@ class PoolImpl implements Pool {
         _establishConnection();
 
     // If connection older than lifetime setting then destroy.
-    } else if (_isExpired(pconn.established, settings.maxLifetime)) {
+    } else if (_isExpired(pconn._established, settings.maxLifetime)) {
 
       _destroyConnection(pconn);
       _establishConnection();
 
     } else {
-      pconn.released = new DateTime.now();
-      pconn.state = available;
+      pconn._released = new DateTime.now();
+      pconn._state = available;
       _processWaitQueue();
     }
   }
@@ -436,8 +453,8 @@ class PoolImpl implements Pool {
   
   _destroyConnection(PooledConnection pconn) {
     _debug('Destroy connection. ${pconn.name}');
-    pconn.connection.close();
-    pconn.state = closed2;
+    pconn._connection.close();
+    pconn._state = closed2;
     _connections.remove(pconn);
   }
   
@@ -482,8 +499,6 @@ class PoolImpl implements Pool {
     _debug('Stopped');
   }
 
-  //FIXME just exposed for testing. Expose in a safer way.
-  List<PooledConnection> getConnections() => _connections;
 }
 
 
