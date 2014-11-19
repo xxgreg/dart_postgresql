@@ -30,7 +30,10 @@ class _Connection implements Connection {
   _Query _query;
   int _msgType;
   int _msgLength;
-
+  
+  final Map<String,String> _parameters = new Map<String, String>();  
+  Map<String,String> get parameters => new UnmodifiableMapView(_parameters);
+  
   Stream get messages => _messages.stream;
   final StreamController _messages = new StreamController.broadcast();
 
@@ -372,7 +375,9 @@ class _Connection implements Connection {
 
   void _readParameterStatus(int msgType, int length) {
     assert(_buffer.bytesAvailable >= length);
-    _buffer.readBytes(length);
+    var name = _buffer.readUtf8String(10000);
+    var value = _buffer.readUtf8String(10000);
+    _parameters[name] = value;
   }
 
   Stream _errorStream(err) {

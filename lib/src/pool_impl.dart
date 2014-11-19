@@ -82,9 +82,9 @@ class ConnectionAdapter implements pg.Connection {
 
   pg.TransactionState get transactionState => _conn.transactionState;
 
-  //FIXME Test this to make sure it doesn't cause memory leaks.
   Stream<pg.Message> get messages => _conn.messages;
 
+  Map<String,String> get parameters => _conn.parameters; 
 }
 
 //TODO make setters private, and expose this information.

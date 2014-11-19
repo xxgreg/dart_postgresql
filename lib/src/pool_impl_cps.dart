@@ -17,10 +17,15 @@ const PooledConnectionState closed2 = PooledConnectionState.closed;
 
 
 // Allow for mocking the pg connection.
-typedef Future<pg.Connection> ConnectionFactory(String uri, settings);
+typedef Future<pg.Connection> ConnectionFactory(
+    String uri, 
+    { Duration timeout,
+      pg.TypeConverter typeConverter});
 
-// TODO pass through required settings such as the type converter
-_defaultConnectionFactory(uri, settings) => pg.connect(uri);
+_defaultConnectionFactory(
+    String uri,
+    { Duration timeout,
+      pg.TypeConverter typeConverter}) => pg.connect(uri);
 
 class PoolSettingsImpl implements PoolSettings {
   PoolSettingsImpl({String poolName,
@@ -77,9 +82,9 @@ class ConnectionAdapter implements pg.Connection {
 
   pg.TransactionState get transactionState => _conn.transactionState;
 
-  //FIXME Test this to make sure it doesn't cause memory leaks.
   Stream<pg.Message> get messages => _conn.messages;
 
+  Map<String,String> get parameters => _conn.parameters; 
 }
 
 //TODO make setters private, and expose this information.
@@ -240,10 +245,7 @@ class PoolImpl implements Pool {
           ..start();
       var pconn = new PooledConnection(this);
       pconn.state = connecting;
-      var onTimeout = (() {
-        return throw new TimeoutException('Connection pool connection established timed out. ' 'establishTimeout: ${settings.establishTimeout}).', settings.establishTimeout);
-      });
-      new Future.value(_connectionFactory(databaseUri, null).timeout(settings.establishTimeout, onTimeout: onTimeout)).then((x0) {
+      new Future.value(_connectionFactory(databaseUri, timeout: settings.establishTimeout, typeConverter: settings.typeConverter)).then((x0) {
         try {
           var conn = x0;
           conn.messages.listen(((msg) {
@@ -277,7 +279,9 @@ class PoolImpl implements Pool {
             }
           }
           try {
-            new Future.value(conn.query('select pg_backend_pid()').single.timeout(settings.establishTimeout - stopwatch.elapsed, onTimeout: onTimeout)).then((x1) {
+            new Future.value(conn.query('select pg_backend_pid()').single.timeout(settings.establishTimeout - stopwatch.elapsed, onTimeout: (() {
+              return throw new TimeoutException('Connection establishment timed out. ' '${settings.establishTimeout}', settings.establishTimeout);
+            }))).then((x1) {
               try {
                 row = x1;
                 join0();

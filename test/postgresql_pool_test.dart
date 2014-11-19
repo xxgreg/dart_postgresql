@@ -20,7 +20,7 @@ main() {
 }
 
 PoolImpl createPool(PoolSettings settings) {
-  var mockConnect = (uri, settings) => new Future.value(new MockConnection());
+  var mockConnect = (uri, {timeout, typeConverter}) => new Future.value(new MockConnection());
   int minConnections = 2;
   return new PoolImpl('postgresql://fakeuri', settings, mockConnect);
 }
@@ -59,7 +59,7 @@ Future testPool() async {
 
 
 Future testStartTimeout() async {
-  var mockConnect = (uri, settings) => new Future.delayed(new Duration(seconds: 10));
+  var mockConnect = (uri, {timeout, typeConverter}) => new Future.delayed(new Duration(seconds: 10));
   var settings = new PoolSettings(
       startTimeout: new Duration(seconds: 2),
       minConnections: 2);

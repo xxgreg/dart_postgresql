@@ -23,6 +23,8 @@ class MockConnection implements pg.Connection {
   pg.ConnectionState state = pg.ConnectionState.idle;
   pg.TransactionState transactionState = none;
 
+  Map<String,String> parameters = {};
+  
   Stream query(String sql, [values]) {
     _log('query("$sql")');
     if (sql == 'select pg_backend_pid()') return queryResults([[_sequence++]]);

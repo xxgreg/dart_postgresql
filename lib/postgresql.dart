@@ -65,6 +65,9 @@ abstract class Connection {
   Stream<Message> get messages;
 
 
+  /// Server configuration parameters such as date format and timezone.
+  Map<String,String> get parameters;
+  
   ConnectionState get state;
 
 
