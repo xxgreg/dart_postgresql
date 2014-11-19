@@ -30,6 +30,10 @@ class _Connection implements Connection {
   _Query _query;
   int _msgType;
   int _msgLength;
+  int _secretKey;
+  
+  int _backendPid;
+  int get backendPid => _backendPid;
   
   final Map<String,String> _parameters = new Map<String, String>();  
   Map<String,String> get parameters => new UnmodifiableMapView(_parameters);
@@ -370,7 +374,8 @@ class _Connection implements Connection {
 
   void _readBackendKeyData(int msgType, int length) {
     assert(_buffer.bytesAvailable >= length);
-    _buffer.readBytes(length);
+    _backendPid = _buffer.readInt32();
+    _secretKey = _buffer.readInt32();
   }
 
   void _readParameterStatus(int msgType, int length) {

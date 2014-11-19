@@ -61,7 +61,7 @@ class PoolSettingsImpl implements PoolSettings {
   final pg.TypeConverter typeConverter;
 }
 
-
+//FIXME Rename this, as it is not an adapter.
 class ConnectionAdapter implements pg.Connection {
 
   ConnectionAdapter(this._conn, {onClose})
@@ -84,7 +84,9 @@ class ConnectionAdapter implements pg.Connection {
 
   Stream<pg.Message> get messages => _conn.messages;
 
-  Map<String,String> get parameters => _conn.parameters; 
+  Map<String,String> get parameters => _conn.parameters;
+  
+  int get backendPid => _conn.backendPid;
 }
 
 //TODO make setters private, and expose this information.
@@ -108,7 +110,7 @@ class PooledConnection {
   DateTime released;
   
   /// The pid of the postgresql handler.
-  int backendPid;
+  int get backendPid => connection == null ? null : connection.backendPid;
 
   /// The id passed to connect for debugging.
   String debugId;
@@ -230,22 +232,6 @@ class PoolImpl implements Pool {
       _releaseConnection(pconn);
     });
 
-    // Fetch postgresql backend pid to use as connection id.
-    //TODO this may actually be passed to the connection during startup.
-    // If that is the case then remove this.
-    pg.Row row;
-    try {
-      row = await conn.query('select pg_backend_pid()').single
-          .timeout(settings.establishTimeout - stopwatch.elapsed,
-                   onTimeout: () => throw new TimeoutException(
-                       'Connection establishment timed out. '
-                       '${settings.establishTimeout}', settings.establishTimeout));
-    } on Exception {
-      conn.close();
-      rethrow;
-    }
-    
-    pconn.backendPid = row[0];
     pconn.state = available;
     _connections.add(pconn);
     
@@ -322,11 +308,11 @@ class PoolImpl implements Pool {
     StackTrace stackTrace = null;
     if (settings.leakDetectionThreshold != null) {
       // Store the current stack trace for connection leak debugging.
-//      try {
-//        throw "Generate stacktrace.";
-//      } catch (ex, st) {
-//        stackTrace = st;
-//      }
+      try {
+        throw "Generate stacktrace.";
+      } catch (ex, st) {
+        stackTrace = st;
+      }
     }
     
     var pconn = await _connect(settings.connectionTimeout);

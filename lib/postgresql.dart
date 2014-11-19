@@ -68,6 +68,9 @@ abstract class Connection {
   /// Server configuration parameters such as date format and timezone.
   Map<String,String> get parameters;
   
+  /// The pid of the process the server started to handle this connection.
+  int get backendPid;
+  
   ConnectionState get state;
 
 

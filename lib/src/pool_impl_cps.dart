@@ -61,7 +61,7 @@ class PoolSettingsImpl implements PoolSettings {
   final pg.TypeConverter typeConverter;
 }
 
-
+//FIXME Rename this, as it is not an adapter.
 class ConnectionAdapter implements pg.Connection {
 
   ConnectionAdapter(this._conn, {onClose})
@@ -84,7 +84,9 @@ class ConnectionAdapter implements pg.Connection {
 
   Stream<pg.Message> get messages => _conn.messages;
 
-  Map<String,String> get parameters => _conn.parameters; 
+  Map<String,String> get parameters => _conn.parameters;
+  
+  int get backendPid => _conn.backendPid;
 }
 
 //TODO make setters private, and expose this information.
@@ -108,7 +110,7 @@ class PooledConnection {
   DateTime released;
   
   /// The pid of the postgresql handler.
-  int backendPid;
+  int get backendPid => connection == null ? null : connection.backendPid;
 
   /// The id passed to connect for debugging.
   String debugId;
@@ -258,42 +260,12 @@ class PoolImpl implements Pool {
           pconn.adapter = new ConnectionAdapter(conn, onClose: (() {
             _releaseConnection(pconn);
           }));
-          pg.Row row;
-          join0() {
-            pconn.backendPid = row[0];
-            pconn.state = available;
-            _connections.add(pconn);
-            _debug('Established connection. ${pconn.name}');
-            completer0.complete();
-          }
-          catch0(e0, s0) {
-            try {
-              if (e0 is Exception) {
-                conn.close();
-                completer0.completeError(e0, s0);
-              } else {
-                throw e0;
-              }
-            } catch (e0, s0) {
-              completer0.completeError(e0, s0);
-            }
-          }
-          try {
-            new Future.value(conn.query('select pg_backend_pid()').single.timeout(settings.establishTimeout - stopwatch.elapsed, onTimeout: (() {
-              return throw new TimeoutException('Connection establishment timed out. ' '${settings.establishTimeout}', settings.establishTimeout);
-            }))).then((x1) {
-              try {
-                row = x1;
-                join0();
-              } catch (e1, s1) {
-                catch0(e1, s1);
-              }
-            }, onError: catch0);
-          } catch (e2, s2) {
-            catch0(e2, s2);
-          }
-        } catch (e3, s3) {
-          completer0.completeError(e3, s3);
+          pconn.state = available;
+          _connections.add(pconn);
+          _debug('Established connection. ${pconn.name}');
+          completer0.complete();
+        } catch (e0, s0) {
+          completer0.completeError(e0, s0);
         }
       }, onError: completer0.completeError);
     } catch (e, s) {
@@ -391,7 +363,23 @@ class PoolImpl implements Pool {
         }, onError: completer0.completeError);
       }
       if (settings.leakDetectionThreshold != null) {
-        join0();
+        join1() {
+          join0();
+        }
+        catch0(ex, st) {
+          try {
+            stackTrace = st;
+            join1();
+          } catch (ex, st) {
+            completer0.completeError(ex, st);
+          }
+        }
+        try {
+          throw "Generate stacktrace.";
+          join1();
+        } catch (e1, s1) {
+          catch0(e1, s1);
+        }
       } else {
         join0();
       }
