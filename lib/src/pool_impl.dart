@@ -331,16 +331,13 @@ class PoolImpl implements Pool {
       }
     }
     
-    return pconn;
-    
-// Disable connection testing.
-//    if (!await _testConnection(pconn).timeout(timeout - stopwatch.elapsed)) { //FIXME, onTimeout: onTimeout)) {
-//      _destroyConnection(pconn);
-//      // Get another connection out of the pool and test again.
-//      return _connect(timeout - stopwatch.elapsed);
-//    } else {
-//      return pconn;
-//    }
+    if (!await _testConnection(pconn).timeout(timeout - stopwatch.elapsed)) { //FIXME, onTimeout: onTimeout)) {
+      _destroyConnection(pconn);
+      // Get another connection out of the pool and test again.
+      return _connect(timeout - stopwatch.elapsed);
+    } else {
+      return pconn;
+    }
   }
 
   List<PooledConnection> _getAvailable()

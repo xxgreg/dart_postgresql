@@ -390,32 +390,46 @@ class PoolImpl implements Pool {
       });
       PooledConnection pconn = _getFirstAvailable();
       join0() {
-        completer0.complete(pconn);
+        new Future.value(_testConnection(pconn).timeout(timeout - stopwatch.elapsed)).then((x0) {
+          try {
+            join1() {
+              completer0.complete();
+            }
+            if (!x0) {
+              _destroyConnection(pconn);
+              completer0.complete(_connect(timeout - stopwatch.elapsed));
+            } else {
+              completer0.complete(pconn);
+            }
+          } catch (e0, s0) {
+            completer0.completeError(e0, s0);
+          }
+        }, onError: completer0.completeError);
       }
       if (pconn == null) {
         var c = new Completer<PooledConnection>();
         _waitQueue.add(c);
-        join1() {
+        join2() {
           join0();
         }
         finally0(cont0) {
           _waitQueue.remove(c);
           cont0();
         }
-        catch0(e1, s1) {
-          finally0(() => completer0.completeError(e1, s1));
+        catch0(e2, s2) {
+          finally0(() => completer0.completeError(e2, s2));
         }
         try {
-          new Future.value(c.future.timeout(timeout)).then((x0) {
+          new Future.value(c.future.timeout(timeout)).then((x1) {
             try {
-              pconn = x0;
-              finally0(join1);
-            } catch (e2, s2) {
-              catch0(e2, s2);
+              pconn = x1;
+              finally0(join2);
+            } catch (e3, s3) {
+              catch0(e3, s3);
             }
           }, onError: catch0);
-        } catch (e3, s3) {
-          catch0(e3, s3);
+        } catch (e4, s4) {
+          catch0(e4, s4);
         }
       } else {
         join0();
