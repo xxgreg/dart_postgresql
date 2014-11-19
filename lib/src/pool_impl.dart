@@ -198,9 +198,9 @@ class PoolImpl implements Pool {
     
     _state = running;
   }
-
+  
   Future _establishConnection() async {
-
+    
     var pconn = new PooledConnection(this);
     pconn.state = connecting;
 
@@ -226,9 +226,8 @@ class PoolImpl implements Pool {
       _checkIfLeaked(pconn);
       _checkIdleTimeout(pconn);
       
-      // This shouldn't be necessary, but could potentially help fault tolerance.
-      //FIXME This is causing the connect timeout to fail. 
-      //_processWaitQueue();
+      // This shouldn't be necessary, but could potentially help fault tolerance. 
+      _processWaitQueue();
     }
     
     _checkIfAllConnectionsLeaked();
@@ -267,12 +266,19 @@ class PoolImpl implements Pool {
   _checkIfAllConnectionsLeaked() {
     if (settings.restartIfAllConnectionsLeaked
         && leakedConnections >= settings.maxConnections) {
+
+      _messages.add(new pg.ClientMessage(
+          severity: 'WARNING',
+          message: '${settings.poolName} is full of leaked connections. '
+            'These will be closed and new connections started.'));
+      
+      // Forcefully close leaked connections.
       _connections.where((c) => c.isLeaked).forEach(_destroyConnection);
-    }
-    
-    // Start new connections in parallel.
-    for (int i = 0; i < settings.minConnections; i++) {
-      _establishConnection();
+      
+      // Start new connections in parallel.
+      for (int i = 0; i < settings.minConnections; i++) {
+        _establishConnection();
+      }
     }
   }
   
@@ -316,19 +322,25 @@ class PoolImpl implements Pool {
     // add the current connection request at the end of the
     // wait queue.
     if (pconn == null) {
-      var c = new Completer();
+      var c = new Completer<PooledConnection>();
       _waitQueue.add(c);
-      pconn = await c.future.timeout(timeout); //FIXME, onTimeout: onTimeout);
-      _waitQueue.remove(c);
+      try {
+        pconn = await c.future.timeout(timeout); //FIXME, onTimeout: onTimeout);
+      } finally {
+        _waitQueue.remove(c);
+      }
     }
-
-    if (!await _testConnection(pconn).timeout(timeout - stopwatch.elapsed)) { //FIXME, onTimeout: onTimeout)) {
-      _destroyConnection(pconn);
-      // Get another connection out of the pool and test again.
-      return _connect(timeout - stopwatch.elapsed);
-    } else {
-      return pconn;
-    }
+    
+    return pconn;
+    
+// Disable connection testing.
+//    if (!await _testConnection(pconn).timeout(timeout - stopwatch.elapsed)) { //FIXME, onTimeout: onTimeout)) {
+//      _destroyConnection(pconn);
+//      // Get another connection out of the pool and test again.
+//      return _connect(timeout - stopwatch.elapsed);
+//    } else {
+//      return pconn;
+//    }
   }
 
   List<PooledConnection> _getAvailable()

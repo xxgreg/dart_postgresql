@@ -229,7 +229,7 @@ class PoolImpl implements Pool {
   });
   return completer0.future;
 }
-
+  
   Future _establishConnection() {
   final completer0 = new Completer();
   scheduleMicrotask(() {
@@ -271,9 +271,8 @@ class PoolImpl implements Pool {
       _checkIfLeaked(pconn);
       _checkIdleTimeout(pconn);
       
-      // This shouldn't be necessary, but could potentially help fault tolerance.
-      //FIXME This is causing the connect timeout to fail. 
-      //_processWaitQueue();
+      // This shouldn't be necessary, but could potentially help fault tolerance. 
+      _processWaitQueue();
     }
     
     _checkIfAllConnectionsLeaked();
@@ -312,12 +311,19 @@ class PoolImpl implements Pool {
   _checkIfAllConnectionsLeaked() {
     if (settings.restartIfAllConnectionsLeaked
         && leakedConnections >= settings.maxConnections) {
+
+      _messages.add(new pg.ClientMessage(
+          severity: 'WARNING',
+          message: '${settings.poolName} is full of leaked connections. '
+            'These will be closed and new connections started.'));
+      
+      // Forcefully close leaked connections.
       _connections.where((c) => c.isLeaked).forEach(_destroyConnection);
-    }
-    
-    // Start new connections in parallel.
-    for (int i = 0; i < settings.minConnections; i++) {
-      _establishConnection();
+      
+      // Start new connections in parallel.
+      for (int i = 0; i < settings.minConnections; i++) {
+        _establishConnection();
+      }
     }
   }
   
@@ -384,34 +390,33 @@ class PoolImpl implements Pool {
       });
       PooledConnection pconn = _getFirstAvailable();
       join0() {
-        new Future.value(_testConnection(pconn).timeout(timeout - stopwatch.elapsed)).then((x0) {
-          try {
-            join1() {
-              completer0.complete();
-            }
-            if (!x0) {
-              _destroyConnection(pconn);
-              completer0.complete(_connect(timeout - stopwatch.elapsed));
-            } else {
-              completer0.complete(pconn);
-            }
-          } catch (e0, s0) {
-            completer0.completeError(e0, s0);
-          }
-        }, onError: completer0.completeError);
+        completer0.complete(pconn);
       }
       if (pconn == null) {
-        var c = new Completer();
+        var c = new Completer<PooledConnection>();
         _waitQueue.add(c);
-        new Future.value(c.future.timeout(timeout)).then((x1) {
-          try {
-            pconn = x1;
-            _waitQueue.remove(c);
-            join0();
-          } catch (e1, s1) {
-            completer0.completeError(e1, s1);
-          }
-        }, onError: completer0.completeError);
+        join1() {
+          join0();
+        }
+        finally0(cont0) {
+          _waitQueue.remove(c);
+          cont0();
+        }
+        catch0(e1, s1) {
+          finally0(() => completer0.completeError(e1, s1));
+        }
+        try {
+          new Future.value(c.future.timeout(timeout)).then((x0) {
+            try {
+              pconn = x0;
+              finally0(join1);
+            } catch (e2, s2) {
+              catch0(e2, s2);
+            }
+          }, onError: catch0);
+        } catch (e3, s3) {
+          catch0(e3, s3);
+        }
       } else {
         join0();
       }
