@@ -1,5 +1,6 @@
 part of postgresql;
 
+
 class _ClientMessage implements ClientMessage {
 
   _ClientMessage({severity,
@@ -48,6 +49,9 @@ class _ServerMessage implements ServerMessage {
           var fieldValue = map[item];
           return '$val\n$fieldName: $fieldValue';
         });
+  
+  _ServerMessage._private(this.isError, this.code, this.severity, this.message,
+    this.detail, this.position, this.allInformation, this.connectionName);
 
   final bool isError;
   final String code;
@@ -77,3 +81,27 @@ final Map<String,String> _fieldNames = {
   'L': 'Line',
   'R': 'Routine'
 };
+
+Message _copy(Message msg, {String connectionName}) {
+  if (msg is _ClientMessage) {
+    return new _ClientMessage(
+        severity: msg.severity,
+        message: msg.message,
+        exception: msg.exception,
+        stackTrace: msg.stackTrace,
+        connectionName: connectionName == null
+          ? msg.connectionName : connectionName);
+  } else if (msg is _ServerMessage) {
+    return new _ServerMessage._private(
+        msg.isError,
+        msg.code,
+        msg.severity,
+        msg.message,
+        msg.detail,
+        msg.position,
+        msg.allInformation,
+        connectionName == null ? msg.connectionName : connectionName);    
+  } else {
+    return msg;
+  }
+}

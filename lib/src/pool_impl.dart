@@ -82,7 +82,6 @@ class ConnectionAdapter implements pg.Connection {
 
 }
 
-//FIXME option to store stacktrace for leak detection.
 //TODO make setters private, and expose this information.
 class PooledConnection {
 
@@ -126,6 +125,7 @@ class PooledConnection {
   String toString() => '$name $state est: $established obt: $obtained';
 }
 
+_debug(msg) => print(msg);
 
 class PoolImpl implements Pool {
 
@@ -147,11 +147,11 @@ class PoolImpl implements Pool {
       new Queue<Completer<PooledConnection>>();
 
   Timer _heartbeatTimer;
+  Future _stopFuture;
   
   final StreamController<pg.Message> _messages =
       new StreamController<pg.Message>.broadcast();
 
-  //TODO pass connection messages through to pool.
   Stream<pg.Message> get messages => _messages.stream;
 
   /// Note includes connections which are currently connecting/testing.
@@ -167,6 +167,7 @@ class PoolImpl implements Pool {
     _connections.where((c) => c.isLeaked).length;
 
   Future start() async {
+    _debug('start');
     //TODO consider allowing moving from state stopped to starting.
     //Need to carefully clear out all state.
     if (_state != initial)
@@ -185,12 +186,12 @@ class PoolImpl implements Pool {
         (i) => _establishConnection());
 
     await Future.wait(futures)
-      .timeout(settings.startTimeout); //FIXME, onTimeout: onTimeout);
+      .timeout(settings.startTimeout, onTimeout: onTimeout);
 
     // If something bad happened and there are not enough connecitons.
     while (_connections.length < settings.minConnections) {
       await _establishConnection()
-        .timeout(settings.startTimeout - stopwatch.elapsed); //FIXME,onTimeout: onTimeout);
+        .timeout(settings.startTimeout - stopwatch.elapsed, onTimeout: onTimeout);
     }
 
     _heartbeatTimer = 
@@ -200,12 +201,28 @@ class PoolImpl implements Pool {
   }
   
   Future _establishConnection() async {
+    _debug('Establish connection.');
+    
+    var stopwatch = new Stopwatch()..start();
     
     var pconn = new PooledConnection(this);
     pconn.state = connecting;
 
-    //FIXME timeout setting - implement in connection, and pass through here.
-    var conn = await _connectionFactory(databaseUri, null); //TODO pass more settings
+    var onTimeout = () => throw new TimeoutException(
+      'Connection pool connection established timed out. '
+        'establishTimeout: ${settings.establishTimeout}).',
+          settings.establishTimeout);
+    
+    //FIXME timeout setting - implement in connection??, and pass through here.
+    //TODO pass more settings
+    var conn = await _connectionFactory(databaseUri, null)
+      .timeout(settings.establishTimeout, onTimeout: onTimeout);
+    
+    // Pass this connection's messages through to the pool messages stream.
+    conn.messages.listen((msg) => _messages.add(
+          new pg.Message.from(msg, connectionName: pconn.name)),
+        onError: (msg) => _messages.addError(
+            new pg.Message.from(msg, connectionName: pconn.name)));
 
     pconn.connection = conn;
     pconn.established = new DateTime.now();
@@ -213,12 +230,24 @@ class PoolImpl implements Pool {
       _releaseConnection(pconn);
     });
 
-    //FIXME timeout setting
-    var row = await conn.query('select pg_backend_pid()').single;
+    // Fetch postgresql backend pid to use as connection id.
+    //TODO this may actually be passed to the connection during startup.
+    // If that is the case then remove this.
+    pg.Row row;
+    try {
+      row = await conn.query('select pg_backend_pid()').single
+          .timeout(settings.establishTimeout - stopwatch.elapsed,
+                   onTimeout: onTimeout);
+    } on Exception {
+      conn.close();
+      rethrow;
+    }
+    
     pconn.backendPid = row[0];
-
-    _connections.add(pconn);
     pconn.state = available;
+    _connections.add(pconn);
+    
+    _debug('Established connection. ${pconn.name}');
   }
   
   void _heartbeat() {    
@@ -226,7 +255,7 @@ class PoolImpl implements Pool {
       _checkIfLeaked(pconn);
       _checkIdleTimeout(pconn);
       
-      // This shouldn't be necessary, but could potentially help fault tolerance. 
+      // This shouldn't be necessary, but should help fault tolerance. 
       _processWaitQueue();
     }
     
@@ -238,7 +267,7 @@ class PoolImpl implements Pool {
       if (pconn.state == available
           && pconn.released != null
           && _isExpired(pconn.released, settings.idleTimeout)) {
-        //TODO debug logging
+        _debug('Idle connection ${pconn.name}.');
         _destroyConnection(pconn);
       }
     }
@@ -286,15 +315,16 @@ class PoolImpl implements Pool {
   static int _sequence = 1;
 
   Future<pg.Connection> connect({String debugId}) async {
-
+    _debug('Connect.');
+    
     StackTrace stackTrace = null;
     if (settings.leakDetectionThreshold != null) {
       // Store the current stack trace for connection leak debugging.
-      try {
-        throw "Generate stacktrace.";
-      } catch (ex, st) {
-        stackTrace = st;
-      }
+//      try {
+//        throw "Generate stacktrace.";
+//      } catch (ex, st) {
+//        stackTrace = st;
+//      }
     }
     
     var pconn = await _connect(settings.connectionTimeout);
@@ -305,6 +335,8 @@ class PoolImpl implements Pool {
       ..debugId = debugId
       ..stackTrace = stackTrace;
 
+    _debug('Connected. ${pconn.name}');
+    
     return pconn.adapter;
   }
 
@@ -325,13 +357,13 @@ class PoolImpl implements Pool {
       var c = new Completer<PooledConnection>();
       _waitQueue.add(c);
       try {
-        pconn = await c.future.timeout(timeout); //FIXME, onTimeout: onTimeout);
+        pconn = await c.future.timeout(timeout, onTimeout: onTimeout);
       } finally {
         _waitQueue.remove(c);
       }
     }
     
-    if (!await _testConnection(pconn).timeout(timeout - stopwatch.elapsed)) { //FIXME, onTimeout: onTimeout)) {
+    if (!await _testConnection(pconn).timeout(timeout - stopwatch.elapsed, onTimeout: onTimeout)) {
       _destroyConnection(pconn);
       // Get another connection out of the pool and test again.
       return _connect(timeout - stopwatch.elapsed);
@@ -366,29 +398,27 @@ class PoolImpl implements Pool {
       ok = row[0];
     } on Exception catch (ex) {
       ok = false;
-      _leakDetected(PooledConnection pconn) {
-        _messages.add(new pg.ClientMessage(
-            severity: 'WARNING',
-            connectionName: pconn.name,
-            message: 'Connection test failed.',
-            exception: ex,
-            stackTrace: pconn.stackTrace));
-      }
+      _messages.add(new pg.ClientMessage(
+          severity: 'WARNING',
+          connectionName: pconn.name,
+          message: 'Connection test failed.',
+          exception: ex,
+          stackTrace: pconn.stackTrace));
     }
     return ok;
   }
 
   _releaseConnection(PooledConnection pconn) {
-
+    _debug('release ${pconn.name}');
+    
     pg.Connection conn = pconn.connection;
-
-    //TODO Maybe rollback transactions. But probably more robust and nearly as fast
-    // to close and reconnect.
-    //if (conn.transactionStatus == pg.TRANSACTION_ERROR) {
-    //  await conn.execute('rollback').timeout(?);
-    //}
-
+    
     // If connection still in transaction or busy with query then destroy.
+    // Note this means connections which are returned with an un-committed 
+    // transaction, the entire connection will be destroyed and re-established.
+    // While it would be possible to write code which would send a rollback 
+    // command, this is simpler and probably nearly as fast (not that this
+    // is likely to become a bottleneck anyway).
     if (conn.state != idle && conn.transactionState != none) {
         _messages.add(new pg.ClientMessage(
             severity: 'WARNING',
@@ -417,25 +447,31 @@ class PoolImpl implements Pool {
     => new DateTime.now().difference(time) > timeout;
   
   _destroyConnection(PooledConnection pconn) {
+    _debug('Destroy connection. ${pconn.name}');
     pconn.connection.close();
     pconn.state = closed2;
     _connections.remove(pconn);
-
-    //FIXME unsubscribe.
-    //pconn.connection.messages
   }
-
-  Future stop() async {
+  
+  Future stop() {
+    _debug('Stop');
     
     if (state == stopped || state == initial) return null;
-
-    //TODO if (state == stopping)
-    // wait for stopping process to finish.
-
-    if (_heartbeatTimer != null) _heartbeatTimer.cancel();
-    
+      
+    if (_stopFuture == null)
+      _stopFuture = _stop();
+    else
+      assert(state == stopping);
+      
+    return _stopFuture;
+  }
+  
+  Future _stop() async {
+   
     _state = stopping;
 
+    if (_heartbeatTimer != null) _heartbeatTimer.cancel();
+  
     // Close connections as they are returned to the pool.
     // If stop timeout is reached then close connections even if still in use.
 
@@ -445,15 +481,25 @@ class PoolImpl implements Pool {
 
       await new Future.delayed(new Duration(milliseconds: 100), () => null);
 
-      //TODO log stopTimeout exceeded. Closing connections.
       if (stopwatch.elapsed > settings.stopTimeout ) {
+        _messages.add(new pg.ClientMessage(
+            severity: 'WARNING',
+            message: 'Exceeded timeout while stopping, '
+              'closing in use connections.'));        
         _connections.forEach(_destroyConnection);
       }
     }
     _state = stopped;
+    
+    _debug('Stopped');
   }
 
   //FIXME just exposed for testing. Expose in a safer way.
   List<PooledConnection> getConnections() => _connections;
 }
+
+
+
+
+
 

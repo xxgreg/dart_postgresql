@@ -82,7 +82,6 @@ class ConnectionAdapter implements pg.Connection {
 
 }
 
-//FIXME option to store stacktrace for leak detection.
 //TODO make setters private, and expose this information.
 class PooledConnection {
 
@@ -126,6 +125,7 @@ class PooledConnection {
   String toString() => '$name $state est: $established obt: $obtained';
 }
 
+_debug(msg) => print(msg);
 
 class PoolImpl implements Pool {
 
@@ -147,11 +147,11 @@ class PoolImpl implements Pool {
       new Queue<Completer<PooledConnection>>();
 
   Timer _heartbeatTimer;
+  Future _stopFuture;
   
   final StreamController<pg.Message> _messages =
       new StreamController<pg.Message>.broadcast();
 
-  //TODO pass connection messages through to pool.
   Stream<pg.Message> get messages => _messages.stream;
 
   /// Note includes connections which are currently connecting/testing.
@@ -170,6 +170,7 @@ class PoolImpl implements Pool {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
+      _debug('start');
       join0() {
         var stopwatch = new Stopwatch()
             ..start();
@@ -180,7 +181,7 @@ class PoolImpl implements Pool {
         var futures = new Iterable.generate(settings.minConnections, ((i) {
           return _establishConnection();
         }));
-        new Future.value(Future.wait(futures).timeout(settings.startTimeout)).then((x0) {
+        new Future.value(Future.wait(futures).timeout(settings.startTimeout, onTimeout: onTimeout)).then((x0) {
           try {
             x0;
             break0() {
@@ -194,7 +195,7 @@ class PoolImpl implements Pool {
             continue0() {
               trampoline0 = null;
               if (_connections.length < settings.minConnections) {
-                new Future.value(_establishConnection().timeout(settings.startTimeout - stopwatch.elapsed)).then((x1) {
+                new Future.value(_establishConnection().timeout(settings.startTimeout - stopwatch.elapsed, onTimeout: onTimeout)).then((x1) {
                   trampoline0 = () {
                     trampoline0 = null;
                     try {
@@ -234,29 +235,61 @@ class PoolImpl implements Pool {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
+      _debug('Establish connection.');
+      var stopwatch = new Stopwatch()
+          ..start();
       var pconn = new PooledConnection(this);
       pconn.state = connecting;
-      new Future.value(_connectionFactory(databaseUri, null)).then((x0) {
+      var onTimeout = (() {
+        return throw new TimeoutException('Connection pool connection established timed out. ' 'establishTimeout: ${settings.establishTimeout}).', settings.establishTimeout);
+      });
+      new Future.value(_connectionFactory(databaseUri, null).timeout(settings.establishTimeout, onTimeout: onTimeout)).then((x0) {
         try {
           var conn = x0;
+          conn.messages.listen(((msg) {
+            return _messages.add(new pg.Message.from(msg, connectionName: pconn.name));
+          }), onError: ((msg) {
+            return _messages.addError(new pg.Message.from(msg, connectionName: pconn.name));
+          }));
           pconn.connection = conn;
           pconn.established = new DateTime.now();
           pconn.adapter = new ConnectionAdapter(conn, onClose: (() {
             _releaseConnection(pconn);
           }));
-          new Future.value(conn.query('select pg_backend_pid()').single).then((x1) {
+          pg.Row row;
+          join0() {
+            pconn.backendPid = row[0];
+            pconn.state = available;
+            _connections.add(pconn);
+            _debug('Established connection. ${pconn.name}');
+            completer0.complete();
+          }
+          catch0(e0, s0) {
             try {
-              var row = x1;
-              pconn.backendPid = row[0];
-              _connections.add(pconn);
-              pconn.state = available;
-              completer0.complete();
+              if (e0 is Exception) {
+                conn.close();
+                completer0.completeError(e0, s0);
+              } else {
+                throw e0;
+              }
             } catch (e0, s0) {
               completer0.completeError(e0, s0);
             }
-          }, onError: completer0.completeError);
-        } catch (e1, s1) {
-          completer0.completeError(e1, s1);
+          }
+          try {
+            new Future.value(conn.query('select pg_backend_pid()').single.timeout(settings.establishTimeout - stopwatch.elapsed, onTimeout: onTimeout)).then((x1) {
+              try {
+                row = x1;
+                join0();
+              } catch (e1, s1) {
+                catch0(e1, s1);
+              }
+            }, onError: catch0);
+          } catch (e2, s2) {
+            catch0(e2, s2);
+          }
+        } catch (e3, s3) {
+          completer0.completeError(e3, s3);
         }
       }, onError: completer0.completeError);
     } catch (e, s) {
@@ -271,7 +304,7 @@ class PoolImpl implements Pool {
       _checkIfLeaked(pconn);
       _checkIdleTimeout(pconn);
       
-      // This shouldn't be necessary, but could potentially help fault tolerance. 
+      // This shouldn't be necessary, but should help fault tolerance. 
       _processWaitQueue();
     }
     
@@ -283,7 +316,7 @@ class PoolImpl implements Pool {
       if (pconn.state == available
           && pconn.released != null
           && _isExpired(pconn.released, settings.idleTimeout)) {
-        //TODO debug logging
+        _debug('Idle connection ${pconn.name}.');
         _destroyConnection(pconn);
       }
     }
@@ -334,6 +367,7 @@ class PoolImpl implements Pool {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
+      _debug('Connect.');
       StackTrace stackTrace = null;
       join0() {
         new Future.value(_connect(settings.connectionTimeout)).then((x0) {
@@ -345,6 +379,7 @@ class PoolImpl implements Pool {
                 ..useId = _sequence++
                 ..debugId = debugId
                 ..stackTrace = stackTrace;
+            _debug('Connected. ${pconn.name}');
             completer0.complete(pconn.adapter);
           } catch (e0, s0) {
             completer0.completeError(e0, s0);
@@ -352,23 +387,7 @@ class PoolImpl implements Pool {
         }, onError: completer0.completeError);
       }
       if (settings.leakDetectionThreshold != null) {
-        join1() {
-          join0();
-        }
-        catch0(ex, st) {
-          try {
-            stackTrace = st;
-            join1();
-          } catch (ex, st) {
-            completer0.completeError(ex, st);
-          }
-        }
-        try {
-          throw "Generate stacktrace.";
-          join1();
-        } catch (e1, s1) {
-          catch0(e1, s1);
-        }
+        join0();
       } else {
         join0();
       }
@@ -390,7 +409,7 @@ class PoolImpl implements Pool {
       });
       PooledConnection pconn = _getFirstAvailable();
       join0() {
-        new Future.value(_testConnection(pconn).timeout(timeout - stopwatch.elapsed)).then((x0) {
+        new Future.value(_testConnection(pconn).timeout(timeout - stopwatch.elapsed, onTimeout: onTimeout)).then((x0) {
           try {
             join1() {
               completer0.complete();
@@ -420,7 +439,7 @@ class PoolImpl implements Pool {
           finally0(() => completer0.completeError(e2, s2));
         }
         try {
-          new Future.value(c.future.timeout(timeout)).then((x1) {
+          new Future.value(c.future.timeout(timeout, onTimeout: onTimeout)).then((x1) {
             try {
               pconn = x1;
               finally0(join2);
@@ -472,9 +491,7 @@ class PoolImpl implements Pool {
         try {
           if (ex is Exception) {
             ok = false;
-            _leakDetected(PooledConnection pconn) {
-              _messages.add(new pg.ClientMessage(severity: 'WARNING', connectionName: pconn.name, message: 'Connection test failed.', exception: ex, stackTrace: pconn.stackTrace));
-            }
+            _messages.add(new pg.ClientMessage(severity: 'WARNING', connectionName: pconn.name, message: 'Connection test failed.', exception: ex, stackTrace: pconn.stackTrace));
             join0();
           } else {
             throw ex;
@@ -504,16 +521,16 @@ class PoolImpl implements Pool {
 }
 
   _releaseConnection(PooledConnection pconn) {
-
+    _debug('release ${pconn.name}');
+    
     pg.Connection conn = pconn.connection;
-
-    //TODO Maybe rollback transactions. But probably more robust and nearly as fast
-    // to close and reconnect.
-    //if (conn.transactionStatus == pg.TRANSACTION_ERROR) {
-    //  await conn.execute('rollback').timeout(?);
-    //}
-
+    
     // If connection still in transaction or busy with query then destroy.
+    // Note this means connections which are returned with an un-committed 
+    // transaction, the entire connection will be destroyed and re-established.
+    // While it would be possible to write code which would send a rollback 
+    // command, this is simpler and probably nearly as fast (not that this
+    // is likely to become a bottleneck anyway).
     if (conn.state != idle && conn.transactionState != none) {
         _messages.add(new pg.ClientMessage(
             severity: 'WARNING',
@@ -542,70 +559,77 @@ class PoolImpl implements Pool {
     => new DateTime.now().difference(time) > timeout;
   
   _destroyConnection(PooledConnection pconn) {
+    _debug('Destroy connection. ${pconn.name}');
     pconn.connection.close();
     pconn.state = closed2;
     _connections.remove(pconn);
-
-    //FIXME unsubscribe.
-    //pconn.connection.messages
   }
-
+  
   Future stop() {
+    _debug('Stop');
+    
+    if (state == stopped || state == initial) return null;
+      
+    if (_stopFuture == null)
+      _stopFuture = _stop();
+    else
+      assert(state == stopping);
+      
+    return _stopFuture;
+  }
+  
+  Future _stop() {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
+      _state = stopping;
       join0() {
-        join1() {
-          _state = stopping;
-          var stopwatch = new Stopwatch()
-              ..start();
-          break0() {
-            _state = stopped;
-            completer0.complete();
-          }
-          var trampoline0;
-          continue0() {
-            trampoline0 = null;
-            if (_connections.isNotEmpty) {
-              _getAvailable().forEach(_destroyConnection);
-              new Future.value(new Future.delayed(new Duration(milliseconds: 100), (() {
-                return null;
-              }))).then((x0) {
-                trampoline0 = () {
-                  trampoline0 = null;
-                  try {
-                    x0;
-                    join2() {
-                      trampoline0 = continue0;
-                    }
-                    if (stopwatch.elapsed > settings.stopTimeout) {
-                      _connections.forEach(_destroyConnection);
-                      join2();
-                    } else {
-                      join2();
-                    }
-                  } catch (e0, s0) {
-                    completer0.completeError(e0, s0);
+        var stopwatch = new Stopwatch()
+            ..start();
+        break0() {
+          _state = stopped;
+          _debug('Stopped');
+          completer0.complete();
+        }
+        var trampoline0;
+        continue0() {
+          trampoline0 = null;
+          if (_connections.isNotEmpty) {
+            _getAvailable().forEach(_destroyConnection);
+            new Future.value(new Future.delayed(new Duration(milliseconds: 100), (() {
+              return null;
+            }))).then((x0) {
+              trampoline0 = () {
+                trampoline0 = null;
+                try {
+                  x0;
+                  join1() {
+                    trampoline0 = continue0;
                   }
-                };
-                do trampoline0(); while (trampoline0 != null);
-              }, onError: completer0.completeError);
-            } else {
-              break0();
-            }
+                  if (stopwatch.elapsed > settings.stopTimeout) {
+                    _messages.add(new pg.ClientMessage(severity: 'WARNING', message: 'Exceeded timeout while stopping, '
+                        'closing in use connections.'));
+                    _connections.forEach(_destroyConnection);
+                    join1();
+                  } else {
+                    join1();
+                  }
+                } catch (e0, s0) {
+                  completer0.completeError(e0, s0);
+                }
+              };
+              do trampoline0(); while (trampoline0 != null);
+            }, onError: completer0.completeError);
+          } else {
+            break0();
           }
-          trampoline0 = continue0;
-          do trampoline0(); while (trampoline0 != null);
         }
-        if (_heartbeatTimer != null) {
-          _heartbeatTimer.cancel();
-          join1();
-        } else {
-          join1();
-        }
+        trampoline0 = continue0;
+        do trampoline0(); while (trampoline0 != null);
       }
-      if (state == stopped || state == initial) {
-        completer0.complete(null);
+      if (_heartbeatTimer != null) {
+        _heartbeatTimer.cancel();
+        join0();
       } else {
         join0();
       }
@@ -619,5 +643,10 @@ class PoolImpl implements Pool {
   //FIXME just exposed for testing. Expose in a safer way.
   List<PooledConnection> getConnections() => _connections;
 }
+
+
+
+
+
 
 

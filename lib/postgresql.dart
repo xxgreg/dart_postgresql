@@ -93,6 +93,10 @@ abstract class Row {
 }
 
 abstract class Message {
+  
+  factory Message.from(Message m, {String connectionName}) 
+    => _copy(m, connectionName: connectionName);
+  
   /// Returns true if this is an error, otherwise it is a server-side notice,
   /// or logging.
   bool get isError;
@@ -112,7 +116,7 @@ abstract class Message {
   String get connectionName;
 }
 
-abstract class ClientMessage extends Message {
+abstract class ClientMessage implements Message {
 
   factory ClientMessage({String severity,
                  String message,
@@ -128,7 +132,7 @@ abstract class ClientMessage extends Message {
 
 }
 
-abstract class ServerMessage extends Message {
+abstract class ServerMessage implements Message {
 
   /// A PostgreSQL error code.
   /// See http://www.postgresql.org/docs/9.2/static/errcodes-appendix.html
