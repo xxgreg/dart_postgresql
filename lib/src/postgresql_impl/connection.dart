@@ -50,8 +50,13 @@ class ConnectionImpl implements Connection {
 
   final StreamController _messages = new StreamController.broadcast();
 
-  static Future<ConnectionImpl> connect(String uri, Duration timeout, TypeConverter typeConverter) {
+  static Future<ConnectionImpl> connect(
+      String uri,
+      Duration timeout, 
+      TypeConverter typeConverter,
+      {Socket mockSocketConnect(String host, int port)}) {
     return new Future.sync(() {
+      
       var settings = new Settings.fromUri(uri);
 
       //FIXME Currently this timeout doesn't cancel the socket connection 
@@ -65,12 +70,16 @@ class ConnectionImpl implements Connection {
           () => throw new TimeoutException(
               'Postgresql connection timed out. $timeout', timeout);
       
-      var future = settings.requireSsl
-        ? _connectSsl(settings, timeout, onTimeout)
-        : Socket.connect(settings.host, settings.port)
-            .timeout(timeout, onTimeout: onTimeout);
+      var connectFunc = mockSocketConnect == null
+          ? Socket.connect
+          : mockSocketConnect;
+      
+      Future<Socket> future = connectFunc(settings.host, settings.port)
+        .timeout(timeout, onTimeout: onTimeout);
+      
+      if (settings.requireSsl) future = _connectSsl(future);
 
-      return future.then((socket) {
+      return future.timeout(timeout, onTimeout: onTimeout).then((socket) {
         var conn = new ConnectionImpl(socket, settings, typeConverter);
         socket.listen(conn._readData, 
             onError: conn._handleSocketError,
@@ -89,12 +98,11 @@ class ConnectionImpl implements Connection {
   }
 
   //TODO yuck - this needs a rewrite.
-  static Future<SecureSocket> _connectSsl(
-      Settings settings, Duration timeout, onTimeout()) {
+  static Future<SecureSocket> _connectSsl(Future<Socket> future) {
 
     var completer = new Completer<SecureSocket>();
 
-    Socket.connect(settings.host, settings.port).then((socket) {
+    future.then((socket) {
 
       socket.listen((data) {
         if (data == null || data[0] != _S) {
@@ -112,7 +120,6 @@ class ConnectionImpl implements Connection {
       socket.add([0, 0, 0, 8, 4, 210, 22, 47]);
 
     })
-    .timeout(timeout, onTimeout: onTimeout)
     .catchError((e) {
       completer.completeError(e);
     });
