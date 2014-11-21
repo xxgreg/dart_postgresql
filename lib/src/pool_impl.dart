@@ -141,7 +141,9 @@ class PooledConnection {
   String toString() => '$name $_state est: $_established obt: $_obtained';
 }
 
-_debug(msg) => print(msg);
+//_debug(msg) => print(msg);
+
+_debug(msg) {}
 
 class PoolImpl implements Pool {
 
