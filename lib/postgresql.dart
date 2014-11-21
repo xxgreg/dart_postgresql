@@ -1,20 +1,7 @@
 library postgresql;
 
 import 'dart:async';
-import 'dart:collection';
-import 'dart:convert';
-import 'dart:io';
-import 'package:crypto/crypto.dart';
-import 'package:postgresql/constants.dart';
-import 'package:postgresql/src/substitute.dart';
-import 'package:postgresql/src/buffer.dart';
-
-part 'src/postgresql/connection.dart';
-part 'src/postgresql/constants.dart';
-part 'src/postgresql/messages.dart';
-part 'src/postgresql/query.dart';
-part 'src/postgresql/settings.dart';
-part 'src/postgresql/type_converter.dart';
+import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart' as impl;
 
 /// Connect to a PostgreSQL database.
 /// A uri has the following format:
@@ -23,7 +10,7 @@ Future<Connection> connect(
     String uri, 
     { Duration connectionTimeout,
       TypeConverter typeConverter}) => 
-        _Connection._connect(uri, connectionTimeout, typeConverter);
+        impl.ConnectionImpl.connect(uri, connectionTimeout, typeConverter);
 
 /// A connection to a PostgreSQL database.
 abstract class Connection {
@@ -100,7 +87,7 @@ abstract class Row {
 abstract class Message {
   
   factory Message.from(Message m, {String connectionName}) 
-    => _copy(m, connectionName: connectionName);
+    => impl.copyMessage(m, connectionName: connectionName);
   
   /// Returns true if this is an error, otherwise it is a server-side notice,
   /// or logging.
@@ -127,7 +114,7 @@ abstract class ClientMessage implements Message {
                  String message,
                  Object exception,
                  StackTrace stackTrace,
-                 String connectionName}) = _ClientMessage;
+                 String connectionName}) = impl.ClientMessageImpl;
 
   /// If an exception was thrown the body will be here.
   Object get exception;
@@ -158,10 +145,10 @@ abstract class ServerMessage implements Message {
 
 abstract class TypeConverter {
 
-  factory TypeConverter() = _DefaultTypeConverter;
+  factory TypeConverter() = impl.DefaultTypeConverter;
 
   /// Returns all results in the raw postgresql string format without conversion.
-  factory TypeConverter.raw() = _RawTypeConverter;
+  factory TypeConverter.raw() = impl.RawTypeConverter;
 
   /// Convert an object to a string representation to use in a sql query.
   /// Be very careful to escape your strings correctly. If you get this wrong
@@ -169,17 +156,18 @@ abstract class TypeConverter {
   /// provided [encodeString] function.
   String encode(value, String type);
 
+  //TODO pgType is ... link to pg docs, and table where you can look these up. 
+  // and also expose some constants for common types.
+  
   /// Convert a string recieved from the database into a dart object.
-  ///TODO pgType is ... link to pg docs, and table where you can look these up.
-  /// Expose some constants.
   Object decode(String value, int pgType);
 }
 
 /// Escape strings to a postgresql string format. i.e. E'str\'ing'
-String encodeString(String s) => _encodeString(s);
+String encodeString(String s) => impl.encodeString(s);
 
 /// Default object to sql string encoding.
-String encodeValue(value, String type) => _encodeValue(value, type);
+String encodeValue(value, String type) => impl.encodeValue(value, type);
 
 //TODO docs do these correspond to libpq names?
 //TODO change to enum once implemented.
@@ -229,4 +217,30 @@ class PostgresqlException implements Exception {
   final dynamic exception;
   final StackTrace stackTrace;
   String toString() => exception == null ? _msg : '$_msg ($exception)';
+}
+
+/// Settings for PostgreSQL.
+abstract class Settings {
+
+  static const num defaultPort = 5432;
+  
+  factory Settings(String host, int port, String user, String password, String database,
+      {bool requireSsl}) = impl.SettingsImpl;
+  
+  factory Settings.fromUri(String uri) = impl.SettingsImpl.fromUri;
+  
+  /// Parse a map, apply default rules etc. Throws [FormatException] when a
+  /// setting (without default value) is present.
+  factory Settings.fromMap(Map config) = impl.SettingsImpl.fromMap;
+  String get host;
+  int get port;
+  String get user;
+  String get password;
+  String get database;
+  bool get requireSsl;
+
+  /// Return connection URI.
+  String toUri();
+  Map toMap();
+  String toString();
 }

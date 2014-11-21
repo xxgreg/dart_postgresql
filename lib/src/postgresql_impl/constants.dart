@@ -1,4 +1,4 @@
-part of postgresql;
+part of postgresql.impl;
 
 String _stateToString(int s) {
   if (s < 0 || s > 8)

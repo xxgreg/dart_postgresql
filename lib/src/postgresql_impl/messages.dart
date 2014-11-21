@@ -1,14 +1,14 @@
-part of postgresql;
+part of postgresql.impl;
 
 
-class _ClientMessage implements ClientMessage {
+class ClientMessageImpl implements ClientMessage {
 
-  _ClientMessage({severity,
+  ClientMessageImpl({severity,
                   this.message,
                   this.exception,
                   this.stackTrace,
                   this.connectionName})
-      : isError = severity == 'ERROR',
+      : isError = severity == 'ERROR',  //FIXME this won't work for database in a non-english local.
         severity = severity {
 
     if (severity != 'ERROR' && severity != 'WARNING' && severity != 'DEBUG')
@@ -36,9 +36,9 @@ class _ClientMessage implements ClientMessage {
   }
 }
 
-class _ServerMessage implements ServerMessage {
+class ServerMessageImpl implements ServerMessage {
 
-  _ServerMessage(this.isError, Map<String,String> map, [this.connectionName])
+  ServerMessageImpl(this.isError, Map<String,String> map, [this.connectionName])
       : code = map['C'] == null ? '' : map['C'],    //FIXME use map.get(key, default), when implemented. See dart issue #2643.
         severity = map['S'] == null ? '' : map['S'],
         message = map['M'] == null ? '' : map['M'],
@@ -50,7 +50,7 @@ class _ServerMessage implements ServerMessage {
           return '$val\n$fieldName: $fieldValue';
         });
   
-  _ServerMessage._private(this.isError, this.code, this.severity, this.message,
+  ServerMessageImpl._private(this.isError, this.code, this.severity, this.message,
     this.detail, this.position, this.allInformation, this.connectionName);
 
   final bool isError;
@@ -82,17 +82,17 @@ final Map<String,String> _fieldNames = {
   'R': 'Routine'
 };
 
-Message _copy(Message msg, {String connectionName}) {
-  if (msg is _ClientMessage) {
-    return new _ClientMessage(
+Message copyMessage(Message msg, {String connectionName}) {
+  if (msg is ClientMessage) {
+    return new ClientMessageImpl(
         severity: msg.severity,
         message: msg.message,
         exception: msg.exception,
         stackTrace: msg.stackTrace,
         connectionName: connectionName == null
           ? msg.connectionName : connectionName);
-  } else if (msg is _ServerMessage) {
-    return new _ServerMessage._private(
+  } else if (msg is ServerMessage) {
+    return new ServerMessageImpl._private(
         msg.isError,
         msg.code,
         msg.severity,

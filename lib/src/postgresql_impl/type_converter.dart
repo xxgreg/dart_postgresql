@@ -1,4 +1,4 @@
-part of postgresql;
+part of postgresql.impl;
 
 const int _apos = 39;
 const int _return = 13;
@@ -7,17 +7,17 @@ const int _backslash = 92;
 
 final _escapeRegExp = new RegExp(r"['\r\n\\]");
 
-class _DefaultTypeConverter implements TypeConverter {
-   String encode(value, String type) => _encodeValue(value, type);
-   Object decode(String value, int pgType) => _decodeValue(value, pgType);
+class DefaultTypeConverter implements TypeConverter {
+   String encode(value, String type) => encodeValue(value, type);
+   Object decode(String value, int pgType) => decodeValue(value, pgType);
 }
 
-class _RawTypeConverter implements TypeConverter {
-   String encode(value, String type) => _encodeValue(value, type);
+class RawTypeConverter implements TypeConverter {
+   String encode(value, String type) => encodeValue(value, type);
    Object decode(String value, int pgType) => value;
 }
 
-String _encodeString(String s) {
+String encodeString(String s) {
   if (s == null) return ' null ';
 
   var escaped = s.replaceAllMapped(_escapeRegExp, (m) {
@@ -34,10 +34,10 @@ String _encodeString(String s) {
 }
 
 
-String _encodeValue(value, String type) {
+String encodeValue(value, String type) {
 
   if (type == null)
-    return _encodeValueDefault(value);
+    return encodeValueDefault(value);
 
   //TODO exception type. PgException
   throwError() => throw new Exception('Invalid runtime type and type modifier combination '
@@ -50,7 +50,7 @@ String _encodeValue(value, String type) {
     type = type.toLowerCase();
 
   if (type == 'text' || type == 'string')
-    return _encodeString(value.toString());
+    return encodeString(value.toString());
 
   if (type == 'integer'
       || type == 'smallint'
@@ -59,14 +59,14 @@ String _encodeValue(value, String type) {
       || type == 'bigserial'
       || type == 'int') {
     if (value is! int) throwError();
-    return _encodeNumber(value);
+    return encodeNumber(value);
   }
 
   if (type == 'real'
       || type == 'double'
       || type == 'num') {
     if (value is! num) throwError();
-    return _encodeNumber(value);
+    return encodeNumber(value);
   }
 
   // TODO numeric, decimal
@@ -78,68 +78,68 @@ String _encodeValue(value, String type) {
 
   if (type == 'timestamp' || type == 'timestamptz' || type == 'datetime') {
     if (value is! DateTime) throwError();
-    return _encodeDateTime(value, isDateOnly: false);
+    return encodeDateTime(value, isDateOnly: false);
   }
 
   if (type == 'date') {
     if (value is! DateTime) throwError();
-    return _encodeDateTime(value, isDateOnly: true);
+    return encodeDateTime(value, isDateOnly: true);
   }
 
   if (type == 'json' || type == 'jsonb')
-    return _encodeValueToJson(value);
+    return encodeValueToJson(value);
 
 //  if (type == 'bytea') {
 //    if (value is! List<int>) throwError();
-//    return _encodeBytea(value);
+//    return encodeBytea(value);
 //  }
 //
 //  if (type == 'array') {
 //    if (value is! List) throwError();
-//    return _encodeArray(value);
+//    return encodeArray(value);
 //  }
 
   throw new Exception('Unknown type name: $type.');
 }
 
 // Unspecified type name. Use default type mapping.
-String _encodeValueDefault(value) {
+String encodeValueDefault(value) {
 
   if (value == null)
     return 'null';
 
   if (value is num)
-    return _encodeNumber(value);
+    return encodeNumber(value);
 
   if (value is String)
-    return _encodeString(value);
+    return encodeString(value);
 
   if (value is DateTime)
-    return _encodeDateTime(value, isDateOnly: false);
+    return encodeDateTime(value, isDateOnly: false);
 
   if (value is bool)
     return value.toString();
 
   if (value is Map)
-    return _encodeString(JSON.encode(value));
+    return encodeString(JSON.encode(value));
 
   if (value is List)
-    return _encodeArray(value);
+    return encodeArray(value);
 
   throw new Exception('Unsupported runtime type as query parameter (${value.runtimeType}).');
 }
 
 //FIXME can probably simplify this, as in postgresql json type must take
 // map or array at top level, not string or number. (I think???)
-String _encodeValueToJson(value) {
+String encodeValueToJson(value) {
   if (value == null)
     return "'null'";
 
   if (value is Map || value is List)
-    return _encodeString(JSON.encode(value));
+    return encodeString(JSON.encode(value));
 
   if (value is String)
-    return _encodeString('"$value"');
+    return encodeString('"$value"');
 
   if (value is num) {
     // These are not valid JSON numbers, so encode them as strings.
@@ -152,7 +152,7 @@ String _encodeValueToJson(value) {
 
   try {
     var map = value.toJson();
-    return _encodeString(JSON.encode(value));
+    return encodeString(JSON.encode(value));
   } catch (e) {
     // Error actually swallowed
     throw new FormatException('Could not convert object to JSON. '
@@ -160,19 +160,19 @@ String _encodeValueToJson(value) {
   }
 }
 
-String _encodeNumber(num n) {
+String encodeNumber(num n) {
   if (n.isNaN) return "'nan'";
   if (n == double.INFINITY) return "'infinity'";
   if (n == double.NEGATIVE_INFINITY) return "'-infinity'";
   return "${n.toString()}";
 }
 
-String _encodeArray(List value) {
+String encodeArray(List value) {
   //TODO
   throw new UnimplementedError('Postgresql array types not implemented yet.');
 }
 
-String _encodeDateTime(DateTime datetime, {bool isDateOnly}) {
+String encodeDateTime(DateTime datetime, {bool isDateOnly}) {
 
   if (datetime == null)
     return 'null';
@@ -218,7 +218,7 @@ String _encodeDateTime(DateTime datetime, {bool isDateOnly}) {
 }
 
 // See http://www.postgresql.org/docs/9.0/static/sql-syntax-lexical.html#SQL-SYNTAX-STRINGS-ESCAPE
-_encodeBytea(List<int> value) {
+String encodeBytea(List<int> value) {
 
   //var b64String = ...;
   //return " decode('$b64String', 'base64') ";
@@ -227,7 +227,7 @@ _encodeBytea(List<int> value) {
   throw new UnimplementedError('bytea encoding not implemented.');
 }
 
-Object _decodeValue(String value, int pgType) {
+Object decodeValue(String value, int pgType) {
 
   switch (pgType) {
 
@@ -250,7 +250,7 @@ Object _decodeValue(String value, int pgType) {
     case _PG_TIMESTAMP:
     case _PG_TIMESTAMPZ:
     case _PG_DATE:
-      return _decodeDateTime(value, isDateOnly: pgType == _PG_DATE);
+      return decodeDateTime(value, isDateOnly: pgType == _PG_DATE);
 
     case _PG_JSON:
     case _PG_JSONB:
@@ -279,7 +279,7 @@ final _timestampRegexp = new RegExp(r'(\d{4,10})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d
 
 final _dateRegexp = new RegExp(r'^(\d{4,10})-(\d\d)-(\d\d)( BC)?$');
 
-DateTime _decodeDateTime(String value, {bool isDateOnly}) {
+DateTime decodeDateTime(String value, {bool isDateOnly}) {
 
   //TODO Figure out how to represent postgresql's quirky 'infinity' and
   // '-infinity' date values. Could use sentinals, null, or throw an exception.

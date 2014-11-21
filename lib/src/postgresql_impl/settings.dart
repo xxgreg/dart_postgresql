@@ -1,12 +1,6 @@
-part of postgresql;
+part of postgresql.impl;
 
-final String DEFAULT_HOST = "localhost";
-final num DEFAULT_PORT = 5432;
-
-/**
- * Settings for PostgreSQL.
- */
-class Settings {
+class SettingsImpl implements Settings {
   String _host;
   int _port;
   String _user;
@@ -14,16 +8,14 @@ class Settings {
   String _database;
   bool _requireSsl;
   
-  /**
-   * Settings map keys
-   */
-  static final String HOST = "host";
-  static final String PORT = "port";
-  static final String USER = "user";
-  static final String PASSWORD = "password";
-  static final String DATABASE = "database";
-
-  Settings(this._host,
+  static const String DEFAULT_HOST = "localhost";
+  static const String HOST = "host";
+  static const String PORT = "port";
+  static const String USER = "user";
+  static const String PASSWORD = "password";
+  static const String DATABASE = "database";
+  
+  SettingsImpl(this._host,
       this._port,
       this._user,
       this._password,
@@ -31,7 +23,7 @@ class Settings {
       {bool requireSsl: false})
     : _requireSsl = requireSsl;
 
-  factory Settings.fromUri(String uri) {
+  factory SettingsImpl.fromUri(String uri) {
 
     var u = Uri.parse(uri);
     if (u.scheme != 'postgres' && u.scheme != 'postgresql')
@@ -51,26 +43,20 @@ class Settings {
 
     return new Settings(
         u.host,
-        u.port == null ? DEFAULT_PORT : u.port,
+        u.port == null ? defaultPort : u.port,
         userInfo[0],
         userInfo[1],
         u.path.substring(1, u.path.length), // Remove preceding forward slash.
         requireSsl: requireSsl);
   }
 
-  /**
-   * Parse a map, apply default rules etc.
-   * 
-   * Throws [FormatException] when a setting (without default value)
-   * is present.
-   */
-  Settings.fromMap(Map config){
+  SettingsImpl.fromMap(Map config){
     final String host = config.containsKey(HOST) ?
         config[HOST] : DEFAULT_HOST;
     final int port = config.containsKey(PORT) ?
         config[PORT] is int ? config[PORT]
           : throw new FormatException("Specified port is not a valid number")
-        : DEFAULT_PORT;
+        : defaultPort;
     if (!config.containsKey(USER))
       throw new FormatException(USER);
     if (!config.containsKey(PASSWORD))
@@ -95,14 +81,9 @@ class Settings {
   String get database => _database;
   bool get requireSsl => _requireSsl;
 
-  /**
-   * Return connection URI.
-   * 
-   * TODO
-   * Support http://www.postgresql.org/docs/9.2/static/libpq-connect.html#AEN38149
-   */
   String toUri()
-    => "postgres://$_user:$_password@$_host:$_port/$_database${requireSsl ? '?sslmode=require' : ''}";
+    => "postgres://$_user:$_password@$_host:$_port"
+          "/$_database${requireSsl ? '?sslmode=require' : ''}";
   
   String toString()
     => "Settings: [host: $_host, port: $_port, user: $_user, database: $_database]";

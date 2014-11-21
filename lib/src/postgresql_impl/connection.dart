@@ -1,8 +1,8 @@
-part of postgresql;
+part of postgresql.impl;
 
-class _Connection implements Connection {
+class ConnectionImpl implements Connection {
 
-  _Connection(this._socket, Settings settings, TypeConverter typeConverter)
+  ConnectionImpl(this._socket, Settings settings, TypeConverter typeConverter)
     : _userName = settings.user,
       _passwordHash = _md5s(settings.password + settings.user),
       _databaseName = settings.database,
@@ -50,7 +50,7 @@ class _Connection implements Connection {
 
   final StreamController _messages = new StreamController.broadcast();
 
-  static Future<_Connection> _connect(String uri, Duration timeout, TypeConverter typeConverter) {
+  static Future<ConnectionImpl> connect(String uri, Duration timeout, TypeConverter typeConverter) {
     return new Future.sync(() {
       var settings = new Settings.fromUri(uri);
 
@@ -71,7 +71,7 @@ class _Connection implements Connection {
             .timeout(timeout, onTimeout: onTimeout);
 
       return future.then((socket) {
-        var conn = new _Connection(socket, settings, typeConverter);
+        var conn = new ConnectionImpl(socket, settings, typeConverter);
         socket.listen(conn._readData, 
             onError: conn._handleSocketError,
             onDone: conn._handleSocketClosed);
@@ -211,7 +211,7 @@ class _Connection implements Connection {
   void _handleSocketError(error, {bool closed: false}) {
 
     if (_state == closed) {
-      _messages.add(new _ClientMessage(
+      _messages.add(new ClientMessageImpl(
           severity: 'WARNING',
           message: 'Socket error after socket closed.',
           exception: error));
@@ -221,7 +221,7 @@ class _Connection implements Connection {
 
     _destroy();
 
-    var ex = new _ClientMessage(
+    var ex = new ClientMessageImpl(
         severity: 'ERROR',
         message: closed
           ? 'Socket closed unexpectedly.'
@@ -362,7 +362,7 @@ class _Connection implements Connection {
       errorCode = _buffer.readByte();
     }
 
-    var ex = new _ServerMessage(
+    var ex = new ServerMessageImpl(
                          msgType == _MSG_ERROR_RESPONSE,
                          map);
 
@@ -577,7 +577,7 @@ class _Connection implements Connection {
       msg.setLength();
       _socket.add(msg.buffer);
     } on Exception catch (e, st) {
-      _messages.add(new _ClientMessage(
+      _messages.add(new ClientMessageImpl(
           severity: 'WARNING',
           message: 'Exception while closing connection. Closed without sending terminate message.',
           exception: e,

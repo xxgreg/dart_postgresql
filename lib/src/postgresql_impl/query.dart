@@ -1,4 +1,4 @@
-part of postgresql;
+part of postgresql.impl;
 
 class _Query {
   int _state = _QUEUED;
