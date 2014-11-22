@@ -581,6 +581,13 @@ class ConnectionImpl implements Connection {
     var prior = _state;
     _state = closed;
 
+    // Need to be very careful that a close message isn't sent while streaming
+    // other data. This is ok at the moment as all messages are sent as whole
+    // buffers. But need to be careful when implementing copy (and?), that close
+    // doesn't inadvertently add data in the middle of the stream. Though since
+    // the transaction would get rolled back anyway, this probably isn't a real
+    // problem in practice. But this could lead to some odd error messages in
+    // the server logs.
     try {
       var msg = new MessageBuffer();
       msg.addByte(_MSG_TERMINATE);
