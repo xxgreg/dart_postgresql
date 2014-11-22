@@ -106,10 +106,14 @@ class ConnectionImpl implements Connection {
 
       socket.listen((data) {
         if (data == null || data[0] != _S) {
-          socket.close(); //TODO socket.destroy(); ??
+          socket.destroy();
           completer.completeError('This postgresql server is not configured to support SSL connections.');
         } else {
-          // TODO validate certs
+          // TODO add option to only allow valid certs.
+          // Note libpq also defaults to ignoring bad certificates, so this is
+          // expected behaviour.
+          // TODO consider adding a warning if certificate is invalid so that it
+          // is at least logged.
           new Future.sync(() => SecureSocket.secure(socket, onBadCertificate: (cert) => true))
             .then((s) => completer.complete(s))
             .catchError((e) => completer.completeError(e));
