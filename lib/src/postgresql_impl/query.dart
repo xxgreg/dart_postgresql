@@ -50,6 +50,7 @@ class _Query {
   }
 }
 
+//TODO rename to field, as it may not be a column.
 class _Column {
   final int index;
   final String name;

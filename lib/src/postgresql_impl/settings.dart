@@ -8,12 +8,12 @@ class SettingsImpl implements Settings {
   String _database;
   bool _requireSsl;
   
-  static const String DEFAULT_HOST = "localhost";
-  static const String HOST = "host";
-  static const String PORT = "port";
-  static const String USER = "user";
-  static const String PASSWORD = "password";
-  static const String DATABASE = "database";
+  static const String DEFAULT_HOST = 'localhost';
+  static const String HOST = 'host';
+  static const String PORT = 'port';
+  static const String USER = 'user';
+  static const String PASSWORD = 'password';
+  static const String DATABASE = 'database';
   
   SettingsImpl(this._host,
       this._port,
@@ -43,7 +43,7 @@ class SettingsImpl implements Settings {
 
     return new Settings(
         u.host,
-        u.port == null ? defaultPort : u.port,
+        u.port == null ? Settings.defaultPort : u.port,
         userInfo[0],
         userInfo[1],
         u.path.substring(1, u.path.length), // Remove preceding forward slash.
@@ -56,7 +56,7 @@ class SettingsImpl implements Settings {
     final int port = config.containsKey(PORT) ?
         config[PORT] is int ? config[PORT]
           : throw new FormatException("Specified port is not a valid number")
-        : defaultPort;
+        : Settings.defaultPort;
     if (!config.containsKey(USER))
       throw new FormatException(USER);
     if (!config.containsKey(PASSWORD))

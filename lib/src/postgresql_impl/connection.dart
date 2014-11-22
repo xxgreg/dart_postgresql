@@ -54,7 +54,7 @@ class ConnectionImpl implements Connection {
       String uri,
       Duration timeout, 
       TypeConverter typeConverter,
-      {Socket mockSocketConnect(String host, int port)}) {
+      {Future<Socket> mockSocketConnect(String host, int port)}) {
     return new Future.sync(() {
       
       var settings = new Settings.fromUri(uri);
@@ -75,7 +75,7 @@ class ConnectionImpl implements Connection {
           : mockSocketConnect;
       
       Future<Socket> future = connectFunc(settings.host, settings.port)
-        .timeout(timeout, onTimeout: onTimeout);
+          .timeout(timeout, onTimeout: onTimeout);
       
       if (settings.requireSsl) future = _connectSsl(future);
 
@@ -106,7 +106,7 @@ class ConnectionImpl implements Connection {
 
       socket.listen((data) {
         if (data == null || data[0] != _S) {
-          socket.close();
+          socket.close(); //TODO socket.destroy(); ??
           completer.completeError('This postgresql server is not configured to support SSL connections.');
         } else {
           // TODO validate certs
