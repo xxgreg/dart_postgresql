@@ -4,15 +4,15 @@ import 'dart:io';
 import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart';
 import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart';
-import 'package:postgresql/src/mock.dart';
+import 'package:postgresql/src/mock/mock.dart';
 import 'package:unittest/unittest.dart';
 
 main() {
+    test('testStartup with socket', () {
+      return MockServer.startSocketServer().then(testStartup);
+    });
 
-  group('Connect', () {
-    test('testStartup', testStartup);
-  });
-
+    test('testStartup with mock socket', () => testStartup(new MockServer()));
 }
 
 int PG_TEXT = 25;
@@ -21,14 +21,11 @@ int PG_TEXT = 25;
 //TODO test which parses/generates a recorded db stream to test protocol matches spec.
 // Might mean that testing can be done at the message object level.
 // But is good test test things like socket errors.
-testStartup() {
+testStartup(MockServer server) {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
-      var server = new MockServer();
-      Future connecting = ConnectionImpl.connect('postgres://testdb:password@localhost:5433/testdb', null, null, mockSocketConnect: ((host, port) {
-        return new Future.value(server.socket);
-      }));
+      Future connecting = server.connect();
       new Future.value(server.waitForClient()).then((x0) {
         try {
           x0;
@@ -60,25 +57,40 @@ testStartup() {
                   done0() {
                     expect(row, isNotNull);
                     conn.close();
-                    expect(server.received, equals([
-                        makeTerminate()
-                    ]));
-                    expect(server.isDestroyed, isTrue);
-                    completer0.complete();
+                    join0() {
+                      expect(server.received, equals([
+                          makeTerminate()
+                      ]));
+                      expect(server.isDestroyed, isTrue);
+                      server.stop();
+                      completer0.complete();
+                    }
+                    if (server is MockSocketServerImpl) {
+                      new Future.value(server.waitForClient()).then((x3) {
+                        try {
+                          x3;
+                          join0();
+                        } catch (e0, s0) {
+                          completer0.completeError(e0, s0);
+                        }
+                      }, onError: completer0.completeError);
+                    } else {
+                      join0();
+                    }
                   }
                   var stream0;
                   finally0(cont0) {
                     try {
                       new Future.value(stream0.cancel()).then(cont0);
-                    } catch (e0, s0) {
-                      completer0.completeError(e0, s0);
+                    } catch (e1, s1) {
+                      completer0.completeError(e1, s1);
                     }
                   }
-                  catch0(e0, s0) {
-                    finally0(() => completer0.completeError(e0, s0));
+                  catch0(e1, s1) {
+                    finally0(() => completer0.completeError(e1, s1));
                   }
-                  stream0 = querying.listen((x3) {
-                    var r = x3;
+                  stream0 = querying.listen((x4) {
+                    var r = x4;
                     row = r;
                     expect(row, new isInstanceOf<Row>());
                     expect(row.toList().length, equals(1));
@@ -86,16 +98,16 @@ testStartup() {
                     server.sendToClient(makeCommandComplete('SELECT 1'));
                     server.sendToClient(makeReadyForQuery(txIdle));
                   }, onError: catch0, onDone: done0);
-                } catch (e1, s1) {
-                  completer0.completeError(e1, s1);
+                } catch (e2, s2) {
+                  completer0.completeError(e2, s2);
                 }
               }, onError: completer0.completeError);
-            } catch (e2, s2) {
-              completer0.completeError(e2, s2);
+            } catch (e3, s3) {
+              completer0.completeError(e3, s3);
             }
           }, onError: completer0.completeError);
-        } catch (e3, s3) {
-          completer0.completeError(e3, s3);
+        } catch (e4, s4) {
+          completer0.completeError(e4, s4);
         }
       }, onError: completer0.completeError);
     } catch (e, s) {

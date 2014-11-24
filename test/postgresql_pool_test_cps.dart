@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/constants.dart';
-import 'package:postgresql/src/mock.dart';
+import 'package:postgresql/src/mock/mock.dart';
 import 'package:postgresql/pool.dart';
 import 'package:postgresql/src/pool_impl_cps.dart';
 import 'package:unittest/unittest.dart';

@@ -4,15 +4,15 @@ import 'dart:io';
 import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart';
 import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart';
-import 'package:postgresql/src/mock.dart';
+import 'package:postgresql/src/mock/mock.dart';
 import 'package:unittest/unittest.dart';
 
 main() {
+    test('testStartup with socket', () {
+      return MockServer.startSocketServer().then(testStartup);
+    });
 
-  group('Connect', () {
-    test('testStartup', testStartup);
-  });
-
+    test('testStartup with mock socket', () => testStartup(new MockServer()));
 }
 
 int PG_TEXT = 25;
@@ -21,11 +21,9 @@ int PG_TEXT = 25;
 //TODO test which parses/generates a recorded db stream to test protocol matches spec.
 // Might mean that testing can be done at the message object level.
 // But is good test test things like socket errors.
-testStartup() async {
+testStartup(MockServer server) async {
     
-    var server = new MockServer();
-    Future connecting = ConnectionImpl.connect('postgres://testdb:password@localhost:5433/testdb', null, null, 
-        mockSocketConnect: (host, port) => new Future.value(server.socket));
+    Future connecting = server.connect();
     
     await server.waitForClient();
     
@@ -64,8 +62,14 @@ testStartup() async {
     
     conn.close();
     
+    // Async in server, but sync in mock.
+    if (server is MockSocketServerImpl)
+      await server.waitForClient();
+    
     expect(server.received, equals([makeTerminate()]));
     expect(server.isDestroyed, isTrue);
+    
+    server.stop();
 }
 
 
