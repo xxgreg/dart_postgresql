@@ -7,10 +7,13 @@ import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart';
 import 'package:postgresql/src/mock/mock.dart';
 import 'package:unittest/unittest.dart';
 
+
 main() {
-    test('testStartup with socket', () {
-      return MockServer.startSocketServer().then(testStartup);
-    });
+  
+  mockLogger = print;
+  
+    test('testStartup with socket', 
+        () => MockServer.startSocketServer().then(testStartup));
 
     test('testStartup with mock socket', () => testStartup(new MockServer()));
 }
@@ -26,88 +29,103 @@ testStartup(MockServer server) {
   scheduleMicrotask(() {
     try {
       Future connecting = server.connect();
-      new Future.value(server.waitForClient()).then((x0) {
+      Future backendStarting = server.waitForConnect();
+      new Future.value(backendStarting).then((x0) {
         try {
-          x0;
-          expect(server.received, equals([
-              makeStartup('testdb', 'testdb')
-          ]));
-          server.clear();
-          server.sendToClient(makeAuth(authOk));
-          server.sendToClient(makeReadyForQuery(txIdle));
-          new Future.value(connecting).then((x1) {
-            try {
-              var conn = x1;
-              var sql = "select 'foo'";
-              Stream<Row> querying = conn.query(sql);
-              new Future.value(server.waitForClient()).then((x2) {
-                try {
-                  x2;
-                  expect(server.received, equals([
-                      makeQuery(sql)
-                  ]), verbose: true);
-                  server.clear();
-                  server.sendToClient(makeRowDescription([
-                      new Field('?', PG_TEXT)
-                  ]));
-                  server.sendToClient(makeDataRow([
-                      'foo'
-                  ]));
-                  var row = null;
-                  done0() {
-                    expect(row, isNotNull);
-                    conn.close();
-                    join0() {
-                      expect(server.received, equals([
-                          makeTerminate()
-                      ]));
-                      expect(server.isDestroyed, isTrue);
-                      server.stop();
-                      completer0.complete();
+          var backend = x0;
+          join0() {
+            expect(backend.received, equals([
+                makeStartup('testdb', 'testdb')
+            ]));
+            backend.clear();
+            backend.sendToClient(makeAuth(authOk));
+            backend.sendToClient(makeReadyForQuery(txIdle));
+            new Future.value(connecting).then((x1) {
+              try {
+                var conn = x1;
+                var sql = "select 'foo'";
+                Stream<Row> querying = conn.query(sql);
+                new Future.value(backend.waitForClient()).then((x2) {
+                  try {
+                    x2;
+                    expect(backend.received, equals([
+                        makeQuery(sql)
+                    ]), verbose: true);
+                    backend.clear();
+                    backend.sendToClient(makeRowDescription([
+                        new Field('?', PG_TEXT)
+                    ]));
+                    backend.sendToClient(makeDataRow([
+                        'foo'
+                    ]));
+                    var row = null;
+                    done0() {
+                      expect(row, isNotNull);
+                      conn.close();
+                      join1() {
+                        expect(backend.received, equals([
+                            makeTerminate()
+                        ]));
+                        expect(backend.isDestroyed, isTrue);
+                        server.stop();
+                        completer0.complete();
+                      }
+                      if (server is MockSocketServerImpl) {
+                        new Future.value(backend.waitForClient()).then((x3) {
+                          try {
+                            x3;
+                            join1();
+                          } catch (e0, s0) {
+                            completer0.completeError(e0, s0);
+                          }
+                        }, onError: completer0.completeError);
+                      } else {
+                        join1();
+                      }
                     }
-                    if (server is MockSocketServerImpl) {
-                      new Future.value(server.waitForClient()).then((x3) {
-                        try {
-                          x3;
-                          join0();
-                        } catch (e0, s0) {
-                          completer0.completeError(e0, s0);
-                        }
-                      }, onError: completer0.completeError);
-                    } else {
-                      join0();
+                    var stream0;
+                    finally0(cont0) {
+                      try {
+                        new Future.value(stream0.cancel()).then(cont0);
+                      } catch (e1, s1) {
+                        completer0.completeError(e1, s1);
+                      }
                     }
-                  }
-                  var stream0;
-                  finally0(cont0) {
-                    try {
-                      new Future.value(stream0.cancel()).then(cont0);
-                    } catch (e1, s1) {
-                      completer0.completeError(e1, s1);
+                    catch0(e1, s1) {
+                      finally0(() => completer0.completeError(e1, s1));
                     }
+                    stream0 = querying.listen((x4) {
+                      var r = x4;
+                      row = r;
+                      expect(row, new isInstanceOf<Row>());
+                      expect(row.toList().length, equals(1));
+                      expect(row[0], equals('foo'));
+                      backend.sendToClient(makeCommandComplete('SELECT 1'));
+                      backend.sendToClient(makeReadyForQuery(txIdle));
+                    }, onError: catch0, onDone: done0);
+                  } catch (e2, s2) {
+                    completer0.completeError(e2, s2);
                   }
-                  catch0(e1, s1) {
-                    finally0(() => completer0.completeError(e1, s1));
-                  }
-                  stream0 = querying.listen((x4) {
-                    var r = x4;
-                    row = r;
-                    expect(row, new isInstanceOf<Row>());
-                    expect(row.toList().length, equals(1));
-                    expect(row[0], equals('foo'));
-                    server.sendToClient(makeCommandComplete('SELECT 1'));
-                    server.sendToClient(makeReadyForQuery(txIdle));
-                  }, onError: catch0, onDone: done0);
-                } catch (e2, s2) {
-                  completer0.completeError(e2, s2);
-                }
-              }, onError: completer0.completeError);
-            } catch (e3, s3) {
-              completer0.completeError(e3, s3);
-            }
-          }, onError: completer0.completeError);
-        } catch (e4, s4) {
-          completer0.completeError(e4, s4);
+                }, onError: completer0.completeError);
+              } catch (e3, s3) {
+                completer0.completeError(e3, s3);
+              }
+            }, onError: completer0.completeError);
+          }
+          if (server is MockSocketServerImpl) {
+            new Future.value(backend.waitForClient()).then((x5) {
+              try {
+                x5;
+                join0();
+              } catch (e4, s4) {
+                completer0.completeError(e4, s4);
+              }
+            }, onError: completer0.completeError);
+          } else {
+            join0();
+          }
+        } catch (e5, s5) {
+          completer0.completeError(e5, s5);
         }
       }, onError: completer0.completeError);
     } catch (e, s) {

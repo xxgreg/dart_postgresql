@@ -7,10 +7,13 @@ import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart';
 import 'package:postgresql/src/mock/mock.dart';
 import 'package:unittest/unittest.dart';
 
+
 main() {
-    test('testStartup with socket', () {
-      return MockServer.startSocketServer().then(testStartup);
-    });
+  
+  mockLogger = print;
+  
+    test('testStartup with socket', 
+        () => MockServer.startSocketServer().then(testStartup));
 
     test('testStartup with mock socket', () => testStartup(new MockServer()));
 }
@@ -23,28 +26,34 @@ int PG_TEXT = 25;
 // But is good test test things like socket errors.
 testStartup(MockServer server) async {
     
+    
     Future connecting = server.connect();
+    Future backendStarting = server.waitForConnect();
     
-    await server.waitForClient();
+    var backend = await backendStarting;
     
-    expect(server.received, equals([makeStartup('testdb', 'testdb')]));
+    //TODO make mock socket server and mock server behave the same.
+    if (server is MockSocketServerImpl)
+      await backend.waitForClient();
     
-    server.clear();
-    server.sendToClient(makeAuth(authOk));
-    server.sendToClient(makeReadyForQuery(txIdle));
+    expect(backend.received, equals([makeStartup('testdb', 'testdb')]));
+    
+    backend.clear();
+    backend.sendToClient(makeAuth(authOk));
+    backend.sendToClient(makeReadyForQuery(txIdle));
     
     var conn = await connecting;
     
     var sql = "select 'foo'";
     Stream<Row> querying = conn.query(sql);
     
-    await server.waitForClient();
+    await backend.waitForClient();
     
-    expect(server.received, equals([makeQuery(sql)]), verbose: true);
-    server.clear();
+    expect(backend.received, equals([makeQuery(sql)]), verbose: true);
+    backend.clear();
 
-    server.sendToClient(makeRowDescription([new Field('?', PG_TEXT)]));
-    server.sendToClient(makeDataRow(['foo']));
+    backend.sendToClient(makeRowDescription([new Field('?', PG_TEXT)]));
+    backend.sendToClient(makeDataRow(['foo']));
     
     var row = null;
     await for (var r in querying) {
@@ -54,8 +63,8 @@ testStartup(MockServer server) async {
       expect(row.toList().length, equals(1));
       expect(row[0], equals('foo'));
       
-      server.sendToClient(makeCommandComplete('SELECT 1'));    
-      server.sendToClient(makeReadyForQuery(txIdle));
+      backend.sendToClient(makeCommandComplete('SELECT 1'));    
+      backend.sendToClient(makeReadyForQuery(txIdle));
     }
     
     expect(row, isNotNull);
@@ -63,11 +72,12 @@ testStartup(MockServer server) async {
     conn.close();
     
     // Async in server, but sync in mock.
+    //TODO make getter on backend. isRealSocket
     if (server is MockSocketServerImpl)
-      await server.waitForClient();
+      await backend.waitForClient();
     
-    expect(server.received, equals([makeTerminate()]));
-    expect(server.isDestroyed, isTrue);
+    expect(backend.received, equals([makeTerminate()]));
+    expect(backend.isDestroyed, isTrue);
     
     server.stop();
 }

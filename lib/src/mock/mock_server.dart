@@ -1,20 +1,22 @@
 part of postgresql.mock;
 
-class MockServerImpl implements MockServer {
+
+class MockServerBackendImpl implements Backend {
   
-  MockServerImpl() {
-    socket.onClose = () {
+  MockServerBackendImpl() {
+        
+    mocket.onClose = () {
       _isClosed = true;
       log.add(new Packet(clientClosed, []));
     };
     
-    socket.onDestroy = () {
+    mocket.onDestroy = () {
       _isClosed = true;
       _isDestroyed = true;
       log.add(new Packet(clientDestroyed, []));
     };
     
-    socket.onAdd = (data) {
+    mocket.onAdd = (data) {
       received.add(data);
       log.add(new Packet(toServer, data));
       if (_waitForClient != null) {
@@ -23,17 +25,16 @@ class MockServerImpl implements MockServer {
       }
     };
     
-    socket.onError = (err, [st]) {
+    mocket.onError = (err, [st]) {
       throw err;
       print(st);
     };
+ 
   }
+
   
-  Future<pg.Connection> connect() => ConnectionImpl.connect(
-      'postgres://testdb:password@localhost:5433/testdb', null, null, 
-      mockSocketConnect: (host, port) => new Future.value(socket));
-  
-  final Mocket socket = new Mocket();
+  final Mocket mocket = new Mocket();
+    
   final List<Packet> log = new List<Packet>();
   final List<List<int>> received = new List<List<int>>();
   
@@ -41,30 +42,20 @@ class MockServerImpl implements MockServer {
   bool _isDestroyed = true;
   bool get isClosed => _isClosed;
   bool get isDestroyed => _isDestroyed;
-  
-  /// Send data over the socket from the mock server to the client listening
-  /// on the socket.
-  void sendToClient(List<int> data) {
-    log.add(new Packet(toClient, data));
-    socket._controller.add(data);
-  }
-  
+    
   /// Clear out received data.
   void clear() {
     received.clear();
   }
-  
+
+  /// Server closes the connection to client.
   void close() {
     log.add(new Packet(serverClosed, []));
     _isClosed = true;
     _isDestroyed = true;
-    socket._controller.close();
+    mocket.close();
   }
   
-  void socketException(String msg) {
-    log.add(new Packet(socketError, []));
-    socket._controller.addError(new SocketException(msg));
-  }
   
   Completer _waitForClient;
   
@@ -74,8 +65,54 @@ class MockServerImpl implements MockServer {
       _waitForClient = new Completer();
     return _waitForClient.future;
   }
+
+  /// Send data over the socket from the mock server to the client listening
+  /// on the socket.
+  void sendToClient(List<int> data) {
+    log.add(new Packet(toClient, data));
+    mocket._controller.add(data);
+  }
+
+  void socketException(String msg) {
+    log.add(new Packet(socketError, []));
+    mocket._controller.addError(new SocketException(msg));
+  }  
+}
+
+
+class MockServerImpl implements MockServer {
+  
+  MockServerImpl();
+  
+  Future<pg.Connection> connect() => ConnectionImpl.connect(
+      'postgres://testdb:password@localhost:5433/testdb', null, null, 
+      mockSocketConnect: (host, port) => new Future(() => _startBackend()));  
   
   stop() {}
+  
+  final List<Backend> backends = <Backend>[];
+    
+  Mocket _startBackend() {
+    var backend = new MockServerBackendImpl();
+    backends.add(backend);
+    
+    if (_waitForConnect != null) {
+      _waitForConnect.complete(backend);
+      _waitForConnect = null;
+    }
+    
+    return backend.mocket;
+  }
+  
+  Completer _waitForConnect;
+  
+  /// Wait for the next client to connect.
+  Future waitForConnect() {
+    if (_waitForConnect == null)
+      _waitForConnect = new Completer();
+    return _waitForConnect.future;
+  }
+
 }
 
 

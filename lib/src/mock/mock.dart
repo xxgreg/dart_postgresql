@@ -34,15 +34,27 @@ abstract class MockServer {
   
   factory MockServer() = MockServerImpl;
   
+  // Starts a mock server using a real socket.
   static Future<MockServer> startSocketServer([int port])
     => MockSocketServerImpl.start(port);
   
   Future<pg.Connection> connect();
   
+  List<Backend> get backends;
+  
+  Future<Backend> waitForConnect();
+  
+  void stop();
+}
+
+
+// For each call to MockServer.connect(), one backend is created.
+abstract class Backend {
+
   List<Packet> get log;
   List<List<int>> get received;
   bool get isClosed;
-  bool get isDestroyed;
+  bool get isDestroyed; //FIXME do I need both this and close? Is this client side specific?
   
   /// Send data over the socket from the mock server to the client listening
   /// on the socket.
@@ -54,15 +66,13 @@ abstract class MockServer {
   /// Server closes the connection.
   void close();
   
+  // This is can only be used for a MockServer, not a MockSocketServer.
   //FIXME can other types of exception be received?
   /// Client receives socket error.
   void socketException(String msg);
   
   Future waitForClient();
-  
-  void stop();
 }
-
 
 
 
