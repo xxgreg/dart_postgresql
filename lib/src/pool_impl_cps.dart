@@ -575,6 +575,11 @@ class PoolImpl implements Pool {
   _releaseConnection(PooledConnectionImpl pconn) {
     _debug('Release ${pconn.name}');
     
+    if (state == stopping || state == stopped) {
+      _destroyConnection(pconn);
+      return;
+    }
+    
     assert(pconn._pool == this);
     assert(_connections.contains(pconn));
     assert(pconn.state == inUse);

@@ -388,7 +388,7 @@ class PoolImpl implements Pool {
     }
     
     pconn._state = testing;
-    
+        
     if (!await _testConnection(pconn).timeout(timeout - stopwatch.elapsed, onTimeout: onTimeout)) {
       _destroyConnection(pconn);
       // Get another connection out of the pool and test again.
@@ -449,6 +449,11 @@ class PoolImpl implements Pool {
 
   _releaseConnection(PooledConnectionImpl pconn) {
     _debug('Release ${pconn.name}');
+    
+    if (state == stopping || state == stopped) {
+      _destroyConnection(pconn);
+      return;
+    }
     
     assert(pconn._pool == this);
     assert(_connections.contains(pconn));
