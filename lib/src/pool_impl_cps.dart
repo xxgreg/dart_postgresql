@@ -348,7 +348,8 @@ class PoolImpl implements Pool {
           connectionName: pconn.name,
           message: 'Leak detected. '
             'state: ${pconn._connection.state} '
-            'transactionState: ${pconn._connection.transactionState}',
+            'transactionState: ${pconn._connection.transactionState} '
+            'debugId: ${pconn.debugId}',
           stackTrace: pconn._stackTrace));
     }
   }
@@ -368,7 +369,9 @@ class PoolImpl implements Pool {
             'These will be closed and new connections started.'));
       
       // Forcefully close leaked connections.
-      _connections.where((c) => c._isLeaked).forEach(_destroyConnection);
+      for (var pconn in new List.from(_connections)) {
+        _destroyConnection(pconn);
+      }
       
       // Start new connections in parallel.
       for (int i = 0; i < settings.minConnections; i++) {

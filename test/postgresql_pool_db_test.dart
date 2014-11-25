@@ -10,6 +10,10 @@ import 'package:postgresql/postgresql.dart';
 
 _log(msg) {}
 
+int secsSince(DateTime time) => time == null
+  ? null
+  : new DateTime.now().difference(time).inSeconds;
+
 debug(Pool pool) {
 
   int total = pool.connections.length;
@@ -24,8 +28,10 @@ debug(Pool pool) {
   
   int testing = pool.connections.where((c) => c.state == PooledConnectionState.testing).length;
   
-  print('pool: ${pool.state} total: $total  available: $available  in-use: $inUse  testing: $testing   waiting: $waiting leaked: $leaked');
-  pool.connections.forEach(print);
+  int connecting = pool.connections.where((c) => c.state == PooledConnectionState.connecting).length;
+  
+  print('pool: ${pool.state} total: $total  available: $available  in-use: $inUse  testing: $testing connecting: $connecting  waiting: $waiting leaked: $leaked');
+  pool.connections.forEach((c) => print('${c.name} ${c.state} ${c.connectionState}  est: ${secsSince(c.established)}  obt: ${secsSince(c.obtained)}  rls: ${secsSince(c.released)}  leaked: ${c.isLeaked}'));
   print('');
 }
 
@@ -34,13 +40,15 @@ Duration millis(int ms) => new Duration(milliseconds: ms);
 
 main() {
 
-  int slowQueries = 5;
-  int testConnects = 10;
+  int slowQueries = 3;
+  int testConnects = 1;
   var queryPeriod = secs(2);
-  var stopAfter = secs(30);
+  var stopAfter = secs(120);
   
   var settings = new PoolSettings(
-    connectionTimeout: secs(15));
+    connectionTimeout: secs(15),
+    leakDetectionThreshold: secs(3),
+    restartIfAllConnectionsLeaked: true);
   
   var uri = 'postgresql://testdb:password@localhost:5433/testdb';
   var pool = new Pool(uri, settings)
@@ -55,10 +63,12 @@ main() {
   int slowQueriesCompleted = 0;
 
   
-  var logger = new Timer.periodic(queryPeriod, (t) {
+  var loggerFunc = (t) {
     print('queriesSent: $queriesSent  queriesCompleted: $queriesCompleted  slowSent: $slowQueriesSent  slowCompleted: $slowQueriesCompleted  connect timeouts: $connectTimeout  queryError: $queryError   connectError: $connectError ');
     debug(pool);
-  });
+  };
+  
+  var logger = new Timer.periodic(queryPeriod, loggerFunc);
   
 //  test('Connect', () {
 //    var pass = expectAsync(() {});
@@ -129,10 +139,30 @@ main() {
       print(st);
     });
 
+    // Burst of connections
+//     new Future.delayed(secs(15), () {
+//       print('####################### BURST! #########################');
+//       for (int i = 0; i < 30; i++) {
+//         testConnect(null);
+//       }
+//     });
+//    
+//     new Future.delayed(secs(30), () {
+//           print('####################### BURST! #########################');
+//           for (int i = 0; i < 30; i++) {
+//             testConnect(null);
+//           }
+//         });
+//    
+    new Timer.periodic(secs(10), (t) {
+      pool.connect(debugId: 'leak!');
+    });
+        
+     
     new Future.delayed(stopAfter, () {
       print('stop');
       if (timer != null) timer.cancel();
-      pool.stop().then((_) => logger.cancel());
+      pool.stop().then((_) { logger.cancel(); loggerFunc(null); });
       pass();
     });
 
