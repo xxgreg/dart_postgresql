@@ -2,18 +2,19 @@ library postgresql.pool.impl;
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math' as math;
 import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/pool.dart';
 
 
+// I like my enums short and sweet, not long and typey.
 const PooledConnectionState connecting = PooledConnectionState.connecting;
 const PooledConnectionState testing = PooledConnectionState.testing;
 const PooledConnectionState available = PooledConnectionState.available;
 const PooledConnectionState inUse = PooledConnectionState.inUse;
+const PooledConnectionState connClosed = PooledConnectionState.closed;
 
-//FIXME better name?
-const PooledConnectionState closed2 = PooledConnectionState.closed;
 
 
 // Allow for mocking the pg connection.
@@ -90,9 +91,9 @@ class ConnectionAdapter implements pg.Connection {
 }
 
 
-class PooledConnection {
+class PooledConnectionImpl implements PooledConnection {
 
-  PooledConnection(this._pool);
+  PooledConnectionImpl(this._pool);
 
   final PoolImpl _pool;
   pg.Connection _connection;
@@ -103,7 +104,7 @@ class PooledConnection {
   DateTime _released;
   String _debugId;
   int _useId;
-  bool _isLeaked;
+  bool _isLeaked = false;
   StackTrace _stackTrace;
   
   /// The state of connection in the pool, available, closed
@@ -134,11 +135,15 @@ class PooledConnection {
   /// The stacktrace at the time pool.connect() was last called.
   StackTrace get stackTrace => _stackTrace;
   
+  /// Returns null if not connected yet.
+  pg.ConnectionState get connectionState
+    => _connection == null ? null : _connection.state;
+  
   String get name => '${_pool.settings.poolName}:$backendPid'
       + (_useId == null ? '' : ':$_useId')
       + (_debugId == null ? '' : ':$_debugId');
 
-  String toString() => '$name $_state est: $_established obt: $_obtained';
+  String toString() => '$name $_state $connectionState est: $_established obt: $_obtained';
 }
 
 //_debug(msg) => print(msg);
@@ -159,8 +164,8 @@ class PoolImpl implements Pool {
   final PoolSettings settings;
   final ConnectionFactory _connectionFactory;
   
-  final Queue<Completer<PooledConnection>> _waitQueue =
-      new Queue<Completer<PooledConnection>>();
+  final Queue<Completer<PooledConnectionImpl>> _waitQueue =
+      new Queue<Completer<PooledConnectionImpl>>();
 
   Timer _heartbeatTimer;
   Future _stopFuture;
@@ -168,29 +173,19 @@ class PoolImpl implements Pool {
   final StreamController<pg.Message> _messages =
       new StreamController<pg.Message>.broadcast();
 
-  final List<PooledConnection> _connections = new List<PooledConnection>();
+  final List<PooledConnectionImpl> _connections = new List<PooledConnectionImpl>();
   
-  List<PooledConnection> _connectionsView; 
+  List<PooledConnectionImpl> _connectionsView; 
   
-  List<PooledConnection> get connections {
+  List<PooledConnectionImpl> get connections {
     if (_connectionsView == null)
       _connectionsView = new UnmodifiableListView(_connections);
     return _connectionsView;
   }
+
+  int get waitQueueLength => _waitQueue.length;
   
   Stream<pg.Message> get messages => _messages.stream;
-
-  /// Note includes connections which are currently connecting/testing.
-  int get totalConnections => _connections.length;
-
-  int get availableConnections =>
-    _connections.where((c) => c._state == available).length;
-
-  int get inUseConnections =>
-    _connections.where((c) => c._state == inUse).length;
-
-  int get leakedConnections =>
-    _connections.where((c) => c._isLeaked).length;
 
   Future start() {
   final completer0 = new Completer();
@@ -262,31 +257,38 @@ class PoolImpl implements Pool {
   scheduleMicrotask(() {
     try {
       _debug('Establish connection.');
-      var stopwatch = new Stopwatch()
-          ..start();
-      var pconn = new PooledConnection(this);
-      pconn._state = connecting;
-      new Future.value(_connectionFactory(databaseUri, timeout: settings.establishTimeout, typeConverter: settings.typeConverter)).then((x0) {
-        try {
-          var conn = x0;
-          conn.messages.listen(((msg) {
-            return _messages.add(new pg.Message.from(msg, connectionName: pconn.name));
-          }), onError: ((msg) {
-            return _messages.addError(new pg.Message.from(msg, connectionName: pconn.name));
-          }));
-          pconn._connection = conn;
-          pconn._established = new DateTime.now();
-          pconn._adapter = new ConnectionAdapter(conn, onClose: (() {
-            _releaseConnection(pconn);
-          }));
-          pconn._state = available;
-          _connections.add(pconn);
-          _debug('Established connection. ${pconn.name}');
-          completer0.complete();
-        } catch (e0, s0) {
-          completer0.completeError(e0, s0);
-        }
-      }, onError: completer0.completeError);
+      join0() {
+        var stopwatch = new Stopwatch()
+            ..start();
+        var pconn = new PooledConnectionImpl(this);
+        pconn._state = connecting;
+        _connections.add(pconn);
+        new Future.value(_connectionFactory(databaseUri, timeout: settings.establishTimeout, typeConverter: settings.typeConverter)).then((x0) {
+          try {
+            var conn = x0;
+            conn.messages.listen(((msg) {
+              return _messages.add(new pg.Message.from(msg, connectionName: pconn.name));
+            }), onError: ((msg) {
+              return _messages.addError(new pg.Message.from(msg, connectionName: pconn.name));
+            }));
+            pconn._connection = conn;
+            pconn._established = new DateTime.now();
+            pconn._adapter = new ConnectionAdapter(conn, onClose: (() {
+              _releaseConnection(pconn);
+            }));
+            pconn._state = available;
+            _debug('Established connection. ${pconn.name}');
+            completer0.complete();
+          } catch (e0, s0) {
+            completer0.completeError(e0, s0);
+          }
+        }, onError: completer0.completeError);
+      }
+      if (_connections.length >= settings.maxConnections) {
+        completer0.complete(new Future.value());
+      } else {
+        join0();
+      }
     } catch (e, s) {
       completer0.completeError(e, s);
     }
@@ -306,8 +308,8 @@ class PoolImpl implements Pool {
     _checkIfAllConnectionsLeaked();
   }
 
-  _checkIdleTimeout(PooledConnection pconn) {
-    if (totalConnections > settings.minConnections) {
+  _checkIdleTimeout(PooledConnectionImpl pconn) {
+    if (_connections.length > settings.minConnections) {
       if (pconn._state == available
           && pconn._released != null
           && _isExpired(pconn._released, settings.idleTimeout)) {
@@ -317,7 +319,7 @@ class PoolImpl implements Pool {
     }
   }
   
-  _checkIfLeaked(PooledConnection pconn) {
+  _checkIfLeaked(PooledConnectionImpl pconn) {
     if (settings.leakDetectionThreshold != null
         && !pconn._isLeaked
         && pconn._state != available
@@ -334,11 +336,14 @@ class PoolImpl implements Pool {
     }
   }
   
+  int get _leakedConnections =>
+    _connections.where((c) => c._isLeaked).length;
+  
   /// If all connections are in leaked state, then destroy them all, and
   /// restart the minimum required number of connections.
   _checkIfAllConnectionsLeaked() {
     if (settings.restartIfAllConnectionsLeaked
-        && leakedConnections >= settings.maxConnections) {
+        && _leakedConnections >= settings.maxConnections) {
 
       _messages.add(new pg.ClientMessage(
           severity: 'WARNING',
@@ -409,7 +414,7 @@ class PoolImpl implements Pool {
   return completer0.future;
 }
 
-  Future<PooledConnection> _connect(Duration timeout) {
+  Future<PooledConnectionImpl> _connect(Duration timeout) {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
@@ -418,7 +423,7 @@ class PoolImpl implements Pool {
       var onTimeout = (() {
         return throw new TimeoutException('Connect timeout exceeded: ${settings.connectionTimeout}.', settings.connectionTimeout);
       });
-      PooledConnection pconn = _getFirstAvailable();
+      PooledConnectionImpl pconn = _getFirstAvailable();
       join0() {
         new Future.value(_testConnection(pconn).timeout(timeout - stopwatch.elapsed, onTimeout: onTimeout)).then((x0) {
           try {
@@ -437,7 +442,7 @@ class PoolImpl implements Pool {
         }, onError: completer0.completeError);
       }
       if (pconn == null) {
-        var c = new Completer<PooledConnection>();
+        var c = new Completer<PooledConnectionImpl>();
         _waitQueue.add(c);
         join2() {
           join0();
@@ -471,10 +476,10 @@ class PoolImpl implements Pool {
   return completer0.future;
 }
 
-  List<PooledConnection> _getAvailable()
+  List<PooledConnectionImpl> _getAvailable()
     => _connections.where((c) => c._state == available).toList();
 
-  PooledConnection _getFirstAvailable()
+  PooledConnectionImpl _getFirstAvailable()
     => _connections.firstWhere((c) => c._state == available, orElse: () => null);
 
   /// If connections are available, return them to waiting clients.
@@ -486,10 +491,20 @@ class PoolImpl implements Pool {
       var completer = _waitQueue.removeFirst();
       completer.complete(pconn);
     }
+    
+    // If required start more connection.
+    if (_waitQueue.isNotEmpty
+        && _connections.length < settings.maxConnections) {
+      int count = math.min(_waitQueue.length,
+          settings.maxConnections - _connections.length);
+      for (int i = 0; i < count; i++) {
+        _establishConnection();
+      }
+    }
   }
 
   /// Perfom a query to check the state of the connection.
-  Future<bool> _testConnection(PooledConnection pconn) {
+  Future<bool> _testConnection(PooledConnectionImpl pconn) {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
@@ -531,7 +546,7 @@ class PoolImpl implements Pool {
   return completer0.future;
 }
 
-  _releaseConnection(PooledConnection pconn) {
+  _releaseConnection(PooledConnectionImpl pconn) {
     _debug('release ${pconn.name}');
     
     pg.Connection conn = pconn._connection;
@@ -569,10 +584,10 @@ class PoolImpl implements Pool {
   bool _isExpired(DateTime time, Duration timeout) 
     => new DateTime.now().difference(time) > timeout;
   
-  _destroyConnection(PooledConnection pconn) {
+  _destroyConnection(PooledConnectionImpl pconn) {
     _debug('Destroy connection. ${pconn.name}');
     pconn._connection.close();
-    pconn._state = closed2;
+    pconn._state = connClosed;
     _connections.remove(pconn);
   }
   

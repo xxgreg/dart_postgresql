@@ -4,8 +4,8 @@ import 'dart:async';
 import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/src/pool_impl_cps.dart';
 
+
 //TODO docs
-//TODO expose more getters from PoolImpl
 abstract class Pool {
   factory Pool(String databaseUri, [PoolSettings settings])
     => new PoolImpl(databaseUri, settings);
@@ -13,7 +13,45 @@ abstract class Pool {
   Future stop();
   Future<pg.Connection> connect({String debugId});
   Stream<pg.Message> get messages;
+  List<PooledConnection> get connections;
+  int get waitQueueLength;
 }
+
+abstract class PooledConnection {
+  
+  /// The state of connection in the pool, available, closed
+  PooledConnectionState get state;
+
+  /// Time at which the physical connection to the database was established.
+  DateTime get established;
+
+  /// Time at which the connection was last obtained by a client.
+  DateTime get obtained;
+
+  /// Time at which the connection was last released by a client.
+  DateTime get released;
+  
+  /// The pid of the postgresql handler.
+  int get backendPid;
+
+  /// The id passed to connect for debugging.
+  String get debugId;
+
+  /// A unique id that updated whenever the connection is obtained.
+  int get useId;
+  
+  /// If a leak detection threshold is set, then this flag will be set on leaked
+  /// connections.
+  bool get isLeaked;
+
+  /// The stacktrace at the time pool.connect() was last called.
+  StackTrace get stackTrace;
+  
+  pg.ConnectionState get connectionState;
+  
+  String get name;
+}
+
 
 abstract class PoolSettings {
 
