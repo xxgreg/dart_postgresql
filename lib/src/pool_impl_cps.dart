@@ -113,6 +113,8 @@ class PooledConnectionImpl implements PooledConnection {
   bool _isLeaked = false;
   StackTrace _stackTrace;
   
+  final Duration _random = new Duration(seconds: new math.Random().nextInt(20));
+  
   /// The state of connection in the pool, available, closed
   PooledConnectionState get state => _state;
 
@@ -149,7 +151,7 @@ class PooledConnectionImpl implements PooledConnection {
       + (_useId == null ? '' : ':$_useId')
       + (_debugId == null ? '' : ':$_debugId');
 
-  String toString() => '$name $_state $connectionState est: $_established obt: $_obtained';
+  String toString() => '$name:$_state:$connectionState';
 }
 
 //_debug(msg) => print(msg);
@@ -170,6 +172,9 @@ class PoolImpl implements Pool {
   final PoolSettings settings;
   final ConnectionFactory _connectionFactory;
   
+  //TODO Consider using a list instead. removeAt(0); instead of removeFirst().
+  // Since the list will be so small there is not performance benefit using a
+  // queue.
   final Queue<Completer<PooledConnectionImpl>> _waitQueue =
       new Queue<Completer<PooledConnectionImpl>>();
 
@@ -309,7 +314,7 @@ class PoolImpl implements Pool {
   void _heartbeat() {
     if (_state != running) return;
     
-    for (var pconn in _connections) {
+    for (var pconn in new List.from(_connections)) {
       _checkIfLeaked(pconn);
       _checkIdleTimeout(pconn);
       
@@ -653,8 +658,10 @@ class PoolImpl implements Pool {
         _establishConnection();
 
     // If connection older than lifetime setting then destroy.
-    } else if (_isExpired(pconn._established, settings.maxLifetime)) {
-
+    // A random number of seconds 0-20 is added, so that all connections don't
+    // expire at exactly the same moment.
+    } else if (settings.maxLifetime != null
+        && _isExpired(pconn._established, settings.maxLifetime + pconn._random)) {
       _destroyConnection(pconn);
       _establishConnection();
 

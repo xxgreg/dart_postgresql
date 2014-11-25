@@ -53,7 +53,7 @@ abstract class PooledConnection {
   String get name;
 }
 
-
+//FIXME docs
 abstract class PoolSettings {
 
   factory PoolSettings({String poolName,
@@ -77,7 +77,13 @@ abstract class PoolSettings {
   Duration get stopTimeout;
   Duration get establishTimeout; //TODO better name
   Duration get connectionTimeout; //TODO better name
+  
+  /// Also has random 20s added.
   Duration get idleTimeout;
+  
+  /// Note max lifetime has a random ammount of seconds added between 0 and 20.
+  /// This to stagger the expiration, so all connections don't get restarted at
+  /// at the same time after the pool has started and maxLifetime is reached.
   Duration get maxLifetime;
   Duration get leakDetectionThreshold;
   bool get testConnections;
