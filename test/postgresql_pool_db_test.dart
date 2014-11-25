@@ -22,7 +22,9 @@ debug(Pool pool) {
   
   int leaked = pool.connections.where((c) => c.isLeaked).length;
   
-  print('pool: ${pool.state} total: $total  available: $available  in-use: $inUse  waiting: $waiting leaked: $leaked');
+  int testing = pool.connections.where((c) => c.state == PooledConnectionState.testing).length;
+  
+  print('pool: ${pool.state} total: $total  available: $available  in-use: $inUse  testing: $testing   waiting: $waiting leaked: $leaked');
   pool.connections.forEach(print);
   print('');
 }
@@ -34,16 +36,15 @@ main() {
 
   int slowQueries = 5;
   int testConnects = 10;
-  var queryPeriod = secs(1);
+  var queryPeriod = secs(2);
   var stopAfter = secs(30);
   
   var settings = new PoolSettings(
-    connectionTimeout: secs(5),
-    stopTimeout: millis(1));
+    connectionTimeout: secs(15));
   
   var uri = 'postgresql://testdb:password@localhost:5433/testdb';
   var pool = new Pool(uri, settings)
-    ..messages.listen(print);
+    ..messages.listen((msg) => print('###$msg###'));
   
   int queryError = 0;
   int connectError = 0;
@@ -83,7 +84,7 @@ main() {
             //print(err);
             connectTimeout++;
           } else {
-            _log('Connect error: $err'); connectError++;
+            print('Connect error: $err'); connectError++;
           }
       });
     }
@@ -108,7 +109,7 @@ main() {
             //print(err);
             connectTimeout++;
           } else {
-            _log('Connect error: $err'); connectError++;
+            print('Connect error: $err'); connectError++;
           }
       });
     }

@@ -10,8 +10,9 @@ import 'package:postgresql/pool.dart';
 
 // I like my enums short and sweet, not long and typey.
 const PooledConnectionState connecting = PooledConnectionState.connecting;
-const PooledConnectionState testing = PooledConnectionState.testing;
 const PooledConnectionState available = PooledConnectionState.available;
+const PooledConnectionState reserved = PooledConnectionState.reserved;
+const PooledConnectionState testing = PooledConnectionState.testing;
 const PooledConnectionState inUse = PooledConnectionState.inUse;
 const PooledConnectionState connClosed = PooledConnectionState.closed;
 
@@ -424,7 +425,8 @@ class PoolImpl implements Pool {
         }
       }
       if (_state != running) {
-        completer0.complete(new Future.error(new pg.PostgresqlException('Connect called while pool is not running.')));
+        throw new pg.PostgresqlException('Connect called while pool is not running.');
+        join0();
       } else {
         join0();
       }
@@ -439,56 +441,72 @@ class PoolImpl implements Pool {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
-      var stopwatch = new Stopwatch()
-          ..start();
-      var onTimeout = (() {
-        return throw new TimeoutException('Connect timeout exceeded.', settings.connectionTimeout);
-      });
-      var pconn = _getFirstAvailable();
       join0() {
-        pconn._state = testing;
-        new Future.value(_testConnection(pconn).timeout(timeout - stopwatch.elapsed, onTimeout: onTimeout)).then((x0) {
-          try {
-            join1() {
-              completer0.complete();
-            }
-            if (!x0) {
-              _destroyConnection(pconn);
-              completer0.complete(_connect(timeout - stopwatch.elapsed));
-            } else {
-              completer0.complete(pconn);
-            }
-          } catch (e0, s0) {
-            completer0.completeError(e0, s0);
-          }
-        }, onError: completer0.completeError);
-      }
-      if (pconn == null) {
-        var c = new Completer<PooledConnectionImpl>();
-        _waitQueue.add(c);
-        join2() {
-          assert(pconn.state == available);
-          join0();
-        }
-        finally0(cont0) {
-          _waitQueue.remove(c);
-          cont0();
-        }
-        catch0(e2, s2) {
-          finally0(() => completer0.completeError(e2, s2));
-        }
-        try {
-          new Future.value(c.future.timeout(timeout, onTimeout: onTimeout)).then((x1) {
+        var stopwatch = new Stopwatch()
+            ..start();
+        var onTimeout = (() {
+          return throw new TimeoutException('Connect timeout exceeded.', settings.connectionTimeout);
+        });
+        var pconn = _getFirstAvailable();
+        join1() {
+          pconn._state = testing;
+          new Future.value(_testConnection(pconn, timeout - stopwatch.elapsed, onTimeout)).then((x0) {
             try {
-              pconn = x1;
-              finally0(join2);
-            } catch (e3, s3) {
-              catch0(e3, s3);
+              join2() {
+                join3() {
+                  completer0.complete();
+                }
+                if (timeout > stopwatch.elapsed) {
+                  onTimeout();
+                  join3();
+                } else {
+                  _destroyConnection(pconn);
+                  completer0.complete(_connect(timeout - stopwatch.elapsed));
+                }
+              }
+              if (x0) {
+                completer0.complete(pconn);
+              } else {
+                join2();
+              }
+            } catch (e0, s0) {
+              completer0.completeError(e0, s0);
             }
-          }, onError: catch0);
-        } catch (e4, s4) {
-          catch0(e4, s4);
+          }, onError: completer0.completeError);
         }
+        if (pconn == null) {
+          var c = new Completer<PooledConnectionImpl>();
+          _waitQueue.add(c);
+          join4() {
+            assert(pconn.state == reserved);
+            join1();
+          }
+          finally0(cont0) {
+            _waitQueue.remove(c);
+            cont0();
+          }
+          catch0(e2, s2) {
+            finally0(() => completer0.completeError(e2, s2));
+          }
+          try {
+            new Future.value(c.future.timeout(timeout, onTimeout: onTimeout)).then((x1) {
+              try {
+                pconn = x1;
+                finally0(join4);
+              } catch (e3, s3) {
+                catch0(e3, s3);
+              }
+            }, onError: catch0);
+          } catch (e4, s4) {
+            catch0(e4, s4);
+          }
+        } else {
+          join1();
+        }
+      }
+      if (state == stopping || state == stopped) {
+        throw new pg.PostgresqlException('Connect failed as pool is stopping.');
+        join0();
       } else {
         join0();
       }
@@ -512,12 +530,17 @@ class PoolImpl implements Pool {
     
     if (_waitQueue.isEmpty) return;
 
-    for (var pconn in _getAvailable()) {
-      if (_waitQueue.isEmpty) return;
+    //FIXME make sure this happens in the correct order so it is fair to the
+    // order which connect was called, and that connections are reused, and
+    // others left idle so that the pool can shrink.
+    var pconns = _getAvailable();
+    while(_waitQueue.isNotEmpty && pconns.isNotEmpty) {
       var completer = _waitQueue.removeFirst();
+      var pconn = pconns.removeLast();
+      pconn._state = reserved;
       completer.complete(pconn);
     }
-    
+        
     // If required start more connection.
     if (_waitQueue.isNotEmpty
         && _connections.length < settings.maxConnections) {
@@ -530,7 +553,10 @@ class PoolImpl implements Pool {
   }
 
   /// Perfom a query to check the state of the connection.
-  Future<bool> _testConnection(PooledConnectionImpl pconn) {
+  Future<bool> _testConnection(
+      PooledConnectionImpl pconn,
+      Duration timeout, 
+      Function onTimeout) {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
@@ -543,8 +569,23 @@ class PoolImpl implements Pool {
         try {
           if (ex is Exception) {
             ok = false;
-            _messages.add(new pg.ClientMessage(severity: 'WARNING', connectionName: pconn.name, message: 'Connection test failed.', exception: ex, stackTrace: pconn._stackTrace));
-            join0();
+            join1() {
+              join0();
+            }
+            if (state != stopping && state != stopped) {
+              join2(x0) {
+                var msg = x0;
+                _messages.add(new pg.ClientMessage(severity: 'WARNING', connectionName: pconn.name, message: msg, exception: ex));
+                join1();
+              }
+              if (ex is TimeoutException) {
+                join2('Connection test timed out.');
+              } else {
+                join2('Connection test failed.');
+              }
+            } else {
+              join1();
+            }
           } else {
             throw ex;
           }
@@ -553,9 +594,9 @@ class PoolImpl implements Pool {
         }
       }
       try {
-        new Future.value(pconn._connection.query('select true').single).then((x0) {
+        new Future.value(pconn._connection.query('select true').single.timeout(timeout, onTimeout: onTimeout)).then((x1) {
           try {
-            var row = x0;
+            var row = x1;
             ok = row[0];
             join0();
           } catch (e0, s1) {
@@ -621,7 +662,7 @@ class PoolImpl implements Pool {
   
   _destroyConnection(PooledConnectionImpl pconn) {
     _debug('Destroy connection. ${pconn.name}');
-    pconn._connection.close();
+    if (pconn._connection != null) pconn._connection.close();
     pconn._state = connClosed;
     _connections.remove(pconn);
   }

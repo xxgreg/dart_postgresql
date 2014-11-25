@@ -10,8 +10,9 @@ import 'package:postgresql/pool.dart';
 
 // I like my enums short and sweet, not long and typey.
 const PooledConnectionState connecting = PooledConnectionState.connecting;
-const PooledConnectionState testing = PooledConnectionState.testing;
 const PooledConnectionState available = PooledConnectionState.available;
+const PooledConnectionState reserved = PooledConnectionState.reserved;
+const PooledConnectionState testing = PooledConnectionState.testing;
 const PooledConnectionState inUse = PooledConnectionState.inUse;
 const PooledConnectionState connClosed = PooledConnectionState.closed;
 
@@ -334,8 +335,8 @@ class PoolImpl implements Pool {
     _debug('Connect.');
     
     if (_state != running)
-      return new Future.error(new pg.PostgresqlException(
-              'Connect called while pool is not running.'));
+      throw new pg.PostgresqlException(
+        'Connect called while pool is not running.');
     
     StackTrace stackTrace = null;
     if (settings.leakDetectionThreshold != null) {
@@ -366,6 +367,9 @@ class PoolImpl implements Pool {
 
   Future<PooledConnectionImpl> _connect(Duration timeout) async {
 
+    if (state == stopping || state == stopped)
+      throw new pg.PostgresqlException('Connect failed as pool is stopping.');
+    
     var stopwatch = new Stopwatch()..start();
 
     var onTimeout = () => throw new TimeoutException(
@@ -384,17 +388,20 @@ class PoolImpl implements Pool {
       } finally {
         _waitQueue.remove(c);
       }
-      assert(pconn.state == available);
+      assert(pconn.state == reserved);
     }
     
     pconn._state = testing;
         
-    if (!await _testConnection(pconn).timeout(timeout - stopwatch.elapsed, onTimeout: onTimeout)) {
+    if (await _testConnection(pconn, timeout - stopwatch.elapsed, onTimeout))
+      return pconn;
+    
+    if (timeout > stopwatch.elapsed) {
+      onTimeout();
+    } else {
       _destroyConnection(pconn);
       // Get another connection out of the pool and test again.
       return _connect(timeout - stopwatch.elapsed);
-    } else {
-      return pconn;
     }
   }
 
@@ -411,12 +418,17 @@ class PoolImpl implements Pool {
     
     if (_waitQueue.isEmpty) return;
 
-    for (var pconn in _getAvailable()) {
-      if (_waitQueue.isEmpty) return;
+    //FIXME make sure this happens in the correct order so it is fair to the
+    // order which connect was called, and that connections are reused, and
+    // others left idle so that the pool can shrink.
+    var pconns = _getAvailable();
+    while(_waitQueue.isNotEmpty && pconns.isNotEmpty) {
       var completer = _waitQueue.removeFirst();
+      var pconn = pconns.removeLast();
+      pconn._state = reserved;
       completer.complete(pconn);
     }
-    
+        
     // If required start more connection.
     if (_waitQueue.isNotEmpty
         && _connections.length < settings.maxConnections) {
@@ -429,20 +441,29 @@ class PoolImpl implements Pool {
   }
 
   /// Perfom a query to check the state of the connection.
-  Future<bool> _testConnection(PooledConnectionImpl pconn) async {
+  Future<bool> _testConnection(
+      PooledConnectionImpl pconn,
+      Duration timeout, 
+      Function onTimeout) async {
     bool ok;
     Exception exception;
     try {
-      var row = await pconn._connection.query('select true').single;
+      var row = await pconn._connection.query('select true').single
+          .timeout(timeout, onTimeout: onTimeout);
       ok = row[0];
-    } on Exception catch (ex) {
+    } on Exception catch (ex) { //TODO Do I really want to log warnings when the connection timeout fails.
       ok = false;
-      _messages.add(new pg.ClientMessage(
-          severity: 'WARNING',
-          connectionName: pconn.name,
-          message: 'Connection test failed.',
-          exception: ex,
-          stackTrace: pconn._stackTrace));
+      // Don't log connection test failures during shutdown.
+      if (state != stopping && state != stopped) {
+        var msg = ex is TimeoutException
+              ? 'Connection test timed out.'
+              : 'Connection test failed.';
+        _messages.add(new pg.ClientMessage(
+            severity: 'WARNING',
+            connectionName: pconn.name,
+            message: msg,
+            exception: ex));
+      }
     }
     return ok;
   }
@@ -496,7 +517,7 @@ class PoolImpl implements Pool {
   
   _destroyConnection(PooledConnectionImpl pconn) {
     _debug('Destroy connection. ${pconn.name}');
-    pconn._connection.close();
+    if (pconn._connection != null) pconn._connection.close();
     pconn._state = connClosed;
     _connections.remove(pconn);
   }
@@ -523,7 +544,7 @@ class PoolImpl implements Pool {
     // Send error messages to connections in wait queue.
     _waitQueue.forEach((completer) =>
       completer.completeError(new pg.PostgresqlException(
-          'Connection pool is shutting down.')));
+          'Connection pool is stopping.')));
     _waitQueue.clear();
     
     

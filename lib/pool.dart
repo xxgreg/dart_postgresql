@@ -104,9 +104,10 @@ class PooledConnectionState {
   final String name;
   toString() => name;
 
-  static const PooledConnectionState connecting = const PooledConnectionState('connecting');
-  static const PooledConnectionState testing = const PooledConnectionState('testing');
+  static const PooledConnectionState connecting = const PooledConnectionState('connecting');  
   static const PooledConnectionState available = const PooledConnectionState('available');
+  static const PooledConnectionState reserved = const PooledConnectionState('reserved');
+  static const PooledConnectionState testing = const PooledConnectionState('testing');
   static const PooledConnectionState inUse = const PooledConnectionState('inUse');
   static const PooledConnectionState closed = const PooledConnectionState('closed');
 }
