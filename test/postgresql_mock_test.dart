@@ -36,11 +36,11 @@ testStartup(MockServer server) async {
     if (server is MockSocketServerImpl)
       await backend.waitForClient();
     
-    expect(backend.received, equals([makeStartup('testdb', 'testdb')]));
+    expect(backend.received, equals([new Startup('testdb', 'testdb').encode()]));
     
     backend.clear();
-    backend.sendToClient(makeAuth(authOk));
-    backend.sendToClient(makeReadyForQuery(txIdle));
+    backend.sendToClient(new AuthenticationRequest.ok().encode());
+    backend.sendToClient(new ReadyForQuery(TransactionStatus.none).encode());
     
     var conn = await connecting;
     
@@ -49,11 +49,11 @@ testStartup(MockServer server) async {
     
     await backend.waitForClient();
     
-    expect(backend.received, equals([makeQuery(sql)]), verbose: true);
+    expect(backend.received, equals([new Query(sql).encode()]), verbose: true);
     backend.clear();
 
-    backend.sendToClient(makeRowDescription([new Field('?', PG_TEXT)]));
-    backend.sendToClient(makeDataRow(['foo']));
+    backend.sendToClient(new RowDescription([new Field('?', PG_TEXT)]).encode());
+    backend.sendToClient(new DataRow.fromStrings(['foo']).encode());
     
     var row = null;
     await for (var r in querying) {
@@ -63,8 +63,8 @@ testStartup(MockServer server) async {
       expect(row.toList().length, equals(1));
       expect(row[0], equals('foo'));
       
-      backend.sendToClient(makeCommandComplete('SELECT 1'));    
-      backend.sendToClient(makeReadyForQuery(txIdle));
+      backend.sendToClient(new CommandComplete('SELECT 1').encode());    
+      backend.sendToClient(new ReadyForQuery(TransactionStatus.none).encode());
     }
     
     expect(row, isNotNull);
@@ -76,7 +76,7 @@ testStartup(MockServer server) async {
     if (server is MockSocketServerImpl)
       await backend.waitForClient();
     
-    expect(backend.received, equals([makeTerminate()]));
+    expect(backend.received, equals([new Terminate().encode()]));
     expect(backend.isDestroyed, isTrue);
     
     server.stop();

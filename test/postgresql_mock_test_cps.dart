@@ -36,11 +36,11 @@ testStartup(MockServer server) {
           var backend = x0;
           join0() {
             expect(backend.received, equals([
-                makeStartup('testdb', 'testdb')
+                new Startup('testdb', 'testdb').encode()
             ]));
             backend.clear();
-            backend.sendToClient(makeAuth(authOk));
-            backend.sendToClient(makeReadyForQuery(txIdle));
+            backend.sendToClient(new AuthenticationRequest.ok().encode());
+            backend.sendToClient(new ReadyForQuery(TransactionStatus.none).encode());
             new Future.value(connecting).then((x1) {
               try {
                 var conn = x1;
@@ -50,22 +50,22 @@ testStartup(MockServer server) {
                   try {
                     x2;
                     expect(backend.received, equals([
-                        makeQuery(sql)
+                        new Query(sql).encode()
                     ]), verbose: true);
                     backend.clear();
-                    backend.sendToClient(makeRowDescription([
+                    backend.sendToClient(new RowDescription([
                         new Field('?', PG_TEXT)
-                    ]));
-                    backend.sendToClient(makeDataRow([
+                    ]).encode());
+                    backend.sendToClient(new DataRow.fromStrings([
                         'foo'
-                    ]));
+                    ]).encode());
                     var row = null;
                     done0() {
                       expect(row, isNotNull);
                       conn.close();
                       join1() {
                         expect(backend.received, equals([
-                            makeTerminate()
+                            new Terminate().encode()
                         ]));
                         expect(backend.isDestroyed, isTrue);
                         server.stop();
@@ -101,8 +101,8 @@ testStartup(MockServer server) {
                       expect(row, new isInstanceOf<Row>());
                       expect(row.toList().length, equals(1));
                       expect(row[0], equals('foo'));
-                      backend.sendToClient(makeCommandComplete('SELECT 1'));
-                      backend.sendToClient(makeReadyForQuery(txIdle));
+                      backend.sendToClient(new CommandComplete('SELECT 1').encode());
+                      backend.sendToClient(new ReadyForQuery(TransactionStatus.none).encode());
                     }, onError: catch0, onDone: done0);
                   } catch (e2, s2) {
                     completer0.completeError(e2, s2);
