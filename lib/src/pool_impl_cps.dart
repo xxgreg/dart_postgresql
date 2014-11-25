@@ -386,7 +386,7 @@ class PoolImpl implements Pool {
           new Future.value(_connect(settings.connectionTimeout)).then((x0) {
             try {
               var pconn = x0;
-              assert(pconn._state == testing);
+              assert((settings.testConnections && pconn._state == testing) || (!settings.testConnections && pconn._state == reserved));
               assert(pconn._connection.state == idle);
               assert(pconn._connection.transactionState == none);
               pconn
@@ -449,35 +449,43 @@ class PoolImpl implements Pool {
         });
         var pconn = _getFirstAvailable();
         join1() {
-          pconn._state = testing;
-          new Future.value(_testConnection(pconn, timeout - stopwatch.elapsed, onTimeout)).then((x0) {
-            try {
-              join2() {
+          join2() {
+            pconn._state = testing;
+            new Future.value(_testConnection(pconn, timeout - stopwatch.elapsed, onTimeout)).then((x0) {
+              try {
                 join3() {
-                  completer0.complete();
+                  join4() {
+                    completer0.complete();
+                  }
+                  if (timeout > stopwatch.elapsed) {
+                    onTimeout();
+                    join4();
+                  } else {
+                    _destroyConnection(pconn);
+                    completer0.complete(_connect(timeout - stopwatch.elapsed));
+                  }
                 }
-                if (timeout > stopwatch.elapsed) {
-                  onTimeout();
-                  join3();
+                if (x0) {
+                  completer0.complete(pconn);
                 } else {
-                  _destroyConnection(pconn);
-                  completer0.complete(_connect(timeout - stopwatch.elapsed));
+                  join3();
                 }
+              } catch (e0, s0) {
+                completer0.completeError(e0, s0);
               }
-              if (x0) {
-                completer0.complete(pconn);
-              } else {
-                join2();
-              }
-            } catch (e0, s0) {
-              completer0.completeError(e0, s0);
-            }
-          }, onError: completer0.completeError);
+            }, onError: completer0.completeError);
+          }
+          if (!settings.testConnections) {
+            pconn._state = reserved;
+            completer0.complete(pconn);
+          } else {
+            join2();
+          }
         }
         if (pconn == null) {
           var c = new Completer<PooledConnectionImpl>();
           _waitQueue.add(c);
-          join4() {
+          join5() {
             assert(pconn.state == reserved);
             join1();
           }
@@ -492,7 +500,7 @@ class PoolImpl implements Pool {
             new Future.value(c.future.timeout(timeout, onTimeout: onTimeout)).then((x1) {
               try {
                 pconn = x1;
-                finally0(join4);
+                finally0(join5);
               } catch (e3, s3) {
                 catch0(e3, s3);
               }
@@ -687,7 +695,7 @@ class PoolImpl implements Pool {
       _state = stopping;
       join0() {
         _waitQueue.forEach(((completer) {
-          return completer.completeError(new pg.PostgresqlException('Connection pool is shutting down.'));
+          return completer.completeError(new pg.PostgresqlException('Connection pool is stopping.'));
         }));
         _waitQueue.clear();
         var stopwatch = new Stopwatch()

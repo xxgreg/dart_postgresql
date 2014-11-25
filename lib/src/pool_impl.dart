@@ -350,7 +350,8 @@ class PoolImpl implements Pool {
     
     var pconn = await _connect(settings.connectionTimeout);
 
-    assert(pconn._state == testing);
+    assert((settings.testConnections && pconn._state == testing)
+        || (!settings.testConnections && pconn._state == reserved));
     assert(pconn._connection.state == idle);
     assert(pconn._connection.transactionState == none);    
     
@@ -375,7 +376,7 @@ class PoolImpl implements Pool {
     var onTimeout = () => throw new TimeoutException(
       'Connect timeout exceeded.', settings.connectionTimeout);
 
-    var pconn = _getFirstAvailable();    
+    var pconn = _getFirstAvailable();
    
     // If there are currently no available connections then
     // add the current connection request at the end of the
@@ -389,6 +390,11 @@ class PoolImpl implements Pool {
         _waitQueue.remove(c);
       }
       assert(pconn.state == reserved);
+    }
+    
+    if (!settings.testConnections) {
+      pconn._state = reserved;
+      return pconn;
     }
     
     pconn._state = testing;
