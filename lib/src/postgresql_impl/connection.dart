@@ -50,6 +50,8 @@ class ConnectionImpl implements Connection {
 
   final StreamController _messages = new StreamController.broadcast();
 
+  String toString() => 'Connection:$_backendPid';
+  
   static Future<ConnectionImpl> connect(
       String uri,
       Duration timeout, 
@@ -575,12 +577,23 @@ class ConnectionImpl implements Connection {
   }
 
   void close() {
+    
     if (_state == closed)
       return;
 
     var prior = _state;
     _state = closed;
 
+    // If a query is in progress then send an error and close the result stream.
+    if (_query != null) {
+      var c = _query._controller;
+      if (c != null && !c.isClosed) {
+        c.addError(new PostgresqlException('Connection closed before query could complete'));
+        c.close();
+        _query = null;
+      }
+    }
+    
     Future flushing;
     try {
       var msg = new MessageBuffer();

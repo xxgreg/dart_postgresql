@@ -65,12 +65,17 @@ class PoolSettingsImpl implements PoolSettings {
 //FIXME Rename this, as it is not an adapter.
 class ConnectionAdapter implements pg.Connection {
 
-  ConnectionAdapter(this._conn, {onClose})
-    : _onClose = onClose;
+  ConnectionAdapter(this._pool, this._pconn, this._conn);
 
+  bool _isReleased = false;
   final pg.Connection _conn;
-  final Function _onClose;
-  void close() => _onClose();
+  final PoolImpl _pool;
+  final PooledConnectionImpl _pconn;
+  
+  void close() {
+    if (!_isReleased) _pool._releaseConnection(_pconn);
+    _isReleased = true;    
+  }
 
   Stream query(String sql, [values]) => _conn.query(sql, values);
 
@@ -258,33 +263,37 @@ class PoolImpl implements Pool {
     try {
       _debug('Establish connection.');
       join0() {
-        var stopwatch = new Stopwatch()
-            ..start();
-        var pconn = new PooledConnectionImpl(this);
-        pconn._state = connecting;
-        _connections.add(pconn);
-        new Future.value(_connectionFactory(databaseUri, timeout: settings.establishTimeout, typeConverter: settings.typeConverter)).then((x0) {
-          try {
-            var conn = x0;
-            conn.messages.listen(((msg) {
-              return _messages.add(new pg.Message.from(msg, connectionName: pconn.name));
-            }), onError: ((msg) {
-              return _messages.addError(new pg.Message.from(msg, connectionName: pconn.name));
-            }));
-            pconn._connection = conn;
-            pconn._established = new DateTime.now();
-            pconn._adapter = new ConnectionAdapter(conn, onClose: (() {
-              _releaseConnection(pconn);
-            }));
-            pconn._state = available;
-            _debug('Established connection. ${pconn.name}');
-            completer0.complete();
-          } catch (e0, s0) {
-            completer0.completeError(e0, s0);
-          }
-        }, onError: completer0.completeError);
+        join1() {
+          var stopwatch = new Stopwatch()
+              ..start();
+          var pconn = new PooledConnectionImpl(this);
+          pconn._state = connecting;
+          _connections.add(pconn);
+          new Future.value(_connectionFactory(databaseUri, timeout: settings.establishTimeout, typeConverter: settings.typeConverter)).then((x0) {
+            try {
+              var conn = x0;
+              conn.messages.listen(((msg) {
+                return _messages.add(new pg.Message.from(msg, connectionName: pconn.name));
+              }), onError: ((msg) {
+                return _messages.addError(new pg.Message.from(msg, connectionName: pconn.name));
+              }));
+              pconn._connection = conn;
+              pconn._established = new DateTime.now();
+              pconn._state = available;
+              _debug('Established connection. ${pconn.name}');
+              completer0.complete();
+            } catch (e0, s0) {
+              completer0.completeError(e0, s0);
+            }
+          }, onError: completer0.completeError);
+        }
+        if (_connections.length >= settings.maxConnections) {
+          completer0.complete(new Future.value());
+        } else {
+          join1();
+        }
       }
-      if (_connections.length >= settings.maxConnections) {
+      if (!(_state == running || _state == PoolState.starting)) {
         completer0.complete(new Future.value());
       } else {
         join0();
@@ -296,7 +305,9 @@ class PoolImpl implements Pool {
   return completer0.future;
 }
   
-  void _heartbeat() {    
+  void _heartbeat() {
+    if (_state != running) return;
+    
     for (var pconn in _connections) {
       _checkIfLeaked(pconn);
       _checkIdleTimeout(pconn);
@@ -368,42 +379,52 @@ class PoolImpl implements Pool {
   scheduleMicrotask(() {
     try {
       _debug('Connect.');
-      StackTrace stackTrace = null;
       join0() {
-        new Future.value(_connect(settings.connectionTimeout)).then((x0) {
-          try {
-            var pconn = x0;
-            pconn
-                .._state = inUse
-                .._obtained = new DateTime.now()
-                .._useId = _sequence++
-                .._debugId = debugId
-                .._stackTrace = stackTrace;
-            _debug('Connected. ${pconn.name}');
-            completer0.complete(pconn._adapter);
-          } catch (e0, s0) {
-            completer0.completeError(e0, s0);
-          }
-        }, onError: completer0.completeError);
-      }
-      if (settings.leakDetectionThreshold != null) {
+        StackTrace stackTrace = null;
         join1() {
-          join0();
+          new Future.value(_connect(settings.connectionTimeout)).then((x0) {
+            try {
+              var pconn = x0;
+              assert(pconn._state == testing);
+              assert(pconn._connection.state == idle);
+              assert(pconn._connection.transactionState == none);
+              pconn
+                  .._state = inUse
+                  .._obtained = new DateTime.now()
+                  .._useId = _sequence++
+                  .._debugId = debugId
+                  .._stackTrace = stackTrace;
+              _debug('Connected. ${pconn.name} ${pconn._connection}');
+              completer0.complete(new ConnectionAdapter(this, pconn, pconn._connection));
+            } catch (e0, s0) {
+              completer0.completeError(e0, s0);
+            }
+          }, onError: completer0.completeError);
         }
-        catch0(ex, st) {
-          try {
-            stackTrace = st;
+        if (settings.leakDetectionThreshold != null) {
+          join2() {
             join1();
-          } catch (ex, st) {
-            completer0.completeError(ex, st);
           }
-        }
-        try {
-          throw "Generate stacktrace.";
+          catch0(ex, st) {
+            try {
+              stackTrace = st;
+              join2();
+            } catch (ex, st) {
+              completer0.completeError(ex, st);
+            }
+          }
+          try {
+            throw "Generate stacktrace.";
+            join2();
+          } catch (e1, s1) {
+            catch0(e1, s1);
+          }
+        } else {
           join1();
-        } catch (e1, s1) {
-          catch0(e1, s1);
         }
+      }
+      if (_state != running) {
+        completer0.complete(new Future.error(new pg.PostgresqlException('Connect called while pool is not running.')));
       } else {
         join0();
       }
@@ -421,10 +442,11 @@ class PoolImpl implements Pool {
       var stopwatch = new Stopwatch()
           ..start();
       var onTimeout = (() {
-        return throw new TimeoutException('Connect timeout exceeded: ${settings.connectionTimeout}.', settings.connectionTimeout);
+        return throw new TimeoutException('Connect timeout exceeded.', settings.connectionTimeout);
       });
-      PooledConnectionImpl pconn = _getFirstAvailable();
+      var pconn = _getFirstAvailable();
       join0() {
+        pconn._state = testing;
         new Future.value(_testConnection(pconn).timeout(timeout - stopwatch.elapsed, onTimeout: onTimeout)).then((x0) {
           try {
             join1() {
@@ -445,6 +467,7 @@ class PoolImpl implements Pool {
         var c = new Completer<PooledConnectionImpl>();
         _waitQueue.add(c);
         join2() {
+          assert(pconn.state == available);
           join0();
         }
         finally0(cont0) {
@@ -484,6 +507,9 @@ class PoolImpl implements Pool {
 
   /// If connections are available, return them to waiting clients.
   _processWaitQueue() {
+    
+    if (_state != running) return;
+    
     if (_waitQueue.isEmpty) return;
 
     for (var pconn in _getAvailable()) {
@@ -547,7 +573,11 @@ class PoolImpl implements Pool {
 }
 
   _releaseConnection(PooledConnectionImpl pconn) {
-    _debug('release ${pconn.name}');
+    _debug('Release ${pconn.name}');
+    
+    assert(pconn._pool == this);
+    assert(_connections.contains(pconn));
+    assert(pconn.state == inUse);
     
     pg.Connection conn = pconn._connection;
     
@@ -557,7 +587,7 @@ class PoolImpl implements Pool {
     // While it would be possible to write code which would send a rollback 
     // command, this is simpler and probably nearly as fast (not that this
     // is likely to become a bottleneck anyway).
-    if (conn.state != idle && conn.transactionState != none) {
+    if (conn.state != idle || conn.transactionState != none) {
         _messages.add(new pg.ClientMessage(
             severity: 'WARNING',
             connectionName: pconn.name,
@@ -610,6 +640,10 @@ class PoolImpl implements Pool {
     try {
       _state = stopping;
       join0() {
+        _waitQueue.forEach(((completer) {
+          return completer.completeError(new pg.PostgresqlException('Connection pool is shutting down.'));
+        }));
+        _waitQueue.clear();
         var stopwatch = new Stopwatch()
             ..start();
         break0() {
@@ -633,9 +667,9 @@ class PoolImpl implements Pool {
                     trampoline0 = continue0;
                   }
                   if (stopwatch.elapsed > settings.stopTimeout) {
-                    _messages.add(new pg.ClientMessage(severity: 'WARNING', message: 'Exceeded timeout while stopping, '
+                    _messages.add(new pg.ClientMessage(severity: 'WARNING', message: 'Exceeded timeout while stopping pool, '
                         'closing in use connections.'));
-                    _connections.forEach(_destroyConnection);
+                    new List.from(_connections).forEach(_destroyConnection);
                     join1();
                   } else {
                     join1();

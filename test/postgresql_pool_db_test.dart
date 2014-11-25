@@ -1,35 +1,63 @@
 import 'dart:async';
-import 'dart:io';
+
+import 'package:matcher/matcher.dart';
 import 'package:postgresql/constants.dart';
 import 'package:postgresql/pool.dart';
 import 'package:postgresql/postgresql.dart';
-import 'package:yaml/yaml.dart';
-
-import 'package:matcher/matcher.dart';
 
 
-Settings loadSettings(){
-  var map = loadYaml(new File('test/test_config.yaml').readAsStringSync());
-  return new Settings.fromMap(map);
+//_log(msg) => print(msg);
+
+_log(msg) {}
+
+debug(Pool pool) {
+
+  int total = pool.connections.length;
+
+  int available = pool.connections.where((c) => c.state == PooledConnectionState.available).length;
+
+  int inUse = pool.connections.where((c) => c.state == PooledConnectionState.inUse).length;
+  
+  int waiting = pool.waitQueueLength;
+  
+  int leaked = pool.connections.where((c) => c.isLeaked).length;
+  
+  print('pool: ${pool.state} total: $total  available: $available  in-use: $inUse  waiting: $waiting leaked: $leaked');
+  pool.connections.forEach(print);
+  print('');
 }
+
+Duration secs(int s) => new Duration(seconds: s);
+Duration millis(int ms) => new Duration(milliseconds: ms);
 
 main() {
 
   int slowQueries = 5;
   int testConnects = 10;
-  var queryPeriod = new Duration(milliseconds: 500);
-  var stopAfter = new Duration(seconds: 30);
+  var queryPeriod = secs(1);
+  var stopAfter = secs(30);
   
-  var settings = new PoolSettings(connectionTimeout: new Duration(seconds: 10));
+  var settings = new PoolSettings(
+    connectionTimeout: secs(5),
+    stopTimeout: millis(1));
   
-  var pool = new Pool(loadSettings().toUri(), settings)
+  var uri = 'postgresql://testdb:password@localhost:5433/testdb';
+  var pool = new Pool(uri, settings)
     ..messages.listen(print);
   
   int queryError = 0;
   int connectError = 0;
   int connectTimeout = 0;
+  int queriesSent = 0;
+  int queriesCompleted = 0;
+  int slowQueriesSent = 0;
+  int slowQueriesCompleted = 0;
 
-  new Timer.periodic(queryPeriod, (t) => print('connect timeouts: $connectTimeout  queryError: $queryError   connectError: $connectError '));
+  
+  var logger = new Timer.periodic(queryPeriod, (t) {
+    print('queriesSent: $queriesSent  queriesCompleted: $queriesCompleted  slowSent: $slowQueriesSent  slowCompleted: $slowQueriesCompleted  connect timeouts: $connectTimeout  queryError: $queryError   connectError: $connectError ');
+    debug(pool);
+  });
   
 //  test('Connect', () {
 //    var pass = expectAsync(() {});
@@ -37,33 +65,58 @@ main() {
 
     testConnect(_) {
       pool.connect().then((conn) {
+        _log('connected ${conn.backendPid}');
+        queriesSent++;
         conn.query("select 'oi';").toList()
           .then((rows) {
-            expect(rows[0].toList(), equals(['oi']));
-            conn.close();
+            queriesCompleted++;
+            expect(rows[0].toList(), equals(['oi']));            
           })
-          .catchError((err) { print('Query error: $err'); queryError += 1; });
+          .catchError((err) { _log('Query error: $err'); queryError++; })
+          .whenComplete(() {
+            _log('close ${conn.backendPid}');
+            conn.close();
+          });
       })
-      .catchError((err) { if (err is TimeoutException) { connectTimeout += 1; } else { print('Connect error: $err'); connectError += 1; } });
+      .catchError((err) {
+          if (err is TimeoutException) {
+            //print(err);
+            connectTimeout++;
+          } else {
+            _log('Connect error: $err'); connectError++;
+          }
+      });
     }
 
     slowQuery() {
      pool.connect().then((conn) {
+       _log('slow connected ${conn.backendPid}');
+       slowQueriesSent++;
         conn.query("select generate_series (1, 100000);").toList()
           .then((rows) {
+            slowQueriesCompleted++;
             expect(rows.length, 100000);
-            conn.close();
           })
-          .catchError((err) { print('Query error: $err'); queryError += 1; });
+          .catchError((err) { _log('Query error: $err'); queryError++; })
+          .whenComplete(() {
+            _log('slow close ${conn.backendPid}');
+            conn.close();
+          });
       })
-      .catchError((err) { if (err is TimeoutException) { connectTimeout += 1; } else { print('Connect error: $err'); connectError += 1; } });
+      .catchError((err) {
+          if (err is TimeoutException) {
+            //print(err);
+            connectTimeout++;
+          } else {
+            _log('Connect error: $err'); connectError++;
+          }
+      });
     }
 
     // Wait for initial connections to be made before starting
     var timer;
     pool.start().then((_) {
       timer = new Timer.periodic(queryPeriod, (_) {
-        debug(pool);
         for (var i = 0; i < slowQueries; i++)
           slowQuery();
         for (var i = 0; i < testConnects; i++)
@@ -78,29 +131,10 @@ main() {
     new Future.delayed(stopAfter, () {
       print('stop');
       if (timer != null) timer.cancel();
-      pool.stop();
+      pool.stop().then((_) => logger.cancel());
       pass();
-      new Future.delayed(new Duration(seconds: 1), () => exit(0)); //FIXME - something is keeping the process alive.
     });
 
 //  });
   
-}
-
-
-debug(Pool pool) {
-
-  int total = pool.connections.length;
-
-  int available = pool.connections.where((c) => c.state == PooledConnectionState.available).length;
-
-  int inUse = pool.connections.where((c) => c.state == PooledConnectionState.inUse).length;
-  
-  int waiting = pool.waitQueueLength;
-  
-  int leaked = pool.connections.where((c) => c.isLeaked).length;
-  
-  print('total: $total  available: $available  in-use: $inUse  waiting: $waiting leaked: $leaked');
-  pool.connections.forEach(print);
-  print('');
 }

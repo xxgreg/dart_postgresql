@@ -12,6 +12,7 @@ abstract class Pool {
   Future start();
   Future stop();
   Future<pg.Connection> connect({String debugId});
+  PoolState get state;
   Stream<pg.Message> get messages;
   List<PooledConnection> get connections;
   int get waitQueueLength;
