@@ -429,9 +429,11 @@ main() {
       conn.query('elect 1').toList().then(
           (rows) => throw new Exception('Should not be reached.'),
           onError: expectAsync((err) {
-            expect(err.severity, equals('ERROR'));
-            expect(err.code, equals('42601'));
-            expect(err.position, equals(1));
+            expect(err, new isInstanceOf<PostgresqlException>());
+            expect(err.serverMessage, isNotNull);
+            expect(err.serverMessage.severity, equals('ERROR'));
+            expect(err.serverMessage.code, equals('42601'));
+            expect(err.serverMessage.position, equals("1"));
           }));
     });
   });

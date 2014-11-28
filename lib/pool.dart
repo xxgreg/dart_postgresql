@@ -49,6 +49,9 @@ abstract class Pool {
   Stream<pg.Message> get messages;
   List<PooledConnection> get connections;
   int get waitQueueLength;
+  
+  /// Depreciated. Use [stop]() instead.
+  @deprecated void destroy();
 }
 
 

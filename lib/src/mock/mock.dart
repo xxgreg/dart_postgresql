@@ -89,6 +89,7 @@ class MockConnection implements pg.Connection {
 
   pg.ConnectionState state = pg.ConnectionState.idle;
   pg.TransactionState transactionState = none;
+  pg.TransactionState transactionStatus = none;
 
   Map<String,String> parameters = {};
   
@@ -128,6 +129,7 @@ class MockConnection implements pg.Connection {
 
 
   Stream<pg.Message> get messages => messagesController.stream;
+  Stream<pg.Message> get unhandled => messages;
   StreamController<pg.Message> messagesController = new StreamController.broadcast();
 
   Future runInTransaction(Future operation(), [pg.Isolation isolation])

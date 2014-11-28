@@ -1,5 +1,6 @@
 library postgresql.protocol;
 
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -340,7 +341,8 @@ class ReadyForQuery implements ProtocolMessage {
 
 abstract class BaseResponse implements ProtocolMessage {
   
-  BaseResponse(this.fields) {
+  BaseResponse(Map<String,String> fields)
+      : fields = new UnmodifiableMapView<String,String>(fields) {
     if (fields == null) throw new ArgumentError();
     assert(fields.keys.every((k) => k.length == 1));
   }

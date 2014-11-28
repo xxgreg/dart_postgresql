@@ -51,6 +51,8 @@ abstract class Connection {
   /// [ServerMessage] for more information.
   Stream<Message> get messages;
 
+  /// Use messages.
+  @deprecated Stream<Message> get unhandled;
 
   /// Server configuration parameters such as date format and timezone.
   Map<String,String> get parameters;
@@ -62,6 +64,9 @@ abstract class Connection {
 
 
   TransactionState get transactionState;
+  
+  /// Use transactionState.
+  @deprecated TransactionState get transactionStatus;
 }
 
 /// Row allows field values to be retrieved as if they were getters.
@@ -110,37 +115,67 @@ abstract class Message {
 
 abstract class ClientMessage implements Message {
 
-  factory ClientMessage({String severity,
+  factory ClientMessage(
+                {bool   isError,
+                 String severity,
                  String message,
-                 Object exception,
-                 StackTrace stackTrace,
-                 String connectionName}) = impl.ClientMessageImpl;
+                 String connectionName,
+                 exception,
+                 StackTrace stackTrace}) = impl.ClientMessageImpl;
 
-  /// If an exception was thrown the body will be here.
-  Object get exception;
-
-  /// Stack trace may be null if the message does not represent an exception.
-  StackTrace get stackTrace;
-
+  final exception;
+  final StackTrace stackTrace;
 }
 
+/// Represents an error or a notice sent from the postgresql server.
 abstract class ServerMessage implements Message {
 
+  /// Returns true if this is an error, otherwise it is a server-side notice.
+  bool get isError;
+
+  /// All of the information returned from the server.
+  Map<String,String> get fields;
+  
+  /// An identifier for the connection. Useful for logging messages in a
+  /// connection pool.
+  String get connectionName;
+
+  /// For a [ServerMessage] from an English localized database the field
+  /// contents are ERROR, FATAL, or PANIC, for an error message. Otherwise in
+  /// a notice message they are
+  /// WARNING, NOTICE, DEBUG, INFO, or LOG.
+  String get severity;
+  
   /// A PostgreSQL error code.
   /// See http://www.postgresql.org/docs/9.2/static/errcodes-appendix.html
   String get code;
+  
+  /// A human readible error message, typically one line.
+  String get message;
 
   /// More detailed information.
   String get detail;
+  
+  String get hint;
 
   /// The position as an index into the original query string where the syntax
   /// error was found. The first character has index 1, and positions are
   /// measured in characters not bytes. If the server does not supply a
   /// position this field is null.
-  int get position;
+  String get position;
+  
+  String get internalPosition;
+  String get internalQuery;
+  String get where;
+  String get schema;
+  String get table;
+  String get column;
+  String get dataType;
+  String get constraint;
+  String get file;
+  String get line;
+  String get routine;
 
-  /// All of the information returned from the server.
-  String get allInformation;
 }
 
 abstract class TypeConverter {
@@ -211,12 +246,23 @@ class Isolation {
   static const Isolation serializable = const Isolation('serializable');
 }
 
+
+@deprecated const Isolation READ_COMMITTED = Isolation.readCommitted;
+@deprecated const Isolation REPEATABLE_READ = Isolation.repeatableRead;
+@deprecated const Isolation SERIALIZABLE = Isolation.serializable;
+
+@deprecated const TRANSACTION_BEGUN = TransactionState.begun;
+@deprecated const TRANSACTION_ERROR = TransactionState.error;
+@deprecated const TRANSACTION_NONE = TransactionState.none;
+@deprecated const TRANSACTION_UNKNOWN = TransactionState.unknown;
+
+
 class PostgresqlException implements Exception {
-  PostgresqlException(this._msg, [this.exception, this.stackTrace]);
+  PostgresqlException(this._msg, {this.serverMessage, this.exception});
   final String _msg;
-  final dynamic exception;
-  final StackTrace stackTrace;
-  String toString() => exception == null ? _msg : '$_msg ($exception)';
+  final ServerMessage serverMessage;
+  final exception;
+  String toString() => _msg;
 }
 
 /// Settings for PostgreSQL.

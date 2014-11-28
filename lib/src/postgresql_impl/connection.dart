@@ -17,6 +17,8 @@ class ConnectionImpl implements Connection {
 
   TransactionState _transactionState = unknown;
   TransactionState get transactionState => _transactionState;
+  
+  @deprecated TransactionState get transactionStatus => _transactionState;
 
   final String _databaseName;
   final String _userName;
@@ -48,6 +50,8 @@ class ConnectionImpl implements Connection {
   
   Stream get messages => _messages.stream;
 
+  @deprecated Stream<Message> get unhandled => messages;
+  
   final StreamController _messages = new StreamController.broadcast();
 
   String toString() => 'Connection:$_backendPid';
@@ -225,6 +229,7 @@ class ConnectionImpl implements Connection {
 
     if (_state == closed) {
       _messages.add(new ClientMessageImpl(
+          isError: false,
           severity: 'WARNING',
           message: 'Socket error after socket closed.',
           exception: error));
@@ -234,19 +239,15 @@ class ConnectionImpl implements Connection {
 
     _destroy();
 
-    var ex = new ClientMessageImpl(
-        severity: 'ERROR',
-        message: closed
-          ? 'Socket closed unexpectedly.'
-          : 'Socket error.',
-        exception: error);
-
+    var msg = closed ? 'Socket closed unexpectedly.' : 'Socket error.';
+    
     if (!_hasConnected) {
-      _connected.completeError(ex);
+      _connected.completeError(new PostgresqlException(msg, exception: error));
     } else if (_query != null) {
-      _query.addError(ex);
+      _query.addError(new PostgresqlException(msg, exception: error));
     } else {
-      _messages.add(ex);
+      _messages.add(new ClientMessage(
+          isError: true, severity: 'ERROR', message: msg, exception: error));
     }
   }
 
@@ -303,9 +304,9 @@ class ConnectionImpl implements Connection {
         _readMessage(msgType, length);
       }
 
-    } on Exception catch (e, st) {
+    } on Exception {
       _destroy();
-      throw new PostgresqlException('Error reading data.', e, st);
+      rethrow;
     }
   }
 
@@ -375,10 +376,12 @@ class ConnectionImpl implements Connection {
       errorCode = _buffer.readByte();
     }
 
-    var ex = new ServerMessageImpl(
+    var msg = new ServerMessageImpl(
                          msgType == _MSG_ERROR_RESPONSE,
                          map);
 
+    var ex = new PostgresqlException(msg.message, serverMessage: msg);
+    
     if (msgType == _MSG_ERROR_RESPONSE) {
       if (!_hasConnected) {
           _state = closed;
@@ -387,10 +390,10 @@ class ConnectionImpl implements Connection {
       } else if (_query != null) {
         _query.addError(ex);
       } else {
-        _messages.add(ex);
+        _messages.add(msg);
       }
     } else {
-      _messages.add(ex);
+      _messages.add(msg);
     }
   }
 

@@ -59,8 +59,12 @@ class ConnectionAdapter implements pg.Connection {
   pg.ConnectionState get state => _conn.state;
 
   pg.TransactionState get transactionState => _conn.transactionState;
+  
+  @deprecated pg.TransactionState get transactionStatus => _conn.transactionState;
 
   Stream<pg.Message> get messages => _conn.messages;
+  
+  @deprecated Stream<pg.Message> get unhandled => messages;
 
   Map<String,String> get parameters => _conn.parameters;
   
@@ -135,7 +139,7 @@ class PoolImpl implements Pool {
         this._typeConverter,
        [this._connectionFactory = _defaultConnectionFactory])
       : settings = settings == null ? new PoolSettings() : settings;
-
+      
   PoolState _state = initial;
   PoolState get state => _state;
 
@@ -320,8 +324,8 @@ class PoolImpl implements Pool {
           message: 'Leak detected. '
             'state: ${pconn._connection.state} '
             'transactionState: ${pconn._connection.transactionState} '
-            'debugId: ${pconn.debugId}',
-          stackTrace: pconn._stackTrace));
+            'debugId: ${pconn.debugId}'
+            'stacktrace: ${pconn._stackTrace}'));
     }
   }
   
@@ -655,6 +659,9 @@ class PoolImpl implements Pool {
     pconn._state = connClosed;
     _connections.remove(pconn);
   }
+  
+  /// Depreciated. Use [stop]() instead.
+  @deprecated void destroy() { stop(); }
   
   Future stop() {
     _debug('Stop');
