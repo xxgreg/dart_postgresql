@@ -54,7 +54,7 @@ class ConnectionImpl implements Connection {
   Map<String,String> _parametersView;
   
   Map<String,String> get parameters {
-    if (_parametersView = null)
+    if (_parametersView == null)
       _parametersView = new UnmodifiableMapView(_parameters);
     return _parametersView;
   }
