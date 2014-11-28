@@ -85,7 +85,8 @@ class MockServerImpl implements MockServer {
   MockServerImpl();
   
   Future<pg.Connection> connect() => ConnectionImpl.connect(
-      'postgres://testdb:password@localhost:5433/testdb', null, null, 
+      'postgres://testdb:password@localhost:5433/testdb', null, null,
+      () => 'pgconn',
       mockSocketConnect: (host, port) => new Future(() => _startBackend()));  
   
   stop() {}

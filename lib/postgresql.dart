@@ -9,8 +9,9 @@ import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart' as impl;
 Future<Connection> connect(
     String uri, 
     { Duration connectionTimeout,
-      TypeConverter typeConverter}) => 
-        impl.ConnectionImpl.connect(uri, connectionTimeout, typeConverter);
+      TypeConverter typeConverter,
+      String debugName}) => 
+        impl.ConnectionImpl.connect(uri, connectionTimeout, typeConverter, () => debugName);
 
 /// A connection to a PostgreSQL database.
 abstract class Connection {
@@ -60,8 +61,9 @@ abstract class Connection {
   /// The pid of the process the server started to handle this connection.
   int get backendPid;
   
+  String get debugName;
+  
   ConnectionState get state;
-
 
   TransactionState get transactionState;
   
@@ -89,11 +91,10 @@ abstract class Row {
   Map toMap();
 }
 
+
+
 abstract class Message {
-  
-  factory Message.from(Message m, {String connectionName}) 
-    => impl.copyMessage(m, connectionName: connectionName);
-  
+    
   /// Returns true if this is an error, otherwise it is a server-side notice,
   /// or logging.
   bool get isError;
@@ -102,7 +103,7 @@ abstract class Message {
   /// contents are ERROR, FATAL, or PANIC, for an error message. Otherwise in
   /// a notice message they are
   /// WARNING, NOTICE, DEBUG, INFO, or LOG.
-  /// FIXME For [ClientMessage] ERROR, WARNING, DEBUG ??
+
   String get severity;
 
   /// A human readible error message, typically one line.
@@ -258,11 +259,22 @@ class Isolation {
 
 
 class PostgresqlException implements Exception {
-  PostgresqlException(this._msg, {this.serverMessage, this.exception});
-  final String _msg;
+  
+  PostgresqlException(this.message, this.connectionName, {this.serverMessage, this.exception});
+  
+  final String message;
+  
+  /// Note the connection name can be null in some cases when thrown by pool.
+  final String connectionName;
+  
   final ServerMessage serverMessage;
+  
+  /// Note may not always be an exception type.
   final exception;
-  String toString() => _msg;
+  
+  String toString() => serverMessage == null 
+      ? '$connectionName $message'
+      : serverMessage.toString();
 }
 
 /// Settings for PostgreSQL.

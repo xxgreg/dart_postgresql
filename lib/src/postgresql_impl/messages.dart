@@ -4,7 +4,7 @@ part of postgresql.impl;
 class ClientMessageImpl implements ClientMessage {
 
   ClientMessageImpl(
-      {this.isError,
+      {this.isError: false,
        this.severity,
        this.message,
        this.connectionName,
@@ -65,23 +65,4 @@ class ServerMessageImpl implements ServerMessage {
   String toString() => connectionName == null
       ? '$severity $code $message'
       : '$connectionName $severity $code $message';
-}
-
-Message copyMessage(Message msg, {String connectionName}) {
-  if (msg is ClientMessage) {
-    return new ClientMessageImpl(
-        severity: msg.severity,
-        message: msg.message,
-        exception: msg.exception,
-        stackTrace: msg.stackTrace,
-        connectionName: connectionName == null
-          ? msg.connectionName : connectionName);
-  } else if (msg is ServerMessage) {
-    return new ServerMessageImpl(
-        msg.isError,
-        msg.fields,
-        connectionName == null ? msg.connectionName : connectionName);    
-  } else {
-    return msg;
-  }
 }

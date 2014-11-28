@@ -2,7 +2,6 @@ library postgresql.buffer;
 
 import 'dart:collection';
 import 'dart:convert';
-import 'package:postgresql/postgresql.dart';
 
 // TODO Plenty of oportunity for optimisation here. This is just a quick and simple,
 // implementation.
@@ -10,6 +9,10 @@ import 'package:postgresql/postgresql.dart';
 // Example here: https://www.dartlang.org/articles/converters-and-codecs/
 class Buffer {
 
+  Buffer(this._createException);
+  
+  Function _createException;
+  
   int _position = 0;
   final Queue<List<int>> _queue = new Queue<List<int>>();
 
@@ -20,7 +23,7 @@ class Buffer {
 
   int readByte() {
     if (_queue.isEmpty)
-      throw new PostgresqlException("Attempted to read from an empty buffer.");
+      throw _createException("Attempted to read from an empty buffer.");
 
     int byte = _queue.first[_position];
 
@@ -86,7 +89,7 @@ class Buffer {
     var bytes = new List<int>();
     int c, i = 0;
     while ((c = readByte()) != 0) {
-      if (i > maxSize) throw new PostgresqlException('Max size exceeded while reading string: $maxSize.');
+      if (i > maxSize) throw _createException('Max size exceeded while reading string: $maxSize.');
       bytes.add(c);
     }
     return UTF8.decode(bytes);

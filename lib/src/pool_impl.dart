@@ -5,6 +5,7 @@ import 'dart:collection';
 import 'dart:math' as math;
 import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart' as pg;
+import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart' as pgi;
 import 'package:postgresql/pool.dart';
 
 
@@ -17,27 +18,30 @@ const PooledConnectionState inUse = PooledConnectionState.inUse;
 const PooledConnectionState connClosed = PooledConnectionState.closed;
 
 
-// Allow for mocking the pg connection.
+/// Allow for mocking the pg connection.
 typedef Future<pg.Connection> ConnectionFactory(
     String uri, 
     { Duration timeout,
-      pg.TypeConverter typeConverter});
+      pg.TypeConverter typeConverter,
+      String getDebugName()});
 
 
 Future<pg.Connection> _defaultConnectionFactory(
     String uri,
     { Duration timeout,
-      pg.TypeConverter typeConverter}) 
-  => pg.connect(
+      pg.TypeConverter typeConverter,
+      String getDebugName()}) 
+
+  => pgi.ConnectionImpl.connect(    
       uri,
-      connectionTimeout: timeout,
-      typeConverter: typeConverter);
+      timeout,
+      typeConverter,
+      getDebugName);
 
 
-//FIXME Rename this, as it is not an adapter.
-class ConnectionAdapter implements pg.Connection {
+class ConnectionDecorator implements pg.Connection {
 
-  ConnectionAdapter(this._pool, this._pconn, this._conn);
+  ConnectionDecorator(this._pool, this._pconn, this._conn);
 
   bool _isReleased = false;
   final pg.Connection _conn;
@@ -69,6 +73,8 @@ class ConnectionAdapter implements pg.Connection {
   Map<String,String> get parameters => _conn.parameters;
   
   int get backendPid => _conn.backendPid;
+  
+  String get debugName => _conn.debugName;
 }
 
 
@@ -78,53 +84,42 @@ class PooledConnectionImpl implements PooledConnection {
 
   final PoolImpl _pool;
   pg.Connection _connection;
-  ConnectionAdapter _adapter;
+  ConnectionDecorator _decorator;
   PooledConnectionState _state;
   DateTime _established;
   DateTime _obtained;
   DateTime _released;
-  String _debugId;
+  String _debugName;
   int _useId;
   bool _isLeaked = false;
   StackTrace _stackTrace;
   
   final Duration _random = new Duration(seconds: new math.Random().nextInt(20));
   
-  /// The state of connection in the pool, available, closed
   PooledConnectionState get state => _state;
 
-  /// Time at which the physical connection to the database was established.
   DateTime get established => _established;
 
-  /// Time at which the connection was last obtained by a client.
   DateTime get obtained => _obtained;
 
-  /// Time at which the connection was last released by a client.
   DateTime get released => _released;
   
-  /// The pid of the postgresql handler.
   int get backendPid => _connection == null ? null : _connection.backendPid;
 
-  /// The id passed to connect for debugging.
-  String get debugId => _debugId;
+  String get debugName => _debugName;
 
-  /// A unique id that updated whenever the connection is obtained.
   int get useId => _useId;
   
-  /// If a leak detection threshold is set, then this flag will be set on leaked
-  /// connections.
   bool get isLeaked => _isLeaked;
 
-  /// The stacktrace at the time pool.connect() was last called.
   StackTrace get stackTrace => _stackTrace;
   
-  /// Returns null if not connected yet.
   pg.ConnectionState get connectionState
     => _connection == null ? null : _connection.state;
   
   String get name => '${_pool.settings.poolName}:$backendPid'
       + (_useId == null ? '' : ':$_useId')
-      + (_debugId == null ? '' : ':$_debugId');
+      + (_debugName == null ? '' : ':$_debugName');
 
   String toString() => '$name:$_state:$connectionState';
 }
@@ -178,13 +173,13 @@ class PoolImpl implements Pool {
     //TODO consider allowing moving from state stopped to starting.
     //Need to carefully clear out all state.
     if (_state != initial)
-      throw new StateError('Cannot start connection pool while in state: $_state.');
+      throw new pg.PostgresqlException(
+          'Cannot start connection pool while in state: $_state.', null);
 
     var stopwatch = new Stopwatch()..start();
 
-    var onTimeout = () => throw new TimeoutException(
-      'Connection pool start timed out with: ${settings.startTimeout}).',
-          settings.startTimeout);
+    var onTimeout = () => throw new pg.PostgresqlException(
+      'Connection pool start timed out with: ${settings.startTimeout}).', null);
 
     _state = starting;
 
@@ -227,17 +222,16 @@ class PoolImpl implements Pool {
     var conn = await _connectionFactory(
       settings.databaseUri,
       timeout: settings.establishTimeout,
-      typeConverter: _typeConverter);
+      typeConverter: _typeConverter,
+      getDebugName: () => pconn.name);
     
     // Pass this connection's messages through to the pool messages stream.
-    conn.messages.listen((msg) => _messages.add(
-          new pg.Message.from(msg, connectionName: pconn.name)),
-        onError: (msg) => _messages.addError(
-            new pg.Message.from(msg, connectionName: pconn.name)));
+    conn.messages.listen((msg) => _messages.add(msg),
+        onError: (msg) => _messages.addError(msg));
 
     pconn._connection = conn;
     pconn._established = new DateTime.now(); 
-    pconn._state = available;    
+    pconn._state = available;
     
     _debug('Established connection. ${pconn.name}');
   }
@@ -280,7 +274,7 @@ class PoolImpl implements Pool {
           message: 'Leak detected. '
             'state: ${pconn._connection.state} '
             'transactionState: ${pconn._connection.transactionState} '
-            'debugId: ${pconn.debugId}'
+            'debugId: ${pconn.debugName}'
             'stacktrace: ${pconn._stackTrace}'));
     }
   }
@@ -314,12 +308,12 @@ class PoolImpl implements Pool {
   // Used to generate unique ids (well... unique for this isolate at least).
   static int _sequence = 1;
 
-  Future<pg.Connection> connect({String debugId}) async {
+  Future<pg.Connection> connect({String debugName}) async {
     _debug('Connect.');
     
     if (_state != running)
       throw new pg.PostgresqlException(
-        'Connect called while pool is not running.');
+        'Connect called while pool is not running.', null);
     
     StackTrace stackTrace = null;
     if (settings.leakDetectionThreshold != null) {
@@ -341,25 +335,28 @@ class PoolImpl implements Pool {
     pconn.._state = inUse
       .._obtained = new DateTime.now()
       .._useId = _sequence++
-      .._debugId = debugId
+      .._debugName = debugName
       .._stackTrace = stackTrace;
 
     _debug('Connected. ${pconn.name} ${pconn._connection}');
     
-    return new ConnectionAdapter(this, pconn, pconn._connection);
+    return new ConnectionDecorator(this, pconn, pconn._connection);
   }
 
   Future<PooledConnectionImpl> _connect(Duration timeout) async {
 
     if (state == stopping || state == stopped)
-      throw new pg.PostgresqlException('Connect failed as pool is stopping.');
+      throw new pg.PostgresqlException(
+          'Connect failed as pool is stopping.', null);
     
     var stopwatch = new Stopwatch()..start();
 
-    var onTimeout = () => throw new TimeoutException(
-      'Connect timeout exceeded.', settings.connectionTimeout);
-
     var pconn = _getFirstAvailable();
+    
+    var onTimeout = () => throw new pg.PostgresqlException(
+      'Obtaining connection from pool exceeded timeout: '
+        '${settings.connectionTimeout}', 
+            pconn == null ? null : pconn.name);    
    
     // If there are currently no available connections then
     // add the current connection request at the end of the
@@ -437,8 +434,8 @@ class PoolImpl implements Pool {
     bool ok;
     Exception exception;
     try {
-      var row = await pconn._connection.query('select true').single
-          .timeout(timeout, onTimeout: onTimeout);
+      var row = await pconn._connection.query('select true')
+                         .single.timeout(timeout);
       ok = row[0];
     } on Exception catch (ex) { //TODO Do I really want to log warnings when the connection timeout fails.
       ok = false;
@@ -538,7 +535,7 @@ class PoolImpl implements Pool {
     // Send error messages to connections in wait queue.
     _waitQueue.forEach((completer) =>
       completer.completeError(new pg.PostgresqlException(
-          'Connection pool is stopping.')));
+          'Connection pool is stopping.', null)));
     _waitQueue.clear();
     
     

@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/constants.dart';
-import 'package:postgresql/src/mock/mock.dart';
 import 'package:postgresql/pool.dart';
+import 'package:postgresql/postgresql.dart';
+import 'package:postgresql/src/mock/mock.dart';
 import 'package:postgresql/src/pool_impl_cps.dart';
 import 'package:unittest/unittest.dart';
 
@@ -20,15 +20,18 @@ main() {
 }
 
 PoolImpl createPool(PoolSettings settings) {
-  var mockConnect = (uri, {timeout, typeConverter}) => new Future.value(new MockConnection());
+  var mockConnect = (uri, {timeout, typeConverter, getDebugName})
+      => new Future.value(new MockConnection());
   int minConnections = 2;
   return new PoolImpl(settings, null, mockConnect);
 }
 
 expectState(PoolImpl pool, {int total, int available, int inUse}) {
   int ctotal = pool.connections.length;
-  int cavailable = pool.connections.where((c) => c.state == PooledConnectionState.available).length;
-  int cinUse = pool.connections.where((c) => c.state == PooledConnectionState.inUse).length;
+  int cavailable = pool.connections
+        .where((c) => c.state == PooledConnectionState.available).length;
+  int cinUse = pool.connections
+        .where((c) => c.state == PooledConnectionState.inUse).length;
   
   if (total != null) expect(ctotal, equals(total));
   if (available != null) expect(cavailable, equals(available));
@@ -100,7 +103,7 @@ Future testStartTimeout() {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
-      var mockConnect = ((uri, {timeout, typeConverter}) {
+      var mockConnect = ((uri, {timeout, typeConverter, getDebugName}) {
         return new Future.delayed(new Duration(seconds: 10));
       });
       var settings = new PoolSettings(databaseUri: 'postgresql://fakeuri', startTimeout: new Duration(seconds: 2), minConnections: 2);
@@ -110,7 +113,8 @@ Future testStartTimeout() {
       }
       catch0(ex, st) {
         try {
-          expect(ex, new isInstanceOf<TimeoutException>());
+          expect(ex, new isInstanceOf<PostgresqlException>());
+          expect(ex.message, contains('timed out'));
           join0();
         } catch (ex, st) {
           completer0.completeError(ex, st);
@@ -164,8 +168,9 @@ Future testConnectTimeout() {
                   }
                   catch0(ex, st) {
                     try {
-                      if (ex is TimeoutException) {
-                        expect(ex, new isInstanceOf<TimeoutException>());
+                      if (ex is PostgresqlException) {
+                        expect(ex, new isInstanceOf<PostgresqlException>());
+                        expect(ex.message, contains('timeout'));
                         join0();
                       } else {
                         throw ex;

@@ -12,7 +12,7 @@ smiles(int i) {
 
 main() {
   test('Buffer', () {
-    var buf = new Buffer();
+    var buf = new Buffer((msg) => new Exception(msg));
 
     var msg = new MessageBuffer();
     for (int i = 1; i < 100; i++) {

@@ -1,10 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart';
 import 'package:postgresql/src/mock/mock.dart';
-import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart';
 import 'package:postgresql/src/protocol.dart';
 import 'package:unittest/unittest.dart';
 

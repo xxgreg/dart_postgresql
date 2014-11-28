@@ -1,9 +1,7 @@
 import 'dart:async';
 
 import 'package:matcher/matcher.dart';
-import 'package:postgresql/constants.dart';
 import 'package:postgresql/pool.dart';
-import 'package:postgresql/postgresql.dart';
 
 
 //_log(msg) => print(msg);
@@ -152,7 +150,7 @@ main() {
 //         });
 //    
     new Timer.periodic(secs(10), (t) {
-      pool.connect(debugId: 'leak!');
+      pool.connect(debugName: 'leak!');
     });
         
      

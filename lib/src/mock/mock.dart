@@ -95,6 +95,8 @@ class MockConnection implements pg.Connection {
   
   int backendPid = 42;
   
+  String debugName = 'pgconn';
+  
   Stream query(String sql, [values]) {
     _log('query("$sql")');
     if (sql == 'select pg_backend_pid()') return queryResults([[_sequence++]]);

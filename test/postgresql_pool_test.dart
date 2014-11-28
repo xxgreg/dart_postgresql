@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/constants.dart';
-import 'package:postgresql/src/mock/mock.dart';
 import 'package:postgresql/pool.dart';
+import 'package:postgresql/postgresql.dart';
+import 'package:postgresql/src/mock/mock.dart';
 import 'package:postgresql/src/pool_impl_cps.dart';
 import 'package:unittest/unittest.dart';
 
@@ -20,15 +20,18 @@ main() {
 }
 
 PoolImpl createPool(PoolSettings settings) {
-  var mockConnect = (uri, {timeout, typeConverter}) => new Future.value(new MockConnection());
+  var mockConnect = (uri, {timeout, typeConverter, getDebugName})
+      => new Future.value(new MockConnection());
   int minConnections = 2;
   return new PoolImpl(settings, null, mockConnect);
 }
 
 expectState(PoolImpl pool, {int total, int available, int inUse}) {
   int ctotal = pool.connections.length;
-  int cavailable = pool.connections.where((c) => c.state == PooledConnectionState.available).length;
-  int cinUse = pool.connections.where((c) => c.state == PooledConnectionState.inUse).length;
+  int cavailable = pool.connections
+        .where((c) => c.state == PooledConnectionState.available).length;
+  int cinUse = pool.connections
+        .where((c) => c.state == PooledConnectionState.inUse).length;
   
   if (total != null) expect(ctotal, equals(total));
   if (available != null) expect(cavailable, equals(available));
@@ -64,7 +67,9 @@ Future testPool() async {
 
 
 Future testStartTimeout() async {
-  var mockConnect = (uri, {timeout, typeConverter}) => new Future.delayed(new Duration(seconds: 10));
+  var mockConnect = (uri, {timeout, typeConverter, getDebugName})
+        => new Future.delayed(new Duration(seconds: 10));
+  
   var settings = new PoolSettings(
       databaseUri: 'postgresql://fakeuri',
       startTimeout: new Duration(seconds: 2),
@@ -76,7 +81,8 @@ Future testStartTimeout() async {
     var v = await pool.start();
     fail('Pool started, but should have timed out.');
   } catch (ex, st) {
-    expect(ex, new isInstanceOf<TimeoutException>());
+    expect(ex, new isInstanceOf<PostgresqlException>());
+    expect(ex.message, contains('timed out'));
 
     //TODO check the state of pool. What state should it be in now? "start-failed"?
   }
@@ -111,8 +117,9 @@ Future testConnectTimeout() async {
     // All connections are in use, this should timeout.
     var c = await pool.connect();
     fail('connect() should have timed out.');
-  } on TimeoutException catch (ex, st) {
-    expect(ex, new isInstanceOf<TimeoutException>());
+  } on PostgresqlException catch (ex, st) {
+    expect(ex, new isInstanceOf<PostgresqlException>());
+    expect(ex.message, contains('timeout'));
     //TODO check the state of the pool.
   }
 }
