@@ -58,7 +58,7 @@ class SettingsImpl implements Settings {
           : throw new FormatException("Specified port is not a valid number")
         : Settings.defaultPort;
     if (!config.containsKey(USER))
-      throw new FormatException(USER);
+      throw new FormatException(USER);  //TODO decide on which exception type to throw. FormatException was probably the wrong decision.
     if (!config.containsKey(PASSWORD))
       throw new FormatException(PASSWORD);
     if (!config.containsKey(DATABASE))
@@ -99,4 +99,6 @@ class SettingsImpl implements Settings {
       map['sslmode'] = 'require';
     return map;
   }
+  
+  Map toJson() => toMap();
 }

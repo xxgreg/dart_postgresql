@@ -22,20 +22,24 @@ main() {
 PoolImpl createPool(PoolSettings settings) {
   var mockConnect = (uri, {timeout, typeConverter}) => new Future.value(new MockConnection());
   int minConnections = 2;
-  return new PoolImpl('postgresql://fakeuri', settings, mockConnect);
+  return new PoolImpl(settings, null, mockConnect);
 }
 
 expectState(PoolImpl pool, {int total, int available, int inUse}) {
-  if (total != null) expect(pool.totalConnections, equals(total));
-  if (available != null) expect(pool.availableConnections, equals(available));
-  if (inUse != null) expect(pool.inUseConnections, equals(inUse));
+  int ctotal = pool.connections.length;
+  int cavailable = pool.connections.where((c) => c.state == PooledConnectionState.available).length;
+  int cinUse = pool.connections.where((c) => c.state == PooledConnectionState.inUse).length;
+  
+  if (total != null) expect(ctotal, equals(total));
+  if (available != null) expect(cavailable, equals(available));
+  if (inUse != null) expect(cinUse, equals(inUse));
 }
 
 Future testPool() {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
-      var pool = createPool(new PoolSettings(minConnections: 2));
+      var pool = createPool(new PoolSettings(databaseUri: 'postgresql://fakeuri', minConnections: 2));
       new Future.value(pool.start()).then((x0) {
         try {
           var v = x0;
@@ -99,8 +103,8 @@ Future testStartTimeout() {
       var mockConnect = ((uri, {timeout, typeConverter}) {
         return new Future.delayed(new Duration(seconds: 10));
       });
-      var settings = new PoolSettings(startTimeout: new Duration(seconds: 2), minConnections: 2);
-      var pool = new PoolImpl('postgresql://fakeuri', settings, mockConnect);
+      var settings = new PoolSettings(databaseUri: 'postgresql://fakeuri', startTimeout: new Duration(seconds: 2), minConnections: 2);
+      var pool = new PoolImpl(settings, null, mockConnect);
       join0() {
         completer0.complete();
       }
@@ -138,7 +142,7 @@ Future testConnectTimeout() {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
-      var settings = new PoolSettings(minConnections: 2, maxConnections: 2, connectionTimeout: new Duration(seconds: 2));
+      var settings = new PoolSettings(databaseUri: 'postgresql://fakeuri', minConnections: 2, maxConnections: 2, connectionTimeout: new Duration(seconds: 2));
       var pool = createPool(settings);
       expect(pool.connections, isEmpty);
       new Future.value(pool.start()).then((x0) {
@@ -207,7 +211,7 @@ Future testWaitQueue() {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
-      var settings = new PoolSettings(minConnections: 2, maxConnections: 2);
+      var settings = new PoolSettings(databaseUri: 'postgresql://fakeuri', minConnections: 2, maxConnections: 2);
       var pool = createPool(settings);
       expect(pool.connections, isEmpty);
       new Future.value(pool.start()).then((x0) {

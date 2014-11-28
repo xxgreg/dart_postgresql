@@ -17,51 +17,22 @@ const PooledConnectionState inUse = PooledConnectionState.inUse;
 const PooledConnectionState connClosed = PooledConnectionState.closed;
 
 
-
 // Allow for mocking the pg connection.
 typedef Future<pg.Connection> ConnectionFactory(
     String uri, 
     { Duration timeout,
       pg.TypeConverter typeConverter});
 
-_defaultConnectionFactory(
+
+Future<pg.Connection> _defaultConnectionFactory(
     String uri,
     { Duration timeout,
-      pg.TypeConverter typeConverter}) => pg.connect(uri);
+      pg.TypeConverter typeConverter}) 
+  => pg.connect(
+      uri,
+      connectionTimeout: timeout,
+      typeConverter: typeConverter);
 
-class PoolSettingsImpl implements PoolSettings {
-  PoolSettingsImpl({String poolName,
-      this.minConnections: 2,
-      this.maxConnections: 10,
-      this.startTimeout: const Duration(seconds: 30),
-      this.stopTimeout: const Duration(seconds: 30),
-      this.establishTimeout: const Duration(seconds: 30),
-      this.connectionTimeout: const Duration(seconds: 30),
-      this.idleTimeout: const Duration(minutes: 10), //FIXME not sure what this default should be
-      this.maxLifetime: const Duration(hours: 1),
-      this.leakDetectionThreshold: null, // Disabled by default.
-      this.testConnections: true,
-      this.restartIfAllConnectionsLeaked: false,
-      this.typeConverter})
-        : poolName = poolName != null ? poolName : 'pgpool${_sequence++}';
-
-  // Ids will be unique for this isolate.
-  static int _sequence = 1;
-
-  final String poolName;
-  final int minConnections;
-  final int maxConnections;
-  final Duration startTimeout;
-  final Duration stopTimeout;
-  final Duration establishTimeout;
-  final Duration connectionTimeout;
-  final Duration idleTimeout;
-  final Duration maxLifetime;
-  final Duration leakDetectionThreshold;
-  final bool testConnections;
-  final bool restartIfAllConnectionsLeaked;
-  final pg.TypeConverter typeConverter;
-}
 
 //FIXME Rename this, as it is not an adapter.
 class ConnectionAdapter implements pg.Connection {
@@ -160,16 +131,16 @@ _debug(msg) {}
 
 class PoolImpl implements Pool {
 
-  PoolImpl(this.databaseUri,
-      [PoolSettings settings,
-       this._connectionFactory = _defaultConnectionFactory])
+  PoolImpl(PoolSettings settings,
+        this._typeConverter,
+       [this._connectionFactory = _defaultConnectionFactory])
       : settings = settings == null ? new PoolSettings() : settings;
-
+      
   PoolState _state = initial;
   PoolState get state => _state;
 
-  final String databaseUri;
   final PoolSettings settings;
+  final pg.TypeConverter _typeConverter;
   final ConnectionFactory _connectionFactory;
   
   //TODO Consider using a list instead. removeAt(0); instead of removeFirst().
@@ -250,9 +221,9 @@ class PoolImpl implements Pool {
     _connections.add(pconn);
 
     var conn = await _connectionFactory(
-      databaseUri,
+      settings.databaseUri,
       timeout: settings.establishTimeout,
-      typeConverter: settings.typeConverter);
+      typeConverter: _typeConverter);
     
     // Pass this connection's messages through to the pool messages stream.
     conn.messages.listen((msg) => _messages.add(

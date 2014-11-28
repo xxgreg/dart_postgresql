@@ -3,12 +3,45 @@ library postgresql.pool;
 import 'dart:async';
 import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/src/pool_impl_cps.dart';
-
+import 'package:postgresql/src/pool_settings_impl.dart';
 
 //TODO docs
 abstract class Pool {
-  factory Pool(String databaseUri, [PoolSettings settings])
-    => new PoolImpl(databaseUri, settings);
+  
+  factory Pool(String databaseUri,
+    {String poolName,
+    int minConnections,
+    int maxConnections,
+    Duration startTimeout,
+    Duration stopTimeout,
+    Duration establishTimeout,
+    Duration connectionTimeout,
+    Duration idleTimeout,
+    Duration maxLifetime,
+    Duration leakDetectionThreshold,
+    bool testConnections,
+    bool restartIfAllConnectionsLeaked,
+    pg.TypeConverter typeConverter})
+      
+      => new PoolImpl(new PoolSettingsImpl.withDefaults(
+              databaseUri: databaseUri,
+              poolName: poolName,
+              minConnections: minConnections,
+              maxConnections: maxConnections,
+              startTimeout: startTimeout,
+              stopTimeout: stopTimeout,
+              establishTimeout: establishTimeout,
+              connectionTimeout: connectionTimeout,
+              idleTimeout: idleTimeout,
+              maxLifetime: maxLifetime,
+              leakDetectionThreshold: leakDetectionThreshold,
+              testConnections: testConnections,
+              restartIfAllConnectionsLeaked: restartIfAllConnectionsLeaked),
+            typeConverter);
+  
+  factory Pool.fromSettings(PoolSettings settings, {pg.TypeConverter typeConverter})
+    => new PoolImpl(settings, typeConverter);
+  
   Future start();
   Future stop();
   Future<pg.Connection> connect({String debugId});
@@ -16,6 +49,64 @@ abstract class Pool {
   Stream<pg.Message> get messages;
   List<PooledConnection> get connections;
   int get waitQueueLength;
+}
+
+
+//FIXME docs
+abstract class PoolSettings {
+
+  factory PoolSettings({
+      String databaseUri,
+      String poolName,
+      int minConnections,
+      int maxConnections,
+      Duration startTimeout,
+      Duration stopTimeout,
+      Duration establishTimeout,
+      Duration connectionTimeout,
+      Duration idleTimeout,
+      Duration maxLifetime,
+      Duration leakDetectionThreshold,
+      bool testConnections,
+      bool restartIfAllConnectionsLeaked}) = PoolSettingsImpl;
+  
+  factory PoolSettings.fromMap(Map map) = PoolSettingsImpl.fromMap;
+
+  String get databaseUri;
+  String get poolName;
+  int get minConnections;
+  int get maxConnections;
+  Duration get startTimeout;
+  Duration get stopTimeout;
+  Duration get establishTimeout; //TODO better name
+  Duration get connectionTimeout; //TODO better name
+  
+  /// Also has random 20s added.
+  Duration get idleTimeout;
+  
+  /// Note max lifetime has a random ammount of seconds added between 0 and 20.
+  /// This to stagger the expiration, so all connections don't get restarted at
+  /// at the same time after the pool has started and maxLifetime is reached.
+  Duration get maxLifetime;
+  Duration get leakDetectionThreshold;
+  bool get testConnections;
+  bool get restartIfAllConnectionsLeaked;
+  
+  Map toMap();
+  Map toJson();
+}
+
+//TODO change to enum once implemented.
+class PoolState {
+  const PoolState(this.name);
+  final String name;
+  toString() => name;
+
+  static const PoolState initial = const PoolState('inital');
+  static const PoolState starting = const PoolState('starting');
+  static const PoolState running = const PoolState('running');
+  static const PoolState stopping = const PoolState('stopping');
+  static const PoolState stopped = const PoolState('stopped');
 }
 
 abstract class PooledConnection {
@@ -53,56 +144,6 @@ abstract class PooledConnection {
   String get name;
 }
 
-//FIXME docs
-abstract class PoolSettings {
-
-  factory PoolSettings({String poolName,
-      int minConnections,
-      int maxConnections,
-      Duration startTimeout,
-      Duration stopTimeout,
-      Duration establishTimeout,
-      Duration connectionTimeout,
-      Duration idleTimeout,
-      Duration maxLifetime,
-      Duration leakDetectionThreshold,
-      bool testConnections,
-      bool restartIfAllConnectionsLeaked,
-      pg.TypeConverter typeConverter}) = PoolSettingsImpl;
-
-  String get poolName;
-  int get minConnections;
-  int get maxConnections;
-  Duration get startTimeout;
-  Duration get stopTimeout;
-  Duration get establishTimeout; //TODO better name
-  Duration get connectionTimeout; //TODO better name
-  
-  /// Also has random 20s added.
-  Duration get idleTimeout;
-  
-  /// Note max lifetime has a random ammount of seconds added between 0 and 20.
-  /// This to stagger the expiration, so all connections don't get restarted at
-  /// at the same time after the pool has started and maxLifetime is reached.
-  Duration get maxLifetime;
-  Duration get leakDetectionThreshold;
-  bool get testConnections;
-  bool get restartIfAllConnectionsLeaked;
-  pg.TypeConverter get typeConverter;
-}
-
-//TODO change to enum once implemented.
-class PoolState {
-  const PoolState(this.name);
-  final String name;
-  toString() => name;
-
-  static const PoolState initial = const PoolState('inital');
-  static const PoolState starting = const PoolState('starting');
-  static const PoolState running = const PoolState('running');
-  static const PoolState stopping = const PoolState('stopping');
-  static const PoolState stopped = const PoolState('stopped');
-}
 
 //TODO change to enum once implemented.
 class PooledConnectionState {

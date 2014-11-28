@@ -45,13 +45,10 @@ main() {
   var queryPeriod = secs(2);
   var stopAfter = secs(120);
   
-  var settings = new PoolSettings(
-    connectionTimeout: secs(15),
-    leakDetectionThreshold: secs(3),
-    restartIfAllConnectionsLeaked: true);
-  
-  var uri = 'postgresql://testdb:password@localhost:5433/testdb';
-  var pool = new Pool(uri, settings)
+  var pool = new Pool('postgresql://testdb:password@localhost:5433/testdb',
+       connectionTimeout: secs(15),
+       leakDetectionThreshold: secs(3),
+       restartIfAllConnectionsLeaked: true)
     ..messages.listen((msg) => print('###$msg###'));
   
   int queryError = 0;
