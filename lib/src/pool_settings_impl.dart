@@ -21,7 +21,9 @@ class PoolSettingsImpl implements PoolSettings {
       this.maxLifetime: const Duration(hours: 1),
       this.leakDetectionThreshold: null, // Disabled by default.
       this.testConnections: true,
-      this.restartIfAllConnectionsLeaked: false})
+      this.restartIfAllConnectionsLeaked: false,
+      this.applicationName,
+      this.timeZone})
         : poolName = poolName != null ? poolName : 'pgpool${_sequence++}';
 
 
@@ -39,7 +41,9 @@ class PoolSettingsImpl implements PoolSettings {
         Duration maxLifetime,
         Duration leakDetectionThreshold,
         bool testConnections,
-        bool restartIfAllConnectionsLeaked}) {
+        bool restartIfAllConnectionsLeaked,
+        String applicationName,
+        String timeZone}) {
   
    return new PoolSettingsImpl(
      databaseUri: databaseUri,
@@ -54,7 +58,9 @@ class PoolSettingsImpl implements PoolSettings {
      maxLifetime: maxLifetime == null ? _default.maxLifetime : maxLifetime,
      leakDetectionThreshold: leakDetectionThreshold == null ? _default.leakDetectionThreshold : leakDetectionThreshold,
      testConnections: testConnections == null ? _default.testConnections : testConnections,
-     restartIfAllConnectionsLeaked: restartIfAllConnectionsLeaked == null ? _default.restartIfAllConnectionsLeaked : restartIfAllConnectionsLeaked); 
+     restartIfAllConnectionsLeaked: restartIfAllConnectionsLeaked == null ? _default.restartIfAllConnectionsLeaked : restartIfAllConnectionsLeaked,
+     applicationName: applicationName,
+     timeZone: timeZone); 
  }
 
   // Ids will be unique for this isolate.
@@ -74,6 +80,8 @@ class PoolSettingsImpl implements PoolSettings {
   final Duration leakDetectionThreshold;
   final bool testConnections;
   final bool restartIfAllConnectionsLeaked;
+  final String applicationName;
+  final String timeZone;
   
   static final DurationFormat _durationFmt = new DurationFormat();
   
@@ -135,7 +143,9 @@ class PoolSettingsImpl implements PoolSettings {
         maxLifetime: getDuration('maxLifetime'),
         leakDetectionThreshold: getDuration('leakDetectionThreshold'),
         testConnections: getBool('testConnections'),
-        restartIfAllConnectionsLeaked: getBool('restartIfAllConnectionsLeaked'));
+        restartIfAllConnectionsLeaked: getBool('restartIfAllConnectionsLeaked'),
+        applicationName: getString('applicationName'),
+        timeZone: getString('timeZone'));
     
     return settings;
   }
@@ -158,6 +168,9 @@ class PoolSettingsImpl implements PoolSettings {
     if (testConnections != null) m['testConnections'] = testConnections;
     if (restartIfAllConnectionsLeaked != null)
       m['restartIfAllConnectionsLeaked'] = restartIfAllConnectionsLeaked;
+    if (applicationName != null) m['applicationName'] = applicationName;
+    if (timeZone != null) m['timeZone'] = timeZone;
+    
     return m;
   }
   

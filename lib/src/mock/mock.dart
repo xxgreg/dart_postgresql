@@ -6,6 +6,7 @@ import 'dart:collection';
 import 'dart:io';
 import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart' as pg;
+import 'package:postgresql/src/pool_impl_cps.dart' as pi;
 import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart';
 
 part 'mock_server.dart';
@@ -197,5 +198,20 @@ class _ListMockRow implements MockRow {
   List toList() => new UnmodifiableListView(_values);
   
   Map toMap() => new Map.fromIterables(_columnNames, _values);
+}
+
+
+pi.ConnectionFactory mockConnectionFactory([Future<pg.Connection> mockConnect()]) {
+  if (mockConnect == null)
+    mockConnect = () => new Future.value(new MockConnection());
+  return
+    (String uri,
+    {Duration connectionTimeout,
+     String applicationName,
+     String timeZone,
+     pg.TypeConverter typeConverter,
+     String getDebugName(),
+     Future<Socket> mockSocketConnect(String host, int port)})
+      => mockConnect();
 }
 

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:unittest/unittest.dart';
 import 'package:postgresql/postgresql.dart';
+import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart';
 import 'package:yaml/yaml.dart';
 
 Settings loadSettings(){
@@ -10,16 +11,17 @@ Settings loadSettings(){
 
 main() {
 
+  DefaultTypeConverter tc = new TypeConverter();
 
   test('String escaping', () {
-    expect(encodeValue('bob', null), equals(" E'bob' "));
-    expect(encodeValue('bo\nb', null), equals(r" E'bo\nb' "));
-    expect(encodeValue('bo\rb', null), equals(r" E'bo\rb' "));
-    expect(encodeValue(r'bo\b', null), equals(r" E'bo\\b' "));
+    expect(tc.encodeValue('bob', null), equals(" E'bob' "));
+    expect(tc.encodeValue('bo\nb', null), equals(r" E'bo\nb' "));
+    expect(tc.encodeValue('bo\rb', null), equals(r" E'bo\rb' "));
+    expect(tc.encodeValue(r'bo\b', null), equals(r" E'bo\\b' "));
 
-    expect(encodeValue(r"'", null), equals(r" E'\'' "));
-    expect(encodeValue(r" '' ", null), equals(r" E' \'\' ' "));
-    expect(encodeValue(r"\''", null), equals(r" E'\\\'\'' "));
+    expect(tc.encodeValue(r"'", null), equals(r" E'\'' "));
+    expect(tc.encodeValue(r" '' ", null), equals(r" E' \'\' ' "));
+    expect(tc.encodeValue(r"\''", null), equals(r" E'\\\'\'' "));
   });
 
 
@@ -56,11 +58,14 @@ main() {
       //TODO test minimum allowable postgresql date
     ];
     var tc = new TypeConverter();
-    var tzname = new DateTime.now().timeZoneName; // Get users current timezone
+    var d = new DateTime.now().timeZoneOffset; // Get users current timezone
+    pad(int i) => i.toString().padLeft(2, '0');
+    var tzoff = '${d.isNegative ? '-' : '+'}'
+      '${d.inHours}:${pad(d.inMinutes % 60)}:${pad(d.inSeconds % 60)}';
     for (int i = 0; i < data.length; i += 2) {
       var str = data[i];
       var dt = data[i + 1];
-      expect(tc.encode(dt, null), equals("'$str $tzname'"));
+      expect(tc.encode(dt, null), equals("'$str $tzoff'"));
     }
   });
 

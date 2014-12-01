@@ -20,10 +20,8 @@ main() {
 }
 
 PoolImpl createPool(PoolSettings settings) {
-  var mockConnect = (uri, {timeout, typeConverter, getDebugName})
-      => new Future.value(new MockConnection());
   int minConnections = 2;
-  return new PoolImpl(settings, null, mockConnect);
+  return new PoolImpl(settings, null, mockConnectionFactory());
 }
 
 expectState(PoolImpl pool, {int total, int available, int inUse}) {
@@ -103,9 +101,9 @@ Future testStartTimeout() {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {
-      var mockConnect = ((uri, {timeout, typeConverter, getDebugName}) {
+      var mockConnect = mockConnectionFactory((() {
         return new Future.delayed(new Duration(seconds: 10));
-      });
+      }));
       var settings = new PoolSettings(databaseUri: 'postgresql://fakeuri', startTimeout: new Duration(seconds: 2), minConnections: 2);
       var pool = new PoolImpl(settings, null, mockConnect);
       join0() {

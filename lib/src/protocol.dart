@@ -48,8 +48,9 @@ class Startup implements ProtocolMessage {
       ..addUtf8('user')
       ..addUtf8(user)
       ..addUtf8('database')
-      ..addUtf8(database);      
-    
+      ..addUtf8(database)
+      ..addUtf8('client_encoding')
+      ..addUtf8('UTF8');    
     parameters.forEach((k, v) {
       mb.addUtf8(k);
       mb.addUtf8(v);

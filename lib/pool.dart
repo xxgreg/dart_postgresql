@@ -9,7 +9,7 @@ import 'package:postgresql/src/pool_settings_impl.dart';
 abstract class Pool {
   
   factory Pool(String databaseUri,
-    {String poolName,
+   {String poolName,
     int minConnections,
     int maxConnections,
     Duration startTimeout,
@@ -21,6 +21,8 @@ abstract class Pool {
     Duration leakDetectionThreshold,
     bool testConnections,
     bool restartIfAllConnectionsLeaked,
+    String applicationName,
+    String timeZone,
     pg.TypeConverter typeConverter})
       
       => new PoolImpl(new PoolSettingsImpl.withDefaults(
@@ -36,7 +38,9 @@ abstract class Pool {
               maxLifetime: maxLifetime,
               leakDetectionThreshold: leakDetectionThreshold,
               testConnections: testConnections,
-              restartIfAllConnectionsLeaked: restartIfAllConnectionsLeaked),
+              restartIfAllConnectionsLeaked: restartIfAllConnectionsLeaked,
+              applicationName: applicationName,
+              timeZone: timeZone),
             typeConverter);
   
   factory Pool.fromSettings(PoolSettings settings, {pg.TypeConverter typeConverter})
@@ -81,8 +85,8 @@ abstract class PoolSettings {
   int get maxConnections;
   Duration get startTimeout;
   Duration get stopTimeout;
-  Duration get establishTimeout; //TODO better name
-  Duration get connectionTimeout; //TODO better name
+  Duration get establishTimeout;
+  Duration get connectionTimeout;
   
   /// Also has random 20s added.
   Duration get idleTimeout;
@@ -94,6 +98,8 @@ abstract class PoolSettings {
   Duration get leakDetectionThreshold;
   bool get testConnections;
   bool get restartIfAllConnectionsLeaked;
+  String get applicationName;
+  String get timeZone;
   
   Map toMap();
   Map toJson();

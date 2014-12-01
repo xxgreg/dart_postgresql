@@ -9,9 +9,19 @@ import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart' as impl;
 Future<Connection> connect(
     String uri, 
     { Duration connectionTimeout,
+      String applicationName,
+      String timeZone,
       TypeConverter typeConverter,
-      String debugName}) => 
-        impl.ConnectionImpl.connect(uri, connectionTimeout, typeConverter, () => debugName);
+      String debugName}) 
+    
+      => impl.ConnectionImpl.connect(
+            uri,
+            connectionTimeout: connectionTimeout,
+            applicationName: applicationName,
+            timeZone: timeZone,
+            typeConverter: typeConverter,
+            getDebugName: () => debugName);
+
 
 /// A connection to a PostgreSQL database.
 abstract class Connection {
@@ -179,31 +189,31 @@ abstract class ServerMessage implements Message {
 
 }
 
+//TODO Consider renaming. Parameter substitution and result set parsing aren't
+// exactly symetric. So encode/decode may be a bit confusing.
 abstract class TypeConverter {
 
   factory TypeConverter() = impl.DefaultTypeConverter;
 
   /// Returns all results in the raw postgresql string format without conversion.
   factory TypeConverter.raw() = impl.RawTypeConverter;
-
+  
   /// Convert an object to a string representation to use in a sql query.
   /// Be very careful to escape your strings correctly. If you get this wrong
   /// you will introduce a sql injection vulnerability. Consider using the
   /// provided [encodeString] function.
-  String encode(value, String type);
+  String encode(value, String type, {getConnectionName()});
 
   //TODO pgType is ... link to pg docs, and table where you can look these up. 
   // and also expose some constants for common types.
   
   /// Convert a string recieved from the database into a dart object.
-  Object decode(String value, int pgType);
+  Object decode(String value, int pgType,
+                {bool isUtcTimeZone, getConnectionName()});
 }
 
 /// Escape strings to a postgresql string format. i.e. E'str\'ing'
 String encodeString(String s) => impl.encodeString(s);
-
-/// Default object to sql string encoding.
-String encodeValue(value, String type) => impl.encodeValue(value, type);
 
 //TODO docs do these correspond to libpq names?
 //TODO change to enum once implemented.
@@ -272,9 +282,10 @@ class PostgresqlException implements Exception {
   /// Note may not always be an exception type.
   final exception;
   
-  String toString() => serverMessage == null 
-      ? '$connectionName $message'
-      : serverMessage.toString();
+  String toString() {
+    if (serverMessage != null) return serverMessage.toString();
+    return connectionName == null ? message : '$connectionName $message';
+  }
 }
 
 /// Settings for PostgreSQL.

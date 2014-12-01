@@ -5,8 +5,10 @@ class ConnectionImpl implements Connection {
   ConnectionImpl._private(
       this._socket,
       Settings settings,
+      this._applicationName,
+      this._timeZone,
       TypeConverter typeConverter,
-      [String getDebugName()])
+      String getDebugName())
     : _userName = settings.user,
       _passwordHash = _md5s(settings.password + settings.user),
       _databaseName = settings.database,
@@ -29,6 +31,8 @@ class ConnectionImpl implements Connection {
   final String _databaseName;
   final String _userName;
   final String _passwordHash;
+  final String _applicationName;
+  final String _timeZone;
   final TypeConverter _typeConverter;
   final Socket _socket;
   final Buffer _buffer;
@@ -39,6 +43,7 @@ class ConnectionImpl implements Connection {
   int _msgType;
   int _msgLength;
   int _secretKey;
+  bool _isUtcTimeZone = false;
   
   int _backendPid;
   final _getDebugName;
@@ -67,15 +72,15 @@ class ConnectionImpl implements Connection {
   
   static Future<ConnectionImpl> connect(
       String uri,
-      Duration timeout, 
-      TypeConverter typeConverter,
-      String getDebugName(),
-      {Future<Socket> mockSocketConnect(String host, int port)}) {
-    
-    assert(getDebugName != null);
-    
+      {Duration connectionTimeout,
+       String applicationName,
+       String timeZone,
+       TypeConverter typeConverter,
+       String getDebugName(),
+       Future<Socket> mockSocketConnect(String host, int port)}) {
+        
     return new Future.sync(() {
-      
+        
       var settings = new Settings.fromUri(uri);
 
       //FIXME Currently this timeout doesn't cancel the socket connection 
@@ -83,10 +88,13 @@ class ConnectionImpl implements Connection {
       // There is a bug open about adding a real socket connect timeout
       // parameter to Socket.connect() if this happens then start using it.
       // http://code.google.com/p/dart/issues/detail?id=19120
-      if (timeout == null) timeout = new Duration(seconds: 180);
-
+      if (connectionTimeout == null)
+        connectionTimeout = new Duration(seconds: 180);
+      
+      getDebugName = getDebugName == null ? () => 'pgconn' : getDebugName;
+      
       var onTimeout = () => throw new PostgresqlException(
-          'Postgresql connection timed out. Timeout: $timeout.',
+          'Postgresql connection timed out. Timeout: $connectionTimeout.',
           getDebugName());
       
       var connectFunc = mockSocketConnect == null
@@ -94,14 +102,14 @@ class ConnectionImpl implements Connection {
           : mockSocketConnect;
       
       Future<Socket> future = connectFunc(settings.host, settings.port)
-          .timeout(timeout, onTimeout: onTimeout);
+          .timeout(connectionTimeout, onTimeout: onTimeout);
       
       if (settings.requireSsl) future = _connectSsl(future);
 
-      return future.timeout(timeout, onTimeout: onTimeout).then((socket) {
+      return future.timeout(connectionTimeout, onTimeout: onTimeout).then((socket) {
         
-        var conn = new ConnectionImpl._private(
-            socket, settings, typeConverter, getDebugName);        
+        var conn = new ConnectionImpl._private(socket, settings,
+            applicationName, timeZone, typeConverter, getDebugName);        
         
         socket.listen(conn._readData, 
             onError: conn._handleSocketError,
@@ -169,7 +177,16 @@ class ConnectionImpl implements Connection {
     msg.addUtf8String(_userName);
     msg.addUtf8String('database');
     msg.addUtf8String(_databaseName);
-    //TODO write params list.
+    msg.addUtf8String('client_encoding');
+    msg.addUtf8String('UTF8');
+    if (_timeZone != null) {
+      msg.addUtf8String('TimeZone');
+      msg.addUtf8String(_timeZone);
+    }
+    if (_applicationName != null) {
+      msg.addUtf8String('application_name');
+      msg.addUtf8String(_applicationName);
+    }
     msg.addByte(0);
     msg.setLength(startup: true);
 
@@ -367,8 +384,6 @@ class ConnectionImpl implements Connection {
 
     int pos = _buffer.bytesRead;
 
-    // print('Handle message: ${_itoa(msgType)} ${_messageName(msgType)}.');
-
     switch (msgType) {
 
       case _MSG_AUTH_REQUEST:     _readAuthenticationRequest(msgType, length); break;
@@ -439,7 +454,25 @@ class ConnectionImpl implements Connection {
     assert(_buffer.bytesAvailable >= length);
     var name = _buffer.readUtf8String(10000);
     var value = _buffer.readUtf8String(10000);
+    
+    warn(msg) {
+      _messages.add(new ClientMessageImpl(
+        severity: 'WARNING',
+        message: msg,
+        connectionName: _getDebugName()));
+    }
+    
     _parameters[name] = value;
+    
+    // Cache this value so that it doesn't need to be looked up from the map.
+    if (name == 'TimeZone') {
+      _isUtcTimeZone = value == 'UTC';
+    }
+    
+    if (name == 'client_encoding' && value != 'UTF8') {
+      warn('client_encoding parameter must remain as UTF8 for correct string ' 
+           'handling. client_encoding is: "$value".');     
+    }
   }
 
   Stream _errorStream(err) {
@@ -544,7 +577,7 @@ class ConnectionImpl implements Connection {
 
     int count = _buffer.readInt16();
     var list = new List<_Column>(count);
-
+    
     for (int i = 0; i < count; i++) {
       var name = _buffer.readUtf8String(length); //TODO better maxSize.
       int fieldId = _buffer.readInt32();
@@ -590,7 +623,10 @@ class ConnectionImpl implements Connection {
           'Binary result set parsing is not implemented.', _getDebugName());
       
       var str = _buffer.readUtf8StringN(colSize);
-      var value = _typeConverter.decode(str, col.fieldType);
+      
+      var value = _typeConverter.decode(str, col.fieldType, 
+          isUtcTimeZone: _isUtcTimeZone, getConnectionName: _getDebugName);
+      
       _query._rowData[index] = value;
     }
 

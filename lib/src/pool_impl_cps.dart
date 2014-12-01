@@ -2,6 +2,7 @@ library postgresql.pool.impl;
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart' as pg;
@@ -18,26 +19,14 @@ const PooledConnectionState inUse = PooledConnectionState.inUse;
 const PooledConnectionState connClosed = PooledConnectionState.closed;
 
 
-/// Allow for mocking the pg connection.
-typedef Future<pg.Connection> ConnectionFactory(
-    String uri, 
-    { Duration timeout,
-      pg.TypeConverter typeConverter,
-      String getDebugName()});
-
-
-Future<pg.Connection> _defaultConnectionFactory(
+typedef Future<pgi.ConnectionImpl> ConnectionFactory(
     String uri,
-    { Duration timeout,
-      pg.TypeConverter typeConverter,
-      String getDebugName()}) 
-
-  => pgi.ConnectionImpl.connect(    
-      uri,
-      timeout,
-      typeConverter,
-      getDebugName);
-
+    {Duration connectionTimeout,
+     String applicationName,
+     String timeZone,
+     pg.TypeConverter typeConverter,
+     String getDebugName(),
+     Future<Socket> mockSocketConnect(String host, int port)});
 
 class ConnectionDecorator implements pg.Connection {
 
@@ -132,7 +121,7 @@ class PoolImpl implements Pool {
 
   PoolImpl(PoolSettings settings,
         this._typeConverter,
-       [this._connectionFactory = _defaultConnectionFactory])
+       [this._connectionFactory = pgi.ConnectionImpl.connect])
       : settings = settings == null ? new PoolSettings() : settings;
       
   PoolState _state = initial;
@@ -245,7 +234,7 @@ class PoolImpl implements Pool {
           var pconn = new PooledConnectionImpl(this);
           pconn._state = connecting;
           _connections.add(pconn);
-          new Future.value(_connectionFactory(settings.databaseUri, timeout: settings.establishTimeout, typeConverter: _typeConverter, getDebugName: (() {
+          new Future.value(_connectionFactory(settings.databaseUri, connectionTimeout: settings.establishTimeout, applicationName: settings.applicationName, timeZone: settings.timeZone, typeConverter: _typeConverter, getDebugName: (() {
             return pconn.name;
           }))).then((x0) {
             try {

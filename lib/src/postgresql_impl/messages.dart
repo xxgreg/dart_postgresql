@@ -37,7 +37,7 @@ class ServerMessageImpl implements ServerMessage {
       : fields = new UnmodifiableMapView<String,String>(fields),
         severity = fields['S'],
         code = fields['C'],
-        message = fields['m'];
+        message = fields['M'];
 
   final bool isError;
   final String connectionName;
