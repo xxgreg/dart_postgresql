@@ -342,13 +342,51 @@ main() {
 
       conn.execute('create temporary table dart_unit_test (a float4, b float8)');
       conn.execute("insert into dart_unit_test values (1.1, 2.2)");
-
+      conn.execute("insert into dart_unit_test values "
+          "(-0.0, -0.0), ('NaN', 'NaN'), ('Infinity', 'Infinity'), "
+          "('-Infinity', '-Infinity');");
+      conn.execute("insert into dart_unit_test values "
+          "(@0, @0), (@1, @1), (@2, @2), (@3, @3), (@4, @4), (@5, @5);",
+            [-0.0, double.NAN, double.INFINITY, double.NEGATIVE_INFINITY, 1e30, 
+             1e-30]);
+      
       conn.query('select a, b from dart_unit_test').toList().then(
         expectAsync((rows) {
           expect(rows[0][0], equals(1.1.toDouble()));
           expect(rows[0][1], equals(2.2.toDouble()));
+          
+          expect(rows[1][0], equals(-0.0));
+          expect(rows[1][1], equals(-0.0));
+          
+          expect(rows[2][0], isNaN);
+          expect(rows[2][1], isNaN);
+          
+          expect(rows[3][0], equals(double.INFINITY));
+          expect(rows[3][1], equals(double.INFINITY));
+          
+          expect(rows[4][0], equals(double.NEGATIVE_INFINITY));
+          expect(rows[4][1], equals(double.NEGATIVE_INFINITY));
+          
+          expect(rows[5][0], equals(-0.0));
+          expect(rows[5][1], equals(-0.0));
+          
+          expect(rows[6][0], isNaN);
+          expect(rows[6][1], isNaN);
+          
+          expect(rows[7][0], equals(double.INFINITY));
+          expect(rows[7][1], equals(double.INFINITY));
+          
+          expect(rows[8][0], equals(double.NEGATIVE_INFINITY));
+          expect(rows[8][1], equals(double.NEGATIVE_INFINITY));
+          
+          expect(rows[9][0], equals(1e30));
+          expect(rows[9][1], equals(1e30));
+          
+          expect(rows[10][0], equals(1e-30));
+          expect(rows[10][1], equals(1e-30));
         })
       );
+
     });
 
     //TODO

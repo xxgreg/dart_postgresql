@@ -241,14 +241,10 @@ class DefaultTypeConverter implements TypeConverter {
       case _PG_INT2: // smallint
       case _PG_INT4: // integer
       case _PG_INT8: // bigint
-      //TODO serial
-      //TODO bigserial
         return int.parse(value);
   
       case _PG_FLOAT4: // real
       case _PG_FLOAT8: // double precision
-        //TODO Test that dart will parse postgresql's number format.
-        // Consider infinity, -infinity, NaN, 0, -0, exponential notation.
         return double.parse(value);
   
       case _PG_TIMESTAMP:
