@@ -74,6 +74,11 @@ main() {
       var result = substitute('@_blah_blah', {'_blah_blah': 20}, tc.encodeValue);
       expect(result, equals("20"));
     });
+    
+    test('Substitute 13', () {
+      var result = substitute('@0 @1', ['foo', 42], tc.encodeValue);
+      expect(result, equals(" E'foo'  42"));
+    });
 
 //    test('Substitute 13', () {
 //      var result = substitute('@apos', {'apos': "'"});
