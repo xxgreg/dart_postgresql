@@ -9,20 +9,21 @@ import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart' as impl;
 /// 
 ///     'postgres://username:password@hostname:5432/database'
 ///
-/// The application name is displayed in the pg_stat_activity view.
+/// The application name is displayed in the pg_stat_activity view. This
+/// parameter is optional.
 /// 
 /// Care is required when setting the time zone, this is generally not required,
-/// the default is to use the server provided default which will typically be
-/// localtime or sometimes UTC. Setting timezone to UTC will override the 
-/// server provided default and all [DateTime] objects will be returned in UTC.
-/// In the case where the application server is on a different host than the
-/// database, and the host's [DateTime]s should be in the hosts localtime, then
-/// set this to the hosts local timezone name. On linux systems this can be 
-/// obtained using:
+/// the default, if omitted, is to use the server provided default which will 
+/// typically be localtime or sometimes UTC. Setting the time zone to UTC will
+/// override the server provided default and all [DateTime] objects will be
+/// returned in UTC. In the case where the application server is on a different 
+/// host than the database, and the host's [DateTime]s should be in the hosts
+/// localtime, then set this to the host's local time zone name. On linux 
+/// systems this can be obtained using:
 /// 
 ///     new File('/etc/timezone').readAsStringSync().trim()
 /// 
-/// The debug name is show in error messages, this helps tracking down which
+/// The debug name is shown in error messages, this helps tracking down which
 /// connection caused an error.
 /// 
 /// The type converter allows the end user to provide their own mapping to and
@@ -48,25 +49,48 @@ Future<Connection> connect(
 /// A connection to a PostgreSQL database.
 abstract class Connection {
 
-  /// Queue a sql query to be run, returning a [Stream] of rows.
+  /// Queue a sql query to be run, returning a [Stream] of [Row]s.
   ///
-  /// The data can be fetched from the rows by column name, or by index.
+  /// If another query is already in progress, then the query will be queued
+  /// and executed once the preceding query is complete.
+  ///
+  /// The results can be fetched from the [Row]s by column name, or by index.
   ///
   /// Generally it is best to call [Stream.toList] on the stream and wait for
   /// all of the rows to be received.
   ///
-  /// Example:
+  /// For example:
   ///
   ///     conn.query("select 'pear', 'apple' as a").toList().then((rows) {
   ///        print(row[0]);
   ///        print(row.a);
   ///     });
   ///
+  /// Values can be substitued into the sql query. If a string contains quotes
+  /// or other special characters these will be escaped.
+  ///
+  /// For example:
+  ///  
+  ///     var a = 'bar';
+  ///     var b = 42;
+  ///     
+  ///     conn.query("insert into foo_table values (@a, @b);", {'a': a, 'b': b})
+  ///       .then(...);
+  ///       
+  ///  Or:
+  ///  
+  ///     conn.query("insert into foo_table values (@0, @1);", [a, b])
+  ///        .then(...);
+  ///        
+  ///  If you need to use an '@' character in your query then you will need to
+  ///  escape it as '@@'. If no values are provided, then there is no need to
+  ///  escape '@' characters.
   Stream<Row> query(String sql, [values]);
 
 
   /// Queues a command for execution, and when done, returns the number of rows
-  /// affected by the sql command.
+  /// affected by the sql command. Indentical to [query] apart from the
+  /// information returned.
   Future<int> execute(String sql, [values]);
 
 

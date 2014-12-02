@@ -156,17 +156,17 @@ abstract class PoolSettings {
   /// The application name is displayed in the pg_stat_activity view.
   String get applicationName;
   
-/// Care is required when setting the time zone, this is
-/// generally not required, the default is to use the server provided default
-/// which will typically be localtime or sometimes UTC. Setting timezone to
-/// UTC will override the server provided default and all [DateTime] objects
-/// will be returned in UTC. In the case where the application server is on a
-/// different host than the database, and the host's [DateTime]s should be in
-/// the hosts localtime, then set this to the hosts local timezone name. On
-/// linux systems this can be obtained using:
-/// 
-///     new File('/etc/timezone').readAsStringSync().trim()
-  
+  /// Care is required when setting the time zone, this is generally not required,
+  /// the default, if omitted, is to use the server provided default which will 
+  /// typically be localtime or sometimes UTC. Setting the time zone to UTC will
+  /// override the server provided default and all [DateTime] objects will be
+  /// returned in UTC. In the case where the application server is on a different 
+  /// host than the database, and the host's [DateTime]s should be in the host's
+  /// localtime, then set this to the host's local time zone name. On linux 
+  /// systems this can be obtained using:
+  /// 
+  ///     new File('/etc/timezone').readAsStringSync().trim()
+  ///   
   String get timeZone;
   
   Map toMap();
