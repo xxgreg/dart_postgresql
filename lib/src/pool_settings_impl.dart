@@ -1,5 +1,6 @@
 library postgresql.pool.pool_settings_impl;
 
+import 'dart:convert';
 import 'package:postgresql/pool.dart';
 import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/src/duration_format.dart';
@@ -11,16 +12,16 @@ class PoolSettingsImpl implements PoolSettings {
   PoolSettingsImpl({
       this.databaseUri,
       String poolName,
-      this.minConnections: 2,
+      this.minConnections: 5,
       this.maxConnections: 10,
       this.startTimeout: const Duration(seconds: 30),
       this.stopTimeout: const Duration(seconds: 30),
       this.establishTimeout: const Duration(seconds: 30),
       this.connectionTimeout: const Duration(seconds: 30),
-      this.idleTimeout: const Duration(minutes: 10), //FIXME not sure what this default should be
-      this.maxLifetime: const Duration(hours: 1),
+      this.idleTimeout: const Duration(minutes: 10),
+      this.maxLifetime: const Duration(minutes: 30),
       this.leakDetectionThreshold: null, // Disabled by default.
-      this.testConnections: true,
+      this.testConnections: false,
       this.restartIfAllConnectionsLeaked: false,
       this.applicationName,
       this.timeZone})
@@ -64,7 +65,7 @@ class PoolSettingsImpl implements PoolSettings {
  }
 
   // Ids will be unique for this isolate.
-  static int _sequence = 1;
+  static int _sequence = 0;
 
   
   final String databaseUri;
@@ -92,11 +93,12 @@ class PoolSettingsImpl implements PoolSettings {
     if (uri == null) {
       try {
         uri = new pg.Settings.fromMap(map).toUri();
-      } on FormatException catch (ex) { //TODO change to use a different exception type.
+      } on pg.PostgresqlException catch (ex) {
       }
     }
     
-    fail(String msg) => throw new FormatException('Pool setting $msg');
+    fail(String msg) => throw new pg.PostgresqlException(
+        'Pool setting $msg', null);
     
     bool getBool(String field) {
       var value = map[field];
@@ -130,7 +132,7 @@ class PoolSettingsImpl implements PoolSettings {
       return _durationFmt.parse(value, onError: fail2);
     }
     
-    var settings = new PoolSettingsImpl(
+    var settings = new PoolSettingsImpl.withDefaults(
         databaseUri: uri,
         poolName: getString('poolName'),
         minConnections: getInt('minConnections'),
@@ -176,4 +178,19 @@ class PoolSettingsImpl implements PoolSettings {
   
   Map toJson() => toMap();
 
+  toString() {
+
+    // Stip out password - better not to accidentally log it.
+    var s = new pg.Settings.fromUri(databaseUri);
+    var m = s.toMap();
+    m['password'] = 'xxxx';
+    var uri = new pg.Settings.fromMap(m).toUri();
+    
+    var map = toMap();
+    map['databaseUri'] = uri;
+    var settings = new PoolSettings.fromMap(map);
+    var json = JSON.encode(settings);
+    
+    return 'PoolSettings $json';
+  }
 }

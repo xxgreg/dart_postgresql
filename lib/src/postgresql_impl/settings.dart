@@ -22,20 +22,22 @@ class SettingsImpl implements Settings {
       this._database,
       {bool requireSsl: false})
     : _requireSsl = requireSsl;
-
+  
+  static _error(msg) => new PostgresqlException('Settings: $msg', null);
+  
   factory SettingsImpl.fromUri(String uri) {
-
+    
     var u = Uri.parse(uri);
     if (u.scheme != 'postgres' && u.scheme != 'postgresql')
-      throw new FormatException('Invalid uri.');
+      throw _error('Invalid uri.');
 
     if (u.userInfo == null || !u.userInfo.contains(':'))
-      throw new FormatException('Invalid uri.');
+      throw _error('Invalid uri.');
 
     var userInfo = u.userInfo.split(':');
 
     if (u.path == null || !u.path.startsWith('/'))
-      throw new FormatException('Invalid uri.');
+      throw _error('Invalid uri.');
 
     bool requireSsl = false;
     if (u.query != null)
@@ -51,18 +53,19 @@ class SettingsImpl implements Settings {
   }
 
   SettingsImpl.fromMap(Map config){
+    
     final String host = config.containsKey(HOST) ?
         config[HOST] : DEFAULT_HOST;
     final int port = config.containsKey(PORT) ?
         config[PORT] is int ? config[PORT]
-          : throw new FormatException("Specified port is not a valid number")
+          : throw _error('Specified port is not a valid number')
         : Settings.defaultPort;
     if (!config.containsKey(USER))
-      throw new FormatException(USER);  //TODO decide on which exception type to throw. FormatException was probably the wrong decision.
+      throw _error(USER);
     if (!config.containsKey(PASSWORD))
-      throw new FormatException(PASSWORD);
+      throw _error(PASSWORD);
     if (!config.containsKey(DATABASE))
-      throw new FormatException(DATABASE);
+      throw _error(DATABASE);
     
     this._host = config[HOST];
     this._port = port;
@@ -86,7 +89,7 @@ class SettingsImpl implements Settings {
           "/$_database${requireSsl ? '?sslmode=require' : ''}";
   
   String toString()
-    => "Settings: [host: $_host, port: $_port, user: $_user, database: $_database]";
+    => "Settings {host: $_host, port: $_port, user: $_user, database: $_database}";
 
   Map toMap() {
     var map = new Map<String, dynamic>();
