@@ -17,7 +17,7 @@ main() {
     map['password'] = "dummy2";
     map['database'] = "dummy3";
     expect(() => new Settings.fromMap(map),
-        throwsA(predicate((e) => e is FormatException)));
+        throwsA(predicate((e) => e is PostgresqlException)));
   });
 
 	test('Test missing password setting', () {
@@ -26,7 +26,7 @@ main() {
     map['user'] = "dummy2";
     map['database'] = "dummy3";
     expect(() => new Settings.fromMap(map),
-        throwsA(predicate((e) => e is FormatException)));
+        throwsA(predicate((e) => e is PostgresqlException)));
   });
 
 	test('Test missing database setting', () {
@@ -35,7 +35,7 @@ main() {
     map['user'] = "dummy2";
     map['password'] = "dummy3";
     expect(() => new Settings.fromMap(map),
-        throwsA(predicate((e) => e is FormatException)));
+        throwsA(predicate((e) => e is PostgresqlException)));
   });
 
 	test('Valid settings', () {
