@@ -138,6 +138,23 @@ main() {
     expect(tc.encode({"fo'o": "ba'r"}, 'json'), equals(' E\'{"fo\\\'o":"ba\\\'r"}\' '));
   });
 
+  test('0.2 compatability test.', () {
+    var tc = new TypeConverter();
+    expect(tc.encode(null, null), equals('null'));
+    expect(tc.encode(null, 'string'), equals('null'));
+    expect(tc.encode(null, 'number'), equals('null'));
+    expect(tc.encode(null, 'foo'), equals('null')); // Should this be an error??
+
+    expect(tc.encode(1, null), equals('1'));
+    expect(tc.encode(1, 'number'), equals('1'));
+    expect(tc.encode(1, 'string'), equals(" E'1' "));
+    expect(tc.encode(1, 'String'), equals(" E'1' "));
+
+    expect(tc.encode(new DateTime.utc(1979,12,20,9), 'date'), equals("'1979-12-20'"));
+    expect(tc.encode(new DateTime.utc(1979,12,20,9), 'timestamp'), equals("'1979-12-20 09:00:00.000 UTC'"));
+  });
+
+  
   //TODO test array
   //TODO test bytea
 }

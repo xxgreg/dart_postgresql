@@ -75,7 +75,8 @@ class DefaultTypeConverter implements TypeConverter {
   
     if (type == 'real'
         || type == 'double'
-        || type == 'num') {
+        || type == 'num'
+        || type == 'number') {
       if (value is! num) throwError();
       return encodeNumber(value);
     }
