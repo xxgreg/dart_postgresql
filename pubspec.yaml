@@ -10,3 +10,4 @@ dependencies:
 dev_dependencies:
   unittest: ">=0.9.0 <0.12.0"
   yaml: ">=0.9.0 <3.0.0"
+  matcher: ">=0.11.1 <0.12.0"
