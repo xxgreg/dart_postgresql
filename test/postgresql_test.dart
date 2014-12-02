@@ -207,7 +207,7 @@ main() {
     Connection conn;
 
     setUp(() {
-      return connect(validUri).then((c) => conn = c);
+      return connect(validUri, timeZone: 'UTC').then((c) => conn = c);
     });
 
     tearDown(() {
@@ -297,16 +297,16 @@ main() {
 
       conn.query('select a from dart_unit_test').toList().then(
         expectAsync((rows) {
-          expect(rows[0][0], equals(new DateTime(1979, 12, 20, 9)));
+          expect(rows[0][0], equals(new DateTime.utc(1979, 12, 20, 9)));
         })
       );
     });
 
     test('Select timestamp with milliseconds', () {
-      var t0 = new DateTime(1979, 12, 20, 9, 0, 0);
-      var t1 = new DateTime(1979, 12, 20, 9, 0, 9);
-      var t2 = new DateTime(1979, 12, 20, 9, 0, 99);
-      var t3 = new DateTime(1979, 12, 20, 9, 0, 999);
+      var t0 = new DateTime.utc(1979, 12, 20, 9, 0, 0);
+      var t1 = new DateTime.utc(1979, 12, 20, 9, 0, 9);
+      var t2 = new DateTime.utc(1979, 12, 20, 9, 0, 99);
+      var t3 = new DateTime.utc(1979, 12, 20, 9, 0, 999);
 
       conn.execute('create temporary table dart_unit_test (a timestamp)');
 
@@ -333,7 +333,7 @@ main() {
 
       conn.query('select a from dart_unit_test').toList().then(
         expectAsync((rows) {
-          expect(rows[0][0], equals(new DateTime(1979, 12, 20)));
+          expect(rows[0][0], equals(new DateTime.utc(1979, 12, 20)));
         })
       );
     });
