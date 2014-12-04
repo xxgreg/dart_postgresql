@@ -30,40 +30,57 @@ typedef Future<pgi.ConnectionImpl> ConnectionFactory(
 
 class ConnectionDecorator implements pg.Connection {
 
-  ConnectionDecorator(this._pool, this._pconn, this._conn);
+  ConnectionDecorator(this._pool, PooledConnectionImpl pconn, this._conn)
+      : _pconn = pconn, _debugName = pconn.name;
 
+  _error(fnName) => new pg.PostgresqlException(
+      '$fnName() called on closed connection.', _debugName);
+  
   bool _isReleased = false;
   final pg.Connection _conn;
   final PoolImpl _pool;
   final PooledConnectionImpl _pconn;
+  final String _debugName;
   
   void close() {
     if (!_isReleased) _pool._releaseConnection(_pconn);
     _isReleased = true;    
   }
 
-  Stream query(String sql, [values]) => _conn.query(sql, values);
+  Stream query(String sql, [values]) => _isReleased
+      ? throw _error('query')
+      : _conn.query(sql, values);
 
-  Future<int> execute(String sql, [values]) => _conn.execute(sql, values);
+  Future<int> execute(String sql, [values]) => _isReleased
+      ? throw _error('execute')
+      : _conn.execute(sql, values);
 
-  Future runInTransaction(Future operation(), [pg.Isolation isolation = readCommitted])
-    => _conn.runInTransaction(operation, isolation);
+  Future runInTransaction(Future operation(), 
+                          [pg.Isolation isolation = readCommitted]) 
+    => _isReleased
+        ? throw throw _error('runInTransaction')
+        : _conn.runInTransaction(operation, isolation);
 
-  pg.ConnectionState get state => _conn.state;
+  pg.ConnectionState get state => _isReleased ? closed : _conn.state;
 
-  pg.TransactionState get transactionState => _conn.transactionState;
+  pg.TransactionState get transactionState => _isReleased 
+      ? unknown
+      : _conn.transactionState;
   
-  @deprecated pg.TransactionState get transactionStatus => _conn.transactionState;
+  @deprecated pg.TransactionState get transactionStatus 
+    => transactionState;
 
-  Stream<pg.Message> get messages => _conn.messages;
+  Stream<pg.Message> get messages => _isReleased
+    ? new Stream.fromIterable([])
+    : _conn.messages;
   
   @deprecated Stream<pg.Message> get unhandled => messages;
 
-  Map<String,String> get parameters => _conn.parameters;
+  Map<String,String> get parameters => _isReleased ? {} : _conn.parameters;
   
   int get backendPid => _conn.backendPid;
   
-  String get debugName => _conn.debugName;
+  String get debugName => _debugName;
 }
 
 

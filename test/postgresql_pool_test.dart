@@ -98,17 +98,19 @@ Future testConnectTimeout() async {
 
   expect(pool.connections, isEmpty);
 
-  var v = await pool.start();
-
+  var f = pool.start();
+  expect(pool.state, equals(initial));
+  //new Future.microtask(() => expect(pool.state, equals(starting)));
+  
+  var v = await f;
   expect(v, isNull);
-  //TODO totalConnections getter;
+  
   expect(pool.connections.length, equals(settings.minConnections));
   expect(pool.connections.where((c) => c.state == available).length,
       equals(settings.minConnections));
 
   // Obtain all of the connections from the pool.
-  //TODO for i..minConnections
-  var c1 = await pool.connect();
+  Connection c1 = await pool.connect();
   var c2 = await pool.connect();
 
   try {
@@ -118,8 +120,24 @@ Future testConnectTimeout() async {
   } on PostgresqlException catch (ex, st) {
     expect(ex, new isInstanceOf<PostgresqlException>());
     expect(ex.message, contains('timeout'));
-    //TODO check the state of the pool.
+    expect(pool.state, equals(running));
   }
+  
+  c1.close();
+  expect(c1.state, equals(closed));
+  
+  var c3 = await pool.connect();
+  expect(c3.state, equals(idle));
+  
+  c2.close();
+  c3.close();
+  
+  expect(c1.state, equals(closed));
+  expect(c3.state, equals(closed));
+  
+  expect(pool.connections.where((c) => c.state == available).length,
+      equals(settings.minConnections));
+
 }
 
 

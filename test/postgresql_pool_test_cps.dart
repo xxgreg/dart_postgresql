@@ -148,7 +148,9 @@ Future testConnectTimeout() {
       var settings = new PoolSettings(databaseUri: 'postgresql://fakeuri', minConnections: 2, maxConnections: 2, connectionTimeout: new Duration(seconds: 2));
       var pool = createPool(settings);
       expect(pool.connections, isEmpty);
-      new Future.value(pool.start()).then((x0) {
+      var f = pool.start();
+      expect(pool.state, equals(initial));
+      new Future.value(f).then((x0) {
         try {
           var v = x0;
           expect(v, isNull);
@@ -158,18 +160,36 @@ Future testConnectTimeout() {
           })).length, equals(settings.minConnections));
           new Future.value(pool.connect()).then((x1) {
             try {
-              var c1 = x1;
+              Connection c1 = x1;
               new Future.value(pool.connect()).then((x2) {
                 try {
                   var c2 = x2;
                   join0() {
-                    completer0.complete();
+                    c1.close();
+                    expect(c1.state, equals(closed));
+                    new Future.value(pool.connect()).then((x3) {
+                      try {
+                        var c3 = x3;
+                        expect(c3.state, equals(idle));
+                        c2.close();
+                        c3.close();
+                        expect(c1.state, equals(closed));
+                        expect(c3.state, equals(closed));
+                        expect(pool.connections.where(((c) {
+                          return c.state == available;
+                        })).length, equals(settings.minConnections));
+                        completer0.complete();
+                      } catch (e0, s0) {
+                        completer0.completeError(e0, s0);
+                      }
+                    }, onError: completer0.completeError);
                   }
                   catch0(ex, st) {
                     try {
                       if (ex is PostgresqlException) {
                         expect(ex, new isInstanceOf<PostgresqlException>());
                         expect(ex.message, contains('timeout'));
+                        expect(pool.state, equals(running));
                         join0();
                       } else {
                         throw ex;
@@ -179,28 +199,28 @@ Future testConnectTimeout() {
                     }
                   }
                   try {
-                    new Future.value(pool.connect()).then((x3) {
+                    new Future.value(pool.connect()).then((x4) {
                       try {
-                        var c = x3;
+                        var c = x4;
                         fail('connect() should have timed out.');
                         join0();
-                      } catch (e0, s0) {
-                        catch0(e0, s0);
+                      } catch (e1, s1) {
+                        catch0(e1, s1);
                       }
                     }, onError: catch0);
-                  } catch (e1, s1) {
-                    catch0(e1, s1);
+                  } catch (e2, s2) {
+                    catch0(e2, s2);
                   }
-                } catch (e2, s2) {
-                  completer0.completeError(e2, s2);
+                } catch (e3, s3) {
+                  completer0.completeError(e3, s3);
                 }
               }, onError: completer0.completeError);
-            } catch (e3, s3) {
-              completer0.completeError(e3, s3);
+            } catch (e4, s4) {
+              completer0.completeError(e4, s4);
             }
           }, onError: completer0.completeError);
-        } catch (e4, s4) {
-          completer0.completeError(e4, s4);
+        } catch (e5, s5) {
+          completer0.completeError(e5, s5);
         }
       }, onError: completer0.completeError);
     } catch (e, s) {
