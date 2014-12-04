@@ -113,6 +113,7 @@ Future testStartTimeout() {
         try {
           expect(ex, new isInstanceOf<PostgresqlException>());
           expect(ex.message, contains('timed out'));
+          expect(pool.state, equals(startFailed));
           join0();
         } catch (ex, st) {
           completer0.completeError(ex, st);

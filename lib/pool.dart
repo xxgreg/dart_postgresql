@@ -181,6 +181,7 @@ class PoolState {
 
   static const PoolState initial = const PoolState('inital');
   static const PoolState starting = const PoolState('starting');
+  static const PoolState startFailed = const PoolState('startFailed');
   static const PoolState running = const PoolState('running');
   static const PoolState stopping = const PoolState('stopping');
   static const PoolState stopped = const PoolState('stopped');

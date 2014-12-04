@@ -82,8 +82,7 @@ Future testStartTimeout() async {
   } catch (ex, st) {
     expect(ex, new isInstanceOf<PostgresqlException>());
     expect(ex.message, contains('timed out'));
-
-    //TODO check the state of pool. What state should it be in now? "start-failed"?
+    expect(pool.state, equals(startFailed));
   }
 }
 

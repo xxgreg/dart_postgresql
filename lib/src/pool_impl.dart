@@ -167,8 +167,12 @@ class PoolImpl implements Pool {
 
     var stopwatch = new Stopwatch()..start();
 
-    var onTimeout = () => throw new pg.PostgresqlException(
-      'Connection pool start timed out with: ${settings.startTimeout}).', null);
+    var onTimeout = () {
+      _state = startFailed;
+      throw new pg.PostgresqlException(
+        'Connection pool start timed out with: '
+          '${settings.startTimeout}).', null);
+    };
 
     _state = starting;
 

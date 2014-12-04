@@ -24,6 +24,7 @@ const TransactionState error = TransactionState.error;
 
 const PoolState initial = PoolState.initial;
 const PoolState starting = PoolState.starting;
+const PoolState startFailed = PoolState.startFailed;
 const PoolState running = PoolState.running;
 const PoolState stopping = PoolState.stopping;
 const PoolState stopped = PoolState.stopped;
