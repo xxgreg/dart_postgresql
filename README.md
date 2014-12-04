@@ -64,15 +64,17 @@ done automatically for you.
 
 ### Conversion of Postgresql datatypes.
 
-Below is the mapping from Postgresql types to Dart types. The type mapping is still a work in progress. All types which do not have an explicit mapping will be returned as a String in Postgresql's standard text format. This means that it is still possible to handle all types, as you can parse the string yourself.
+Below is the mapping from Postgresql types to Dart types. All types which do not have an explicit mapping will be returned as a String in Postgresql's standard text format. This means that it is still possible to handle all types, as you can parse the string yourself.
 
 ```
-  Postgresql type        Dart type
-	boolean                bool
-	int2, int4, int8       int
-	float4, float8         double
-	timestamp, date        Datetime
-	All other types        String
+     Postgresql type                 Dart type
+	boolean                         bool
+	int2, int4, int8                int
+	float4, float8                  double
+	numeric                         String
+	timestamp, timestamptz, date    Datetime
+	json, jsonb                     Map/List
+	All other types                 String
 ```
 
 ### Mapping the results of a query to an object
@@ -142,20 +144,23 @@ it is received, or you can wait till they all arrive by calling Stream.toList().
 In server applications, a connection pool can be used to avoid the overhead of obtaining a connection for each request.
 
 ```dart
-// import 'postgres/postgres_pool.dart';
-var uri = 'postgres://username:password@localhost:5432/database';
-var pool = new Pool(uri, min: 2, max: 5);
-pool.start().then((_) {
-  print('Min connections established.');
-  pool.connect().then((conn) { // Obtain connection from pool
-    conn.query("select 'oi';")
-      .toList()
-      .then(print)
-      .then((_) => conn.close()) // Return connection to pool
-      .catchError((err) => print('Query error: $err'));
-  });
-});
+import 'package:postgresql/pool.dart';
 
+main() {
+  var uri = 'postgres://username:password@localhost:5432/database';
+  var pool = new Pool(uri, minConnections: 2, maxConnections: 5);
+  pool.messages.listen(print);
+  pool.start().then((_) {
+    print('Min connections established.');
+    pool.connect().then((conn) { // Obtain connection from pool
+      conn.query("select 'oi';")
+        .toList()
+        .then(print)
+        .then((_) => conn.close()) // Return connection to pool
+        .catchError((err) => print('Query error: $err'));
+    });
+  });
+}
 ```
 
 ### Example program
