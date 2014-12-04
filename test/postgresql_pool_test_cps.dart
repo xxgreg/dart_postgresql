@@ -154,16 +154,20 @@ Future testConnectTimeout() {
         try {
           var v = x0;
           expect(v, isNull);
+          expect(pool.state, equals(running));
           expect(pool.connections.length, equals(settings.minConnections));
           expect(pool.connections.where(((c) {
             return c.state == available;
           })).length, equals(settings.minConnections));
           new Future.value(pool.connect()).then((x1) {
             try {
-              Connection c1 = x1;
+              var c1 = x1;
               new Future.value(pool.connect()).then((x2) {
                 try {
                   var c2 = x2;
+                  expect(pool.connections.where(((c) {
+                    return c.state == available;
+                  })).length, 0);
                   join0() {
                     c1.close();
                     expect(c1.state, equals(closed));

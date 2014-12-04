@@ -105,14 +105,17 @@ Future testConnectTimeout() async {
   var v = await f;
   expect(v, isNull);
   
+  expect(pool.state, equals(running));
   expect(pool.connections.length, equals(settings.minConnections));
   expect(pool.connections.where((c) => c.state == available).length,
       equals(settings.minConnections));
 
   // Obtain all of the connections from the pool.
-  Connection c1 = await pool.connect();
+  var c1 = await pool.connect();
   var c2 = await pool.connect();
 
+  expect(pool.connections.where((c) => c.state == available).length, 0);
+  
   try {
     // All connections are in use, this should timeout.
     var c = await pool.connect();
@@ -154,10 +157,7 @@ Future testWaitQueue() async {
   var v = await pool.start();
 
   expect(v, isNull);
-  //TODO getter totalConnections;
   expect(pool.connections.length, equals(2));
-
-  //TODO expose getter availableConnections
   expect(pool.connections.where((c) => c.state == available).length,
       equals(2));
 
@@ -178,5 +178,5 @@ Future testWaitQueue() async {
 
   c3.close();
 
-  //TODO check state of pool.
+  
 }
