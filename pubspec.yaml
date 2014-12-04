@@ -2,7 +2,7 @@ name: postgresql
 version: 0.3.0
 author: Greg Lowe <greg@vis.net.nz>
 description: Postgresql database driver.
-homepage: https://github.com/xxgreg/postgresql
+homepage: https://github.com/xxgreg/dart_postgresql
 environment:
   sdk: ">=0.8.10+6 <2.0.0"
 dependencies:
