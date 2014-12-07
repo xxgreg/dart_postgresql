@@ -1,8 +1,4 @@
-library postgresql.protocol;
-
-import 'dart:collection';
-import 'dart:convert';
-import 'dart:io';
+part of postgresql.protocol;
 
 // http://www.postgresql.org/docs/9.2/static/protocol-message-formats.html
 
@@ -21,13 +17,51 @@ abstract class ProtocolMessage {
   List<int> encode();
   
   //TODO
-  static ProtocolMessage decodeFrontend(List<int> buffer, int offset)
-    => throw new UnimplementedError();
-
+//  static ProtocolMessage decodeFrontend(List<int> buffer, int offset)
+//    => throw new UnimplementedError();
+//
   //TODO
-  static ProtocolMessage decodeBackend(List<int> buffer, int offset)
-    => throw new UnimplementedError();
+//  static ProtocolMessage decodeBackend(List<int> buffer, int offset)
+//    => throw new UnimplementedError();
+  
+  // Note msgBodyLength excludes the 5 byte header. Is 0 for some message types.
+  static ProtocolMessage decode(int msgType, int msgBodyLength, ByteReader byteReader) {
+    assert(msgBodyLength <= byteReader.bytesAvailable);
+    var decoder = _messageDecoders[msgType];
+    if (decoder == null) throw new Exception('Unknown message type: $msgType'); //TODO exception type, and atoi on messageType.
+    var msg = decoder(msgType, msgBodyLength, byteReader);
+    //TODO check bytesRead == msgBodyLength, or throw lost message sync exception.
+    return msg;
+  }
 }
+
+const int _C = 67;
+const int _D = 68;
+//const int _E = 69;
+//const int _I = 73;
+const int _K = 75;
+const int _N = 78;
+const int _Q = 81;
+const int _R = 82;
+//const int _S = 83;
+//const int _T = 84;
+const int _X = 88;
+const int _Z = 90;
+
+const Map<int,Function> _messageDecoders = const {
+  _C : CommandComplete.decode,
+  _D : DataRow.decode,
+  _E : ErrorResponse.decode,
+  _I : EmptyQueryResponse.decode,
+  _K : BackendKeyData.decode,
+  _Q : Query.decode,
+  _N : NoticeResponse.decode,  
+  _R : AuthenticationRequest.decode,
+  _S : ParameterStatus.decode,
+  _T : RowDescription.decode,
+  _X : Terminate.decode,
+  _Z : ReadyForQuery.decode,
+};
 
 class Startup implements ProtocolMessage {
   
@@ -72,7 +106,9 @@ class Startup implements ProtocolMessage {
 class SslRequest implements ProtocolMessage {
   // Startup and ssl request are the only messages without a messageCode.
   final int messageCode = 0;
+  
   List<int> encode() => <int> [0, 0, 0, 8, 4, 210, 22, 47];
+  
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
     'code': new String.fromCharCode(messageCode),
@@ -80,16 +116,25 @@ class SslRequest implements ProtocolMessage {
 }
 
 class Terminate implements ProtocolMessage {
-  final int messageCode = 'X'.codeUnitAt(0);
+  
+  final int messageCode = _X;
+  
   List<int> encode() => new MessageBuilder(messageCode).build();
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _X);
+    if (bodyLength != 0) throw new Exception(); //FIXME
+    return new Terminate();
+  }
+  
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
     'code': new String.fromCharCode(messageCode),
   });
 }
 
-const int authTypeOk = 0;
-const int authTypeMd5 = 5;
+//const int authTypeOk = 0;
+//const int authTypeMd5 = 5;
 
 //const int authOk = 0;
 //const int authKerebosV5 = 2;
@@ -100,22 +145,36 @@ const int authTypeMd5 = 5;
 
 class AuthenticationRequest implements ProtocolMessage {
   
-  AuthenticationRequest.ok() : authType = authTypeOk, salt = null;
+  AuthenticationRequest.ok() : authType = 0, salt = null;
   
   AuthenticationRequest.md5(this.salt)
-      : authType = authTypeMd5 {
-    if (salt == null || salt.length != 4) throw new ArgumentError();
+      : authType = 5 {
+    if (salt == null || salt.length != 4) throw new Exception(); //FIXME
   }
   
-  final int messageCode = 'R'.codeUnitAt(0);
+  final int messageCode = _R;
   final int authType;
   final List<int> salt;
   
   List<int> encode() {
     var mb = new MessageBuilder(messageCode);
     mb.addInt32(authType);
-    if (authType == authTypeMd5) mb.addBytes(salt);
+    if (authType == 5) mb.addBytes(salt);
     return mb.build();
+  }
+  
+  static AuthenticationRequest decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _R);
+    int authType = r.readInt32();
+    if (authType == 0) {
+      return new AuthenticationRequest.ok();
+    
+    } else if (authType == 5) {
+      var salt = r.readBytes(4);
+      return new AuthenticationRequest.md5(salt);
+    } else {
+      throw new Exception('Invalid authType: $authType');
+    }
   }
   
   String toString() => JSON.encode({
@@ -132,7 +191,7 @@ class BackendKeyData implements ProtocolMessage {
     if (backendPid == null || secretKey == null) throw new ArgumentError();
   }
   
-  final int messageCode = 'K'.codeUnitAt(0);
+  final int messageCode = _K;
   final int backendPid;
   final int secretKey;
   
@@ -141,6 +200,14 @@ class BackendKeyData implements ProtocolMessage {
       ..addInt32(backendPid)
       ..addInt32(secretKey);
     return mb.build();
+  }
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _K);
+    if (bodyLength != 8) throw new Exception(); //FIXME
+    int pid = r.readInt32();
+    int key = r.readInt32();
+    return new BackendKeyData(pid, key);
   }
   
   String toString() => JSON.encode({
@@ -155,7 +222,7 @@ class ParameterStatus implements ProtocolMessage {
   
   ParameterStatus(this.name, this.value);
   
-  final int messageCode = 'S'.codeUnitAt(0);
+  final int messageCode = _S;
   final String name;
   final String value;
   
@@ -164,6 +231,14 @@ class ParameterStatus implements ProtocolMessage {
       ..addUtf8(name)
       ..addUtf8(value);
     return mb.build();
+  }
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _S);
+    int maxlen = bodyLength;
+    var name = r.readString(maxlen);
+    var value = r.readString(maxlen);
+    return new ParameterStatus(name, value);
   }
   
   String toString() => JSON.encode({
@@ -176,13 +251,21 @@ class ParameterStatus implements ProtocolMessage {
 
 class Query implements ProtocolMessage {
   
-  Query(this.query);
+  Query(this.query) {
+    if (query == null) throw new ArgumentError();
+  }
   
-  final int messageCode = 'Q'.codeUnitAt(0);
+  final int messageCode = _Q;
   final String query;
   
   List<int> encode()
     => (new MessageBuilder(messageCode)..addUtf8(query)).build(); //FIXME why do I need extra parens here. Analyzer bug?
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _Q);
+    var query = r.readString(bodyLength);
+    return new Query(query);
+  }
   
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
@@ -192,14 +275,26 @@ class Query implements ProtocolMessage {
 
 
 class Field {
-  Field(this.name, this.fieldType);
+  
+  Field({
+    this.name,
+    this.fieldId: 0,
+    this.tableColNo: 0,
+    this.fieldType,
+    this.dataSize: -1,
+    this.typeModifier: 0,
+    this.formatCode: 0}) {
+    if (name == null || fieldType == null) throw new ArgumentError();
+  }
+  
   final String name;
-  final int fieldId = 0;
-  final int tableColNo = 0;
+  final int fieldId;
+  final int tableColNo;
   final int fieldType;
-  final int dataSize = -1;
-  final int typeModifier = 0;
-  final int formatCode = 0;
+  final int dataSize;
+  final int typeModifier;
+  final int formatCode;
+  
   bool get isBinary => formatCode == 1;
   
   String toString() => JSON.encode({
@@ -215,12 +310,14 @@ class Field {
 
 class RowDescription implements ProtocolMessage {
   
-  RowDescription(this.fields) {
-    if (fields == null) throw new ArgumentError();
+  RowDescription(this._fields) {
+    if (_fields == null) throw new ArgumentError();
   }
   
-  final int messageCode = 'T'.codeUnitAt(0);
-  final List<Field> fields;
+  final int messageCode = _T;
+  
+  final List<Field> _fields;
+  List<Field> get fields => new UnmodifiableListView(_fields);
   
   List<int> encode() {
     var mb = new MessageBuilder(messageCode) 
@@ -239,6 +336,25 @@ class RowDescription implements ProtocolMessage {
     return mb.build();
   }
   
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _T);
+    int maxlen = bodyLength;
+    int count = r.readInt16();
+    var fields = new List(count);
+    for (int i = 0; i < count; i++) {
+      var field = new Field(
+          name: r.readString(maxlen),
+          fieldId: r.readInt32(),
+          tableColNo: r.readInt16(),
+          fieldType: r.readInt32(),
+          dataSize: r.readInt16(),
+          typeModifier: r.readInt32(),
+          formatCode: r.readInt16());
+      fields[i] = field;
+    }
+    return new RowDescription(fields);
+  }
+  
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
     'code': new String.fromCharCode(messageCode),
@@ -246,25 +362,26 @@ class RowDescription implements ProtocolMessage {
 }
 
 
-// Performance DataRows. multiple rows aggregated into one.
-
 class DataRow implements ProtocolMessage {
   
-  DataRow.fromBytes(this.values) {
-    if (values == null) throw new ArgumentError();
+  DataRow.fromBytes(this._values) {
+    if (_values == null) throw new ArgumentError();
   }
 
   DataRow.fromStrings(List<String> strings)
-    : values = strings.map(UTF8.encode).toList(growable: false);
+    : _values = strings.map(UTF8.encode).toList(growable: false);
   
-  final int messageCode = 'D'.codeUnitAt(0);
-  final List<List<int>> values;
+  final int messageCode = _D;
+  
+  final List<List<int>> _values;
+  List<List<int>> get values => _values;
+  
   
   List<int> encode() {
     var mb = new MessageBuilder(messageCode)
-      ..addInt16(values.length);
+      ..addInt16(_values.length);
     
-    for (var bytes in values) {
+    for (var bytes in _values) {
       mb..addInt32(bytes.length)
         ..addBytes(bytes);
     }
@@ -272,14 +389,29 @@ class DataRow implements ProtocolMessage {
     return mb.build();
   }
   
+  //FIXME this currently copies data. Make a zero-copy version.
+  // ... caller will need to use zero copy version carefully.
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _D);
+    int count = r.readInt16();
+    var values = new List(count);
+    for (int i = 0; i < count; i++) {
+      int len = r.readInt32();
+      var bytes = r.readBytes(len);
+      values[i] = bytes;
+    }
+    return new DataRow.fromBytes(values);
+  }
+  
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
     'code': new String.fromCharCode(messageCode),
-    'values': values.map(UTF8.decode) //TODO not all DataRows are text, some are binary.
+    'values': _values.map(UTF8.decode) //TODO not all DataRows are text, some are binary.
   });
 }
 
 
+// TODO expose rows and oid getter
 class CommandComplete implements ProtocolMessage {
   
   CommandComplete(this.tag);
@@ -292,10 +424,16 @@ class CommandComplete implements ProtocolMessage {
   CommandComplete.fetch(int rows) : this('FETCH $rows');
   CommandComplete.copy(int rows) : this('COPY $rows');
   
-  final int messageCode = 'C'.codeUnitAt(0);
+  final int messageCode = _C;
   final String tag;
   
-  List<int> encode() => (new MessageBuilder(messageCode)..addUtf8(tag)).build(); //FIXME remove extra parens.
+  List<int> encode() => (new MessageBuilder(messageCode)..addUtf8(tag)).build(); //FIXME why extra parens needed?
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _C);
+    var tag = r.readString(bodyLength);
+    return new CommandComplete(tag);
+  }
   
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
@@ -316,21 +454,39 @@ class TransactionStatus {
 
 class ReadyForQuery implements ProtocolMessage {
   
-  ReadyForQuery(this.transactionStatus);
+  ReadyForQuery.fromStatus(this.transactionStatus);
   
-  final int messageCode = 'Z'.codeUnitAt(0);
+  ReadyForQuery(int statusCode)
+      : transactionStatus = _txStatusR[statusCode] {
+    if (transactionStatus == null) throw new Exception(); //FIXME
+  }
+  
+  final int messageCode = _Z;
   final TransactionStatus transactionStatus;
   
-  static final Map _txStatus = {
-    TransactionStatus.none: 'I'.codeUnitAt(0),
-    TransactionStatus.transaction: 'T'.codeUnitAt(0),
-    TransactionStatus.failed: 'E'.codeUnitAt(0)
+  static const Map _txStatus = const {
+    TransactionStatus.none: _I,
+    TransactionStatus.transaction: _T,
+    TransactionStatus.failed: _E
+  };
+
+  static const Map _txStatusR = const {
+    _I: TransactionStatus.none,
+    _T: TransactionStatus.transaction,
+    _E: TransactionStatus.failed,
   };
   
   List<int> encode() {
     var mb = new MessageBuilder(messageCode)
       ..addByte(_txStatus[transactionStatus]);
     return mb.build();
+  }
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _Z);
+    if (bodyLength != 1) throw new Exception(); //FIXME
+    int statusCode = r.readByte();
+    return new ReadyForQuery(statusCode);
   }
   
   String toString() => JSON.encode({
@@ -369,10 +525,25 @@ abstract class BaseResponse implements ProtocolMessage {
   final Map<String, String> fields;
   
   List<int> encode() {
-    var mb = new MessageBuilder(messageCode);
+    final mb = new MessageBuilder(messageCode);
     fields.forEach((k, v) => mb..addUtf8(k)..addUtf8(v));
     mb.addByte(0); // Terminator
     return mb.build();
+  }
+  
+  static BaseResponse decode(int msgType, int bodyLength, ByteReader r) {
+    int maxlen = bodyLength;
+    
+    final fields = <String,String>{};
+    String key, value;
+    while ((key = r.readString(maxlen)) != '') {
+      value = r.readString(maxlen);
+      fields[key] = value;
+    }
+    
+    return msgType == _E
+        ? new ErrorResponse(fields)
+        : new NoticeResponse(fields);
   }
   
   String toString() => JSON.encode({
@@ -384,17 +555,35 @@ abstract class BaseResponse implements ProtocolMessage {
 
 class ErrorResponse extends BaseResponse implements ProtocolMessage {
   ErrorResponse(Map<String,String> fields) : super(fields);
-  final int messageCode = 'E'.codeUnitAt(0);
+  final int messageCode = _E;
+  
+  static ErrorResponse decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _E);
+    return BaseResponse.decode(msgType, bodyLength, r);
+  }
 }
 
 class NoticeResponse extends BaseResponse implements ProtocolMessage {
   NoticeResponse(Map<String,String> fields) : super(fields);
-  final int messageCode = 'N'.codeUnitAt(0);
+  final int messageCode = _N;
+  
+  static NoticeResponse decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _N);
+    return BaseResponse.decode(msgType, bodyLength, r);
+  }
 }
 
 class EmptyQueryResponse implements ProtocolMessage {  
-  final int messageCode = 'I'.codeUnitAt(0);
+  
+  final int messageCode = _I;
+  
   List<int> encode() => new MessageBuilder(messageCode).build();
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _I);
+    if (bodyLength != 0) throw new Exception(); //TODO
+    return new EmptyQueryResponse();
+  }
   
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
@@ -403,83 +592,3 @@ class EmptyQueryResponse implements ProtocolMessage {
 }
 
 
-class MessageBuilder {
-  
-  MessageBuilder(this._messageCode) {
-    // All messages other than startup have a message code header.
-    if (_messageCode != 0)
-      _builder.addByte(_messageCode);
-    
-    // Add a padding for filling in the length during build.
-    _builder.add(const [0, 0, 0, 0]);
-  }
-  
-  final int _messageCode;
-  
-  //TODO experiment with disabling copy for performance.
-  //Probably better just to do for large performance sensitive message types.
-  final BytesBuilder _builder = new BytesBuilder(copy: true);
-  
-  void addByte(int byte) {
-    assert(byte >= 0 && byte < 256);
-    _builder.addByte(byte);
-  }
-
-  void addInt16(int i) {
-    assert(i >= -32768 && i <= 32767);
-
-    if (i < 0) i = 0x10000 + i;
-
-    int a = (i >> 8) & 0x00FF;
-    int b = i & 0x00FF;
-
-    _builder.addByte(a);
-    _builder.addByte(b);
-  }
-
-  void addInt32(int i) {
-    assert(i >= -2147483648 && i <= 2147483647);
-
-    if (i < 0) i = 0x100000000 + i;
-
-    int a = (i >> 24) & 0x000000FF;
-    int b = (i >> 16) & 0x000000FF;
-    int c = (i >> 8) & 0x000000FF;
-    int d = i & 0x000000FF;
-
-    _builder.addByte(a);
-    _builder.addByte(b);
-    _builder.addByte(c);
-    _builder.addByte(d);
-  }
-
-  /// Add a null terminated string.
-  void addUtf8(String s) {
-    // Postgresql server must be configured to accept UTF8 - this is the default.
-    _builder.add(UTF8.encode(s));
-    addByte(0);
-  }
-
-  void addBytes(List<int> bytes) {
-    _builder.add(bytes);
-  }
-  
-  List<int> build() {
-    var bytes = _builder.toBytes();
-
-    int offset = 0;
-    int i = bytes.length;
-
-    if (_messageCode != 0) {
-      offset = 1;
-      i -= 1;
-    }
-
-    bytes[offset] = (i >> 24) & 0x000000FF;
-    bytes[offset + 1] = (i >> 16) & 0x000000FF;
-    bytes[offset + 2] = (i >> 8) & 0x000000FF;
-    bytes[offset + 3] = i & 0x000000FF;
-    
-    return bytes;
-  }
-}
