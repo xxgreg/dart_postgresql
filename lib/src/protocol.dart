@@ -43,7 +43,7 @@ class Startup implements ProtocolMessage {
   final Map<String,String> parameters;
   
   List<int> encode() {
-    var mb = new _MessageBuilder(messageCode)
+    var mb = new MessageBuilder(messageCode)
       ..addInt32(protocolVersion)
       ..addUtf8('user')
       ..addUtf8(user)
@@ -81,7 +81,7 @@ class SslRequest implements ProtocolMessage {
 
 class Terminate implements ProtocolMessage {
   final int messageCode = 'X'.codeUnitAt(0);
-  List<int> encode() => new _MessageBuilder(messageCode).build();
+  List<int> encode() => new MessageBuilder(messageCode).build();
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
     'code': new String.fromCharCode(messageCode),
@@ -112,7 +112,7 @@ class AuthenticationRequest implements ProtocolMessage {
   final List<int> salt;
   
   List<int> encode() {
-    var mb = new _MessageBuilder(messageCode);
+    var mb = new MessageBuilder(messageCode);
     mb.addInt32(authType);
     if (authType == authTypeMd5) mb.addBytes(salt);
     return mb.build();
@@ -137,7 +137,7 @@ class BackendKeyData implements ProtocolMessage {
   final int secretKey;
   
   List<int> encode() {
-    var mb = new _MessageBuilder(messageCode)
+    var mb = new MessageBuilder(messageCode)
       ..addInt32(backendPid)
       ..addInt32(secretKey);
     return mb.build();
@@ -160,7 +160,7 @@ class ParameterStatus implements ProtocolMessage {
   final String value;
   
   List<int> encode() {
-    var mb = new _MessageBuilder(messageCode)
+    var mb = new MessageBuilder(messageCode)
       ..addUtf8(name)
       ..addUtf8(value);
     return mb.build();
@@ -182,7 +182,7 @@ class Query implements ProtocolMessage {
   final String query;
   
   List<int> encode()
-    => (new _MessageBuilder(messageCode)..addUtf8(query)).build(); //FIXME why do I need extra parens here. Analyzer bug?
+    => (new MessageBuilder(messageCode)..addUtf8(query)).build(); //FIXME why do I need extra parens here. Analyzer bug?
   
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
@@ -223,7 +223,7 @@ class RowDescription implements ProtocolMessage {
   final List<Field> fields;
   
   List<int> encode() {
-    var mb = new _MessageBuilder(messageCode) 
+    var mb = new MessageBuilder(messageCode) 
       ..addInt16(fields.length);
 
     for (var f in fields) {
@@ -261,7 +261,7 @@ class DataRow implements ProtocolMessage {
   final List<List<int>> values;
   
   List<int> encode() {
-    var mb = new _MessageBuilder(messageCode)
+    var mb = new MessageBuilder(messageCode)
       ..addInt16(values.length);
     
     for (var bytes in values) {
@@ -295,7 +295,7 @@ class CommandComplete implements ProtocolMessage {
   final int messageCode = 'C'.codeUnitAt(0);
   final String tag;
   
-  List<int> encode() => (new _MessageBuilder(messageCode)..addUtf8(tag)).build(); //FIXME remove extra parens.
+  List<int> encode() => (new MessageBuilder(messageCode)..addUtf8(tag)).build(); //FIXME remove extra parens.
   
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
@@ -328,7 +328,7 @@ class ReadyForQuery implements ProtocolMessage {
   };
   
   List<int> encode() {
-    var mb = new _MessageBuilder(messageCode)
+    var mb = new MessageBuilder(messageCode)
       ..addByte(_txStatus[transactionStatus]);
     return mb.build();
   }
@@ -369,7 +369,7 @@ abstract class BaseResponse implements ProtocolMessage {
   final Map<String, String> fields;
   
   List<int> encode() {
-    var mb = new _MessageBuilder(messageCode);
+    var mb = new MessageBuilder(messageCode);
     fields.forEach((k, v) => mb..addUtf8(k)..addUtf8(v));
     mb.addByte(0); // Terminator
     return mb.build();
@@ -394,7 +394,7 @@ class NoticeResponse extends BaseResponse implements ProtocolMessage {
 
 class EmptyQueryResponse implements ProtocolMessage {  
   final int messageCode = 'I'.codeUnitAt(0);
-  List<int> encode() => new _MessageBuilder(messageCode).build();
+  List<int> encode() => new MessageBuilder(messageCode).build();
   
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
@@ -403,9 +403,9 @@ class EmptyQueryResponse implements ProtocolMessage {
 }
 
 
-class _MessageBuilder {
+class MessageBuilder {
   
-  _MessageBuilder(this._messageCode) {
+  MessageBuilder(this._messageCode) {
     // All messages other than startup have a message code header.
     if (_messageCode != 0)
       _builder.addByte(_messageCode);
