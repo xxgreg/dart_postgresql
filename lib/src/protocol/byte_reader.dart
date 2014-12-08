@@ -1,220 +1,185 @@
 part of postgresql.protocol;
 
-abstract class ByteReader {
-  
-  factory ByteReader(List<int> bytes) => new ByteReaderImpl(bytes);
-  
-  int readByte();
-  int readInt16();
-  int readInt32();
-  String readString([int maxLength = 64000]);
-  String readStringN(int length);
-  
-  //FIXME Currently always copies.
-  List<int> readBytes(int count); 
-  
-  int get bytesAvailable;
-  
-  // The remaining bytes in the buffer. Throws an error if this
-  // is called and there is more than one byte array left to be consumed.
-  // Is usually a Uint8ListView.
-  List<int> get remainingBytes;
-}
 
-class ByteReaderImpl implements ByteReader {
+class ZeroCopyBytesBuilder {
   
-  ByteReaderImpl(this._bytes);
+  int _position = 0; // 0 >= _position >= _chunks.first.length 
+  int _length = 0;
+  final List<Uint8List> _chunks = <Uint8List>[];
   
-  final List<int> _bytes;
-  int _offset = 0;
+  int get length => _length;
   
-  int readByte() {
-    int b = _bytes[_offset];
-    _offset++;
-    assert(b < 256 && b >= 0);
-    return b;
+  bool get isEmpty => _length == 0;
+  
+  bool get isNotEmpty => _length != 0;
+  
+//  void clear() {
+//    _position = 0;
+//    _length = 0;
+//    _chunks.clear();
+//  }
+
+  void add(List<int> bytes, {copy: false}) {
+    assert(_chunks.isEmpty || _position <= _chunks.first.length);
+    if (bytes.isEmpty) return;
+    if (copy || bytes is! Uint8List)
+      bytes = new Uint8List.fromList(bytes);
+    _chunks.add(bytes);
+    _length += bytes.length;
+    assert(_chunks.isEmpty || _position <= _chunks.first.length);
   }
-  
-  int readInt16() {
-    int a = _bytes[_offset];
-    int b = _bytes[_offset + 1];
-
-    _offset += 2;
     
-    assert(a < 256 && b < 256 && a >= 0 && b >= 0);
-    int i = (a << 8) | b;
-
-    if (i >= 0x8000)
-      i = -0x10000 + i;
-    
-    return i;  
-  }
-  
-  int readInt32() {
-      int a = _bytes[_offset];
-      int b = _bytes[_offset + 1];
-      int c = _bytes[_offset + 2];
-      int d = _bytes[_offset + 3];
-
-      _offset += 4;
-      
-      assert(a < 256 && b < 256 && c < 256 && d < 256 && a >= 0 && b >= 0 && c >= 0 && d >= 0);
-      int i = (a << 24) | (b << 16) | (c << 8) | d;
-
-      if (i >= 0x80000000)
-        i = -0x100000000 + i;      
-      
-      return i;
-  }
-
-  String readStringN(int size) => UTF8.decode(readBytes(size));
-
-  /// Read a zero terminated utf8 string.
-  String readString([int maxSize = 64000]) {
-
-    int i = _offset;
-    while(_bytes[i] != 0 && i <= _offset + maxSize) {
-      i++;
+  /// Warning: very inefficient, only use for short sized lists.
+  /// Returns a normal List<int>, not a Uint8List.
+  List<int> peekBytes(int count) {
+    if (_chunks.isEmpty) return const [];
+    int len = 0, c = 0, p = _position;
+    Uint8List chunk = _chunks.first;
+    var result = new List(count);
+    while (len <= count) {
+      if (p >= chunk.length) {
+        p = 0;
+        chunk = _chunks[++c];
+      }      
+      result.add(chunk[p]);
+      p++;
+      len++;
     }
-    
-    if (_bytes[i] != 0)
-      throw new Exception('Max size exceeded while reading string: $maxSize.');
-    
-    var bytes = _bytes.sublist(_offset, i);
-    return UTF8.decode(bytes);
-    
-    //FIXME soon it will be possible to do this to remove the copy.
-    //return UTF8.decoder.convert(_bytes, offset, i);
+    return result;
   }
   
-  //FIXME provide a non copying implementation.
-  List<int> readBytes(int bytes) => _bytes.sublist(_offset, _offset + bytes);
-  
-  int get bytesAvailable => _bytes.length - _offset;
-  
-
-  List<int> get remainingBytes {
-    if (_bytes is Uint8List) {
-      Uint8List b = _bytes; //FIXME Why do I have to cast here?
-      return new Uint8List.view(b.buffer, _offset);
+  // Return a Uint8ListView into the buffer if possible. If bytes are split
+  // accross multiple buffers, then they will be copied.
+  List<int> takeBytes(int count, {copy: false}) {
+    
+    assert(_chunks.isEmpty || _position <= _chunks.first.length);
+    
+    if (count < 0) throw new ArgumentError();
+    
+    if (count == 0) return new Uint8List(0);
+    
+    if (count > length) throw new Exception(); //TODO 
+    
+    var chunk = _chunks.first;
+    
+    Uint8List bytes;
+    if (!copy && _position + count < chunk.length) {
+      bytes = new Uint8List.view(chunk.buffer, _position, count);
+      _length -= count;
+      _position += count;
+    
+    } else if (!copy && _position + count == chunk.length) {
+      bytes = new Uint8List.view(chunk.buffer, _position);
+      _length -= count;
+      _position = 0;
+      _chunks.removeAt(0);            
+      
+    } else if (copy && _position + count <= chunk.length) {
+      //Copy into a new contiguous buffer.
+      bytes = new Uint8List(count)..setRange(0, count, chunk, _position);
+      _length -= count;
+      _position += count;
+      
     } else {
-      return _bytes.sublist(_offset);
+      // Copy into a new contiguous buffer.
+      bytes = new Uint8List(count);
+      int len = chunk.length - _position;
+      bytes.setRange(0, len, chunk, _position);
+      
+      int p = len;
+      while (p < count) {
+        var c = _chunks.first;
+        int remaining = count - p;
+        if (c.length > remaining) {
+          _position = remaining;
+          bytes.setRange(p, p + remaining, c);
+          p += remaining;
+          assert(p == count);
+        } else {
+          _chunks.removeAt(0);
+          bytes.setRange(p, p + c.length, c);
+          p += c.length;
+        }
+      }
+      assert(p == count);
+      _length -= count;
     }
-  }
-}
-
-
-class ByteBuffer {
-
-  ByteBuffer();
     
-  int _position = 0;
-  final List<List<int>> _queue = new List<List<int>>();
-
-  int get bytesAvailable => _queue.fold(0, (len, buffer) => len + buffer.length) - _position;
-
-  void clear() {
-    _queue.clear();
+    assert(_chunks.isEmpty || _position <= _chunks.first.length);
+    
+    return bytes;
+  }
+  
+  /// Returns the remaining consecutive bytes in the builder.
+  List<int> takeChunk() {
+    if (isEmpty) return new Uint8List(0);
     _position = 0;
+    _length -= _chunks.length;
+    return _chunks.removeAt(0);
   }
-
-  void addBytes(List<int> bytes) {
-    assert(bytes != null && bytes.isNotEmpty);
-    _queue.add(bytes);
-  }
-  
-  void addBytesView(List<int> bytes) => addBytes(bytes);
-  
-  ByteReader get reader => new ByteBufferReader(this);
+    
 }
 
-// TODO Plenty of oportunity for optimisation here. This is just a quick and simple,
-// implementation. But this code probably isn't in a hot path, since it is only
-// used for passing messages that span multiple packets. (Well maybe getBytes() needs to be fancy??).
-class ByteBufferReader implements ByteReader {
-  
-  ByteBufferReader(this._buffer);
-  
-  final ByteBuffer _buffer;
-    
-  int get bytesAvailable => _buffer.bytesAvailable;
-  
-  List<int> get remainingBytes {
-    if (_buffer._queue.length != 1)
-      throw new Exception('remainingBytes called on invalid buffer.');
-    
-    var bytes = _buffer._queue[0];
-    
-    if (bytes is Uint8List) {
-      return new Uint16List.view(bytes.buffer, _buffer._position);
-    } else {
-      return bytes.sublist(_buffer._position);
-    }
-  }
-  
-  int readByte() {
-    if (_buffer._queue.isEmpty)
-      throw new Exception("Attempted to read from an empty buffer.");
 
-    int byte = _buffer._queue.first[_buffer._position];
-
-    _buffer._position++;
-    if (_buffer._position >= _buffer._queue.first.length) {
-      _buffer._queue.removeAt(0);
-      _buffer._position = 0;
-    }
-
-    return byte;
+/// See http://www.postgresql.org/docs/9.2/static/protocol-message-types.html
+class ByteReader {
+  
+  factory ByteReader(List<int> bytes, [int offset = 0]) {
+    var list = bytes is Uint8List ? bytes : new Uint8List.fromList(bytes);
+    var byteData = new ByteData.view(list.buffer);
+    return new ByteReader._private(byteData, list, offset);
   }
 
+  ByteReader._private(this._bytes, this._list, this._position);
+  
+  final ByteData _bytes;
+  final Uint8List _list;
+  int _position;
+  
+  int get bytesAvailable => _bytes.lengthInBytes - _position;
+  int get bytesRead => _position;
+
+  /// Warning - inefficient, only use for short lists.
+  List<int> peekBytes(int count) => _list.sublist(_position, count);
+  
+  void skipBytes(int count) {
+    _position += count;
+    assert(bytesAvailable >= 0);
+  }
+  
+  int readByte() => _bytes.getUint8(_position++);
+  
   int readInt16() {
-    int a = readByte();
-    int b = readByte();
-
-    assert(a < 256 && b < 256 && a >= 0 && b >= 0);
-    int i = (a << 8) | b;
-
-    if (i >= 0x8000)
-      i = -0x10000 + i;
-
+    int i = _bytes.getUint16(_position, Endianness.BIG_ENDIAN);
+    _position += 2;
     return i;
   }
-
+  
   int readInt32() {
-    int a = readByte();
-    int b = readByte();
-    int c = readByte();
-    int d = readByte();
-
-    assert(a < 256 && b < 256 && c < 256 && d < 256 && a >= 0 && b >= 0 && c >= 0 && d >= 0);
-    int i = (a << 24) | (b << 16) | (c << 8) | d;
-
-    if (i >= 0x80000000)
-      i = -0x100000000 + i;
-
+    int i = _bytes.getUint32(_position, Endianness.BIG_ENDIAN);
+    _position += 4;
     return i;
   }
-
-  List<int> readBytes(int bytes) {
-    var list = new List<int>(bytes);
-    for (int i = 0; i < bytes; i++) {
-      list[i] = readByte();
-    }
-    return list;
+    
+  /// If copy is false return a Uint8List view, otherwise copy into a new 
+  /// Uint8List.
+  List<int> readBytes(int count, {copy: true}) => copy
+      ? (new Uint8List(count)..setRange(0, count, _list, _position))
+      : new Uint8List.view(_list.buffer, _position, count);
+  
+  /// Read a zero terminated UTF8 string.
+  String readString() {
+    int len = _list.indexOf(0, _position) - _position;
+    _position += len;
+    //TODO soon can use UTF8.decoder.convert(bytes, start, end);
+    return UTF8.decode(readBytes(len, copy: false));
   }
-
-  String readStringN(int size) => UTF8.decode(readBytes(size));
-
-  /// Read a zero terminated utf8 string.
-  String readString([int maxSize = 64000]) {
-    var bytes = new List<int>();
-    int c, i = 0;
-    while ((c = readByte()) != 0) {
-      if (i > maxSize) throw new Exception('Max size exceeded while reading string: $maxSize.');
-      bytes.add(c);
-    }
-    return UTF8.decode(bytes);
+  
+  /// Read a fixed length UTF8 string.
+  String readStringN(int bytes) {
+    _position += bytes;
+    return UTF8.decode(readBytes(bytes, copy: false));
   }
-
+  
 }
 

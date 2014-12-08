@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:postgresql/postgresql.dart';
 import 'package:postgresql/src/mock/mock.dart';
-import 'package:postgresql/src/protocol/messages.dart';
+import 'package:postgresql/src/protocol/protocol.dart';
 import 'package:unittest/unittest.dart';
 
 
@@ -36,7 +36,7 @@ testStartup(MockServer server) async {
     
     backend.clear();
     backend.sendToClient(new AuthenticationRequest.ok().encode());
-    backend.sendToClient(new ReadyForQuery(TransactionStatus.none).encode());
+    backend.sendToClient(new ReadyForQuery.fromState(TransactionState.none).encode());
     
     var conn = await connecting;
     
@@ -48,7 +48,7 @@ testStartup(MockServer server) async {
     expect(backend.received, equals([new Query(sql).encode()]), verbose: true);
     backend.clear();
 
-    backend.sendToClient(new RowDescription([new Field('?', PG_TEXT)]).encode());
+    backend.sendToClient(new RowDescription([new Field(name: '?', fieldType: PG_TEXT)]).encode());
     backend.sendToClient(new DataRow.fromStrings(['foo']).encode());
     
     var row = null;
@@ -60,7 +60,7 @@ testStartup(MockServer server) async {
       expect(row[0], equals('foo'));
       
       backend.sendToClient(new CommandComplete('SELECT 1').encode());    
-      backend.sendToClient(new ReadyForQuery(TransactionStatus.none).encode());
+      backend.sendToClient(new ReadyForQuery.fromState(TransactionState.none).encode());
     }
     
     expect(row, isNotNull);

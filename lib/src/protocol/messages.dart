@@ -29,9 +29,7 @@ abstract class ProtocolMessage {
     assert(msgBodyLength <= byteReader.bytesAvailable);
     var decoder = _messageDecoders[msgType];
     if (decoder == null) throw new Exception('Unknown message type: $msgType'); //TODO exception type, and atoi on messageType.
-    var msg = decoder(msgType, msgBodyLength, byteReader);
-    //TODO check bytesRead == msgBodyLength, or throw lost message sync exception.
-    return msg;
+    return decoder(msgType, msgBodyLength, byteReader);
   }
 }
 
@@ -236,8 +234,8 @@ class ParameterStatus implements ProtocolMessage {
   static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
     assert(msgType == _S);
     int maxlen = bodyLength;
-    var name = r.readString(maxlen);
-    var value = r.readString(maxlen);
+    var name = r.readString();
+    var value = r.readString();
     return new ParameterStatus(name, value);
   }
   
@@ -263,7 +261,7 @@ class Query implements ProtocolMessage {
   
   static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
     assert(msgType == _Q);
-    var query = r.readString(bodyLength);
+    var query = r.readString();
     return new Query(query);
   }
   
@@ -343,7 +341,7 @@ class RowDescription implements ProtocolMessage {
     var fields = new List(count);
     for (int i = 0; i < count; i++) {
       var field = new Field(
-          name: r.readString(maxlen),
+          name: r.readString(),
           fieldId: r.readInt32(),
           tableColNo: r.readInt16(),
           fieldType: r.readInt32(),
@@ -431,7 +429,7 @@ class CommandComplete implements ProtocolMessage {
   
   static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
     assert(msgType == _C);
-    var tag = r.readString(bodyLength);
+    var tag = r.readString();
     return new CommandComplete(tag);
   }
   
@@ -444,41 +442,41 @@ class CommandComplete implements ProtocolMessage {
 
 
 //FIXME use an enum when implemented
-class TransactionStatus {
-  const TransactionStatus(this._name);
-  final String _name;
-  static const TransactionStatus none = const TransactionStatus('TransactionStatus.none'); // idle
-  static const TransactionStatus transaction = const TransactionStatus('TransactionStatus.transaction'); // in transaction
-  static const TransactionStatus failed = const TransactionStatus('TransactionStatus.failed'); // failed transaction
-}
+//class TransactionState {
+//  const TransactionState(this._name);
+//  final String _name;
+//  static const TransactionState none = const TransactionState('TransactionStatus.none'); // idle
+//  static const TransactionState transaction = const TransactionState('TransactionStatus.transaction'); // in transaction
+//  static const TransactionState failed = const TransactionState('TransactionStatus.failed'); // failed transaction
+//}
 
 class ReadyForQuery implements ProtocolMessage {
   
-  ReadyForQuery.fromStatus(this.transactionStatus);
+  ReadyForQuery.fromState(this.transactionState);
   
   ReadyForQuery(int statusCode)
-      : transactionStatus = _txStatusR[statusCode] {
-    if (transactionStatus == null) throw new Exception(); //FIXME
+      : transactionState = _txStatusR[statusCode] {
+    if (transactionState == null) throw new Exception(); //FIXME
   }
   
   final int messageCode = _Z;
-  final TransactionStatus transactionStatus;
+  final TransactionState transactionState;
   
   static const Map _txStatus = const {
-    TransactionStatus.none: _I,
-    TransactionStatus.transaction: _T,
-    TransactionStatus.failed: _E
+    TransactionState.none: _I,
+    TransactionState.begun: _T,
+    TransactionState.error: _E
   };
 
   static const Map _txStatusR = const {
-    _I: TransactionStatus.none,
-    _T: TransactionStatus.transaction,
-    _E: TransactionStatus.failed,
+    _I: TransactionState.none,
+    _T: TransactionState.begun,
+    _E: TransactionState.error,
   };
   
   List<int> encode() {
     var mb = new MessageBuilder(messageCode)
-      ..addByte(_txStatus[transactionStatus]);
+      ..addByte(_txStatus[transactionState]);
     return mb.build();
   }
   
@@ -492,7 +490,7 @@ class ReadyForQuery implements ProtocolMessage {
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
     'code': new String.fromCharCode(messageCode),
-    'transactionStatus': _txStatus[transactionStatus]
+    'transactionStatus': _txStatus[transactionState]
   });
 }
 
@@ -536,8 +534,8 @@ abstract class BaseResponse implements ProtocolMessage {
     
     final fields = <String,String>{};
     String key, value;
-    while ((key = r.readString(maxlen)) != '') {
-      value = r.readString(maxlen);
+    while ((key = r.readString()) != '') {
+      value = r.readString();
       fields[key] = value;
     }
     

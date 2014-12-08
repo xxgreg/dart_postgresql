@@ -1,5 +1,6 @@
 part of postgresql.protocol;
 
+//TODO use typed_data.ByteData
 class MessageBuilder {
   
   MessageBuilder(this._messageCode) {
