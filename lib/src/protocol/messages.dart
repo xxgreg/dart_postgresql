@@ -567,7 +567,7 @@ abstract class BaseResponse implements ProtocolMessage {
   
   List<int> encode() {
     final mb = new MessageBuilder(messageCode);
-    fields.forEach((k, v) => mb..addUtf8(k)..addUtf8(v));
+    fields.forEach((k, v) => mb..addByte(k.codeUnitAt(0))..addUtf8(v));
     mb.addByte(0); // Terminator
     return mb.build();
   }
@@ -576,10 +576,12 @@ abstract class BaseResponse implements ProtocolMessage {
     int maxlen = bodyLength;
     
     final fields = <String,String>{};
-    String key, value;
-    while ((key = r.readString()) != '') {
+    int key;
+    String value;
+    while ((key = r.readByte()) != 0) {
       value = r.readString();
-      fields[key] = value;
+      var k = new String.fromCharCode(key);
+      fields[k] = value;
     }
     
     return msgType == _E
