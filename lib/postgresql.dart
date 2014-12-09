@@ -203,6 +203,10 @@ abstract class ClientMessage implements Message {
 /// Represents an error or a notice sent from the postgresql server.
 abstract class ServerMessage implements Message {
 
+  factory ServerMessage(
+      bool isError, Map<String,String> fields, [String connectionName]) 
+      = impl.ServerMessageImpl;
+  
   /// Returns true if this is an error, otherwise it is a server-side notice.
   bool get isError;
 

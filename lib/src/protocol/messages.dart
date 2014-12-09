@@ -39,6 +39,7 @@ const int _D = 68;
 //const int _I = 73;
 const int _K = 75;
 const int _N = 78;
+const int _p = 112;
 const int _Q = 81;
 const int _R = 82;
 //const int _S = 83;
@@ -53,7 +54,8 @@ const Map<int,Function> _messageDecoders = const {
   _I : EmptyQueryResponse.decode,
   _K : BackendKeyData.decode,
   _Q : Query.decode,
-  _N : NoticeResponse.decode,  
+  _N : NoticeResponse.decode,
+  _p : PasswordMessage.decode,
   _R : AuthenticationRequest.decode,
   _S : ParameterStatus.decode,
   _T : RowDescription.decode,
@@ -161,7 +163,7 @@ class AuthenticationRequest implements ProtocolMessage {
     return mb.build();
   }
   
-  static AuthenticationRequest decode(int msgType, int bodyLength, ByteReader r) {
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
     assert(msgType == _R);
     int authType = r.readInt32();
     if (authType == 0) {
@@ -180,6 +182,31 @@ class AuthenticationRequest implements ProtocolMessage {
     'code': new String.fromCharCode(messageCode),
     'authType': {0: "ok", 5: "md5"}[authType],
     'salt': salt
+  });
+}
+
+class PasswordMessage implements ProtocolMessage {
+  
+  PasswordMessage(this.password);
+  
+  final int messageCode = _p;
+  
+  final String password;
+  
+  List<int> encode() {
+    var mb = new MessageBuilder(messageCode);
+    mb.addUtf8(password);
+    return mb.build();    
+  }
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _p);
+    return new PasswordMessage(r.readString());
+  }
+  
+  String toString() => JSON.encode({
+    'msg': runtimeType.toString(),
+    'password': password
   });
 }
 
@@ -408,6 +435,17 @@ class DataRow implements ProtocolMessage {
   });
 }
 
+//FIXME
+class CopyInResponse implements ProtocolMessage {
+  final int messageCode = null;
+  List<int> encode() => throw new UnimplementedError();
+}
+
+//FIXME
+class CopyOutResponse implements ProtocolMessage {
+  final int messageCode = null;
+  List<int> encode() => throw new UnimplementedError();
+}
 
 // TODO expose rows and oid getter
 class CommandComplete implements ProtocolMessage {
@@ -424,6 +462,8 @@ class CommandComplete implements ProtocolMessage {
   
   final int messageCode = _C;
   final String tag;
+  
+  int get rowsAffected => throw new UnimplementedError();
   
   List<int> encode() => (new MessageBuilder(messageCode)..addUtf8(tag)).build(); //FIXME why extra parens needed?
   
