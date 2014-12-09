@@ -174,17 +174,16 @@ class ConnectionImpl {
     
     _queue.add(task);
     
-    new Future(_processTasks);
+    new Future.microtask(_processTask);
     
     return task.controller.stream;
   }
   
-  void _processTasks() {
-    while (_queue.isNotEmpty) {
-      var task = _queue.removeAt(0);
-      _client.send(new Query(task.sql));
-      _simpleQuery(task);
-    }
+  void _processTask() {
+    if (_state != CState.idle || _queue.isEmpty) return;
+    var task = _queue.removeAt(0);
+    _client.send(new Query(task.sql));
+    _simpleQuery(task);
   }
 
   // TODO Once async* is implemented might be able to make this pretty.
@@ -265,7 +264,7 @@ class ConnectionImpl {
         out.addError(ex);
       }
       _state = CState.idle;
-      _processTasks();
+      _processTask();
     });
   }
   
