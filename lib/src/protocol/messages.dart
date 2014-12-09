@@ -517,7 +517,7 @@ class CopyOutResponse implements ProtocolMessage {
     for (int i = 0; i < columns; i++) {
       columnFormats[i] = r.readInt16();
     }
-    return new CopyInResponse(format, columns, columnFormats);
+    return new CopyOutResponse(format, columns, columnFormats);
   }
 }
 
@@ -532,7 +532,7 @@ class CopyData implements ProtocolMessage {
     
     bytes[0] = _d;
     
-    int i = data.length;
+    int i = data.length + 4;
     bytes[1] = (i >> 24) & 0x000000FF;
     bytes[2] = (i >> 16) & 0x000000FF;
     bytes[3] = (i >> 8) & 0x000000FF;
@@ -544,7 +544,7 @@ class CopyData implements ProtocolMessage {
   // Note this copies the data so that it can all fit in a single buffer.
   // This is not actually used by ProtocolClient.send() for efficiency reasons.
   List<int> encode() {
-    var bytes = new Uint8List(data.length + 5);
+    var bytes = new Uint8List(data.length + 4);
     bytes.setRange(0, 5, header);
     bytes.setRange(5, bytes.length, data);
     return bytes;
@@ -560,10 +560,11 @@ class CopyData implements ProtocolMessage {
 class CopyDone implements ProtocolMessage {
   final int messageCode = _c;
   
-  List<int> encode() => new MessageBuilder(messageCode).build();
+  List<int> encode() => [_c, 0, 0, 0, 4];
   
   static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
     assert(msgType == _c);
+    assert(bodyLength == 0);
     return new CopyDone();
   }
 }

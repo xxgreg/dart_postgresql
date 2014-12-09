@@ -76,6 +76,8 @@ class ProtocolClient {
     if (_state == closed) return new Future.error(
       'Protocol client state is closed, cannot send msg: $msg');
     
+    print('sent $msg');
+    
     // Prevent an unnecessary copy of the bytes stored in CopyData.data.
     // TODO consider changing msg.encode() to take a ByteSink instead of 
     // returning a List<int>().
