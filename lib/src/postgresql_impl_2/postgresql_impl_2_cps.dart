@@ -12,23 +12,46 @@ import 'package:postgresql/src/protocol/protocol.dart';
 //enum CState { starting, authenticated, idle, busy, streaming }
 
 class CState {
-  const CState();
-  static const CState starting = const CState();
-  static const CState authenticated = const CState();
-  static const CState idle = const CState();
-  static const CState busy = const CState();
-  static const CState streaming = const CState();
+  const CState(this.name);
+  final String name;
+  
+  static const CState starting = const CState('starting');
+  static const CState authenticated = const CState('authenticated');
+  static const CState idle = const CState('idle');
+  static const CState busy = const CState('busy');
+  static const CState streaming = const CState('streaming');
+  
+  static const CState copyIn = const CState('copyIn');
+  static const CState copyOut = const CState('copyOut');
+  
+  static const CState closed = const CState('closed');
+  
+  String toString() => name;
 }
 
 typedef Object RowMapper(RowDescription desc, int cmd, DataRow row);
 
+typedef CopyInCallback(StreamSink<List<int>> sink);
+typedef CopyOutCallback(Stream<List<int>> stream);
+
 class Task {
-  Task.query(this.sql, this.mapper) : isExecute = false;
-  Task.execute(this.sql) : isExecute = true, mapper = ((a, b, c) {});
+  
+  Task.query(this.sql, this.mapper, {this.copyIn, this.copyOut})
+    : isExecute = false;
+  
+  Task.execute(this.sql, {this.copyIn, this.copyOut})
+    : isExecute = true, mapper = ((a, b, c) {});
+  
   final String sql;
   final bool isExecute;
   final RowMapper mapper;
-  final StreamController controller = new StreamController();
+  final StreamController controller = new StreamController(); // Rename results or something.
+  final CopyInCallback copyIn;
+  final CopyOutCallback copyOut;
+  
+  StreamController<List<int>> copyOutController;
+  int cmd = 0;
+  RowDescription desc = null;
 }
 
 String md5s(String s) {
@@ -47,16 +70,17 @@ String md5CredentialsHash(String user, String password, List<int> salt) {
 class ConnectionImpl {
 
   ConnectionImpl(this._settings, this._client);
-    
+  
   final Settings _settings;
   final ProtocolClient _client;
   
   CState _state = CState.starting;
+  Task _task;
   int _backendPid;
   int _secretKey;
   final Map<String,String> _parameters = <String,String>{};
   final StreamController<Message> _messages = new StreamController<Message>();
-  final List<Task> _queue = new List<Task>();
+  final List<Task> _queue = new List<Task>();  
   
   static Future<ConnectionImpl> connect(
       Settings settings, Duration timeout) {
@@ -71,7 +95,6 @@ class ConnectionImpl {
             try {
               x1;
               assert(conn._state == CState.idle);
-              conn._idle();
               completer0.complete(conn);
             } catch (e0, s0) {
               completer0.completeError(e0, s0);
@@ -87,7 +110,8 @@ class ConnectionImpl {
   });
   return completer0.future;
 }
-  
+    
+  // Need to manually patch cps output: finally0((_) => ....); should be finally0((_) => ....);
   // http://www.postgresql.org/docs/9.2/static/protocol-flow.html#AEN95219
   Future _startup() {
   final completer0 = new Completer();
@@ -149,6 +173,9 @@ class ConnectionImpl {
             assert(_state == CState.authenticated);
             assert(msg.transactionState == TransactionState.none);
             _state = CState.idle;
+            _client.messages.listen(_handleMessage)
+                ..onError(_handleError)
+                ..onDone(_handleDisconnect);
             finally0((_) {
               completer0.complete(null);
             });
@@ -197,59 +224,78 @@ class ConnectionImpl {
   return completer0.future;
 }  
   
-Future _idle() {
-  final completer0 = new Completer();
-  scheduleMicrotask(() {
-    try {
-      assert(_state == CState.idle);
-      done0() {
-        completer0.complete();
-      }
-      var stream0;
-      finally0(cont0) {
-        try {
-          new Future.value(stream0.cancel()).then(cont0);
-        } catch (e0, s0) {
-          completer0.completeError(e0, s0);
-        }
-      }
-      catch0(e0, s0) {
-        finally0(() => completer0.completeError(e0, s0));
-      }
-      stream0 = _client.messages.listen((x0) {
-        var msg = x0;
-        join0() {
-          join1() {
-          }
-          if (msg is ErrorResponse || msg is NoticeResponse) {
-            _messages.add(new ServerMessage(msg is ErrorResponse, msg.fields));
-            join1();
-          } else {
-            join2() {
-              join1();
-            }
-            if (msg is ParameterStatus) {
-              _parameters[msg.name] = msg.value;
-              join2();
-            } else {
-              join2();
-            }
-          }
-        }
-        if (_state != CState.idle) {
-          finally0(() {
-            completer0.complete(null);
-          });
-        } else {
-          join0();
-        }
-      }, onError: catch0, onDone: done0);
-    } catch (e, s) {
-      completer0.completeError(e, s);
+  void _handleMessage(ProtocolMessage msg) {
+    switch (_state) {
+      case CState.starting:
+      case CState.authenticated:
+        throw new Exception('boom!'); //TODO
+        break;
+      case CState.idle:
+        _idle(msg);
+        break;
+      case CState.busy:
+      case CState.streaming:
+        _simpleQuery(msg);
+        break;
+      case CState.copyOut:
+        _copyOut(msg);
+        break;
+      default:
+        assert(false);
     }
-  });
-  return completer0.future;
-}
+  }
+  
+  void _handleError(error) {
+    
+    if (_state == CState.busy ||
+        _state == CState.streaming ||
+        _state == CState.copyIn ||
+        _state == CState.copyOut) {
+
+      var c = _task.controller;
+      if (!c.isClosed) {
+        c.addError(error);
+        c.close();
+      }
+      
+    } else {
+      throw error; // FIXME
+      
+      if (!_messages.isClosed)
+        _messages.addError(error);
+    }
+  }
+  
+  void _handleDisconnect() {
+    //FIXME
+    
+    if (_state == CState.busy ||
+        _state == CState.streaming ||
+        _state == CState.copyIn ||
+        _state == CState.copyOut) {
+      
+      var c = _task.controller;
+      if (!c.isClosed) {
+        var err = new Exception('Connection closed.'); // FIXME
+        c.addError(err);
+        c.close();
+      }
+    }
+    
+    _state = CState.closed;
+  }
+
+  
+  //FIXME should be return void.
+  // But async_await chokes.
+  void _idle(ProtocolMessage msg) {
+    assert(_state == CState.idle);
+    if (msg is BaseResponse) {
+      _messages.add(new ServerMessage(msg is ErrorResponse, msg.fields));
+    } else if (msg is ParameterStatus) {
+      _parameters[msg.name] = msg.value;
+    }
+  }
   
 
   Stream query(String sql) {
@@ -267,6 +313,23 @@ Future _idle() {
     _enqueue(task);
     return task.controller.stream.last;
   }
+   
+  Future<int> executeWithCopy(String sql, {CopyInCallback copyIn, CopyOutCallback copyOut}) {
+    var task = new Task.execute(sql, copyIn: copyIn, copyOut: copyOut);
+    _enqueue(task);
+    return task.controller.stream.last;    
+  }
+
+  Stream queryWithCopy(String sql, {CopyInCallback copyIn, CopyOutCallback copyOut}) {
+    //TODO proper mapper.
+    var mapper = (RowDescription desc, int cmd, DataRow msg) =>
+          msg.values.map((bytes) => UTF8.decode(bytes)).toList(growable: false);
+    
+    var task = new Task.query(sql, mapper, copyIn: copyIn, copyOut: copyOut);
+    _enqueue(task);
+    return task.controller.stream;
+  }
+
   
   Stream _enqueue(Task task) {
     
@@ -279,50 +342,73 @@ Future _idle() {
     
     _queue.add(task);
     
-    new Future(_processTasks);
+    new Future.microtask(_processTask);
     
     return task.controller.stream;
   }
   
-  void _processTasks() {
-    while (_queue.isNotEmpty) {
-      var task = _queue.removeAt(0);
-      _client.send(new Query(task.sql));
-      _simpleQuery(task);
-    }
-  }
-
-  // TODO Once async* is implemented might be able to make this pretty.
-  // http://www.postgresql.org/docs/9.2/static/protocol-flow.html#AEN95294
-  void _simpleQuery(Task task) {
-    
+  void _processTask() {
+    if (_state != CState.idle || _queue.isEmpty) return;
     _state = CState.busy;
+    _task = _queue.removeAt(0);    
+    _client.send(new Query(_task.sql));
+  }
+  
+  // http://www.postgresql.org/docs/9.2/static/protocol-flow.html#AEN95294
+  void _simpleQuery(ProtocolMessage msg) {
+    assert(_state == CState.busy || _state == CState.streaming);
     
-    var out = task.controller;
-        
-    int cmd = 0;
-    RowDescription desc = null;
-    
-    var subs = _client.messages.listen(null);
-    
-    subs.onData((msg) {
-      if (msg is DataRow) {
-        if (!out.isClosed && !task.isExecute)
-          out.add(task.mapper(desc, cmd, msg));
+    var out = _task.controller;
+         
+    if (msg is DataRow) {
+        if (!out.isClosed && !_task.isExecute)
+          out.add(_task.mapper(_task.desc, _task.cmd, msg));
 
       } else if (msg is CommandComplete) {
-        cmd++;
-        if (!out.isClosed && task.isExecute)
+        _task.cmd++;
+        if (!out.isClosed && _task.isExecute)
           out.add(msg.rowsAffected);
         
       } else if (msg is CopyInResponse) {
-        throw new UnimplementedError();
-      
+        if (_task.copyIn == null)
+          throw new Exception('No CopyInCallback provided.'); //FIXME
+        
+        _state = CState.copyIn;
+        
+        // could use. ctl.stream.map ??
+        var ctl = new StreamController<List<int>>();
+        ctl.stream.listen(null)
+          ..onData((data) => _client.send(new CopyData(data)))
+          ..onError((err) => _client.send(new CopyFail(err.toString())))
+          ..onDone(() {
+            new Future.microtask(() => _client.send(new CopyDone()))
+            .then((_) { _state = CState.streaming; }); //TODO not sure if this is the correct state.
+// TODO handle send (i.e.socket flush) failure. 
+//              .catchError((err) {
+//                out.addError(err);
+//                out.close();
+//                //FIXME
+//                // close connection if send fails?
+//                //_state = error ??
+//              });
+          });
+          
+          // Call user's code and get then to copy the data in.
+          new Future.microtask(() => _task.copyIn(ctl.sink));
+        
       } else if (msg is CopyOutResponse) {
-        throw new UnimplementedError();
-      
+        if (_task.copyOut == null)
+          throw new Exception('No CopyOutCallback provided.'); //FIXME
+        
+        assert(_task.copyOutController == null);
+        var c = new StreamController<List<int>>();
+        _task.copyOutController = c; 
+        _task.copyOut(c.stream);
+        
+        _state = CState.copyOut;
+        
       } else if (msg is RowDescription) {
-        desc = msg;
+        _task.desc = msg;
         _state = CState.streaming;
         
       } else if (msg is EmptyQueryResponse) {
@@ -330,7 +416,9 @@ Future _idle() {
       
       } else if (msg is ReadyForQuery) {
         if (!out.isClosed) out.close();
-        subs.cancel(); //TODO handle error returned by future?
+        _state = CState.idle;
+        //TODO _txState = msg.transactionState;
+        _processTask();
       
       } else if (msg is ErrorResponse) {
         var error = new ServerMessage(true, msg.fields);
@@ -349,29 +437,25 @@ Future _idle() {
       } else if (msg is ParameterStatus) {
         // TODO move the general async handlers into a shared method.
         _parameters[msg.name] = msg.value;
-      }
-    });
-    
-    subs.onError((err) {
-      if (!out.isClosed) {
-        out.addError(err);
-        out.close();
       } else {
-        var error = new ClientMessage(
-            isError: true, message: err.toString(), exception: err);
-        _messages.addError(error);
+        throw new Exception('Invalid message type while using simple query protocol. $msg'); 
       }
-      subs.cancel(); //TODO handle error returned by future?
-    });
+  }
+  
+  _copyOut(ProtocolMessage msg) {
+    assert(_state == CState.copyOut);
+    var ctl = _task.copyOutController; 
     
-    subs.onDone(() {
-      if (!out.isClosed) {
-        var ex = new Exception('Connection with server was lost.'); //TODO exception type.
-        out.addError(ex);
-      }
-      _state = CState.idle;
-      _processTasks();
-    });
+    if (msg is CopyData) {
+      ctl.add(msg.data);
+    } else if (msg is CopyDone) {
+      ctl.close();
+      _task.copyOutController = null;
+      _state = CState.streaming; //TODO not sure if this is correct.
+    } else if (msg is CopyFail) {
+      var err = new Exception(msg.message); //FIXME
+      ctl.addError(err);
+    }
   }
   
 }

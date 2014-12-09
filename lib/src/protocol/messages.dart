@@ -34,10 +34,6 @@ abstract class ProtocolMessage {
     return msg;
   }
   
-  String toString() => JSON.encode({
-    'msg': runtimeType.toString(),
-    'code': new String.fromCharCode(messageCode)
-  });
 }
 
 // One day dart will have ascii constants :(
@@ -555,6 +551,11 @@ class CopyData implements ProtocolMessage {
     // TODO experiment with zero copy streaming. i.e. copy: false.
     return new CopyData(r.readBytes(bodyLength, copy: true));
   }
+  
+  String toString() => JSON.encode({
+    'msg': runtimeType.toString(),
+    'code': new String.fromCharCode(messageCode)
+  });
 }
 
 class CopyDone implements ProtocolMessage {
@@ -567,6 +568,11 @@ class CopyDone implements ProtocolMessage {
     assert(bodyLength == 0);
     return new CopyDone();
   }
+  
+  String toString() => JSON.encode({
+    'msg': runtimeType.toString(),
+    'code': new String.fromCharCode(messageCode)
+  });
 }
 
 class CopyFail implements ProtocolMessage {
@@ -605,7 +611,7 @@ class CommandComplete implements ProtocolMessage {
   final int messageCode = _C;
   final String tag;
   
-  int get rowsAffected => throw new UnimplementedError();
+  int get rowsAffected => int.parse(tag.split(' ').last, onError: (_) => null);
   
   List<int> encode() => (new MessageBuilder(messageCode)..addUtf8(tag)).build(); //FIXME why extra parens needed?
   
