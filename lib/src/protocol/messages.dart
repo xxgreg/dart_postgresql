@@ -33,11 +33,22 @@ abstract class ProtocolMessage {
     print(msg);
     return msg;
   }
+  
+  String toString() => JSON.encode({
+    'msg': runtimeType.toString(),
+    'code': new String.fromCharCode(messageCode)
+  });
 }
 
+// One day dart will have ascii constants :(
 const int _C = 67;
+const int _c = 99;  
 const int _D = 68;
+const int _d = 100;
 //const int _E = 69;
+const int _f = 102;
+const int _G = 71;
+const int _H = 72;
 //const int _I = 73;
 const int _K = 75;
 const int _N = 78;
@@ -49,10 +60,15 @@ const int _R = 82;
 const int _X = 88;
 const int _Z = 90;
 
-const Map<int,Function> _messageDecoders = const {
+const Map<int,Function> _messageDecoders = const {  
   _C : CommandComplete.decode,
+  _c : CopyDone.decode,
   _D : DataRow.decode,
+  _d : CopyData.decode,
   _E : ErrorResponse.decode,
+  _f : CopyFail.decode,
+  _G : CopyInResponse.decode,
+  _H : CopyOutResponse.decode,
   _I : EmptyQueryResponse.decode,
   _K : BackendKeyData.decode,
   _Q : Query.decode,
@@ -438,16 +454,138 @@ class DataRow implements ProtocolMessage {
   });
 }
 
-//FIXME
 class CopyInResponse implements ProtocolMessage {
-  final int messageCode = null;
-  List<int> encode() => throw new UnimplementedError();
+  
+  final int messageCode = _G;
+  
+  CopyInResponse(this.format, this.columns, this.columnFormats);
+  
+  // TODO provide better names like isBinary.
+  final int format;
+  final int columns;
+  final List<int> columnFormats;
+  
+  List<int> encode() {
+    var mb = new MessageBuilder(messageCode)
+      ..addByte(format)
+      ..addInt16(columns);
+    
+    columnFormats.forEach((i) => mb.addInt16(i));
+    
+    return mb.build();
+  }
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _G);
+    int format = r.readByte();
+    int columns = r.readInt16();
+    List<int> columnFormats = new List<int>(columns);
+    for (int i = 0; i < columns; i++) {
+      columnFormats[i] = r.readInt16();
+    }
+    return new CopyInResponse(format, columns, columnFormats);
+  }
 }
 
-//FIXME
+//FIXME share code with CopyInResponse
 class CopyOutResponse implements ProtocolMessage {
-  final int messageCode = null;
-  List<int> encode() => throw new UnimplementedError();
+  
+  final int messageCode = _H;
+  
+  CopyOutResponse(this.format, this.columns, this.columnFormats);
+  
+  // TODO provide better names like isBinary.
+  final int format;
+  final int columns;
+  final List<int> columnFormats;
+  
+  List<int> encode() {
+    var mb = new MessageBuilder(messageCode)
+      ..addByte(format)
+      ..addInt16(columns);
+    
+    columnFormats.forEach((i) => mb.addInt16(i));
+    
+    return mb.build();
+  }
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _H);
+    int format = r.readByte();
+    int columns = r.readInt16();
+    List<int> columnFormats = new List<int>(columns);
+    for (int i = 0; i < columns; i++) {
+      columnFormats[i] = r.readInt16();
+    }
+    return new CopyInResponse(format, columns, columnFormats);
+  }
+}
+
+class CopyData implements ProtocolMessage {
+  CopyData(this.data);
+  
+  final int messageCode = _d;
+  final List<int> data;
+  
+  List<int> get header {
+    var bytes = new Uint8List(5);
+    
+    bytes[0] = _d;
+    
+    int i = data.length;
+    bytes[1] = (i >> 24) & 0x000000FF;
+    bytes[2] = (i >> 16) & 0x000000FF;
+    bytes[3] = (i >> 8) & 0x000000FF;
+    bytes[4] = i & 0x000000FF;
+    
+    return bytes;
+  }
+  
+  // Note this copies the data so that it can all fit in a single buffer.
+  // This is not actually used by ProtocolClient.send() for efficiency reasons.
+  List<int> encode() {
+    var bytes = new Uint8List(data.length + 5);
+    bytes.setRange(0, 5, header);
+    bytes.setRange(5, bytes.length, data);
+    return bytes;
+  }
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _d);
+    // TODO experiment with zero copy streaming. i.e. copy: false.
+    return new CopyData(r.readBytes(bodyLength, copy: true));
+  }
+}
+
+class CopyDone implements ProtocolMessage {
+  final int messageCode = _c;
+  
+  List<int> encode() => new MessageBuilder(messageCode).build();
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _c);
+    return new CopyDone();
+  }
+}
+
+class CopyFail implements ProtocolMessage {
+  CopyFail(this.message);
+  final int messageCode = _f;
+  final String message;
+  
+  List<int> encode() => (new MessageBuilder(messageCode)
+    ..addUtf8(message)).build();
+  
+  static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
+    assert(msgType == _f);
+    return new CopyFail(r.readString());
+  }
+  
+  String toString() => JSON.encode({
+    'msg': runtimeType.toString(),
+    'code': new String.fromCharCode(messageCode),
+    'message': message
+  });
 }
 
 // TODO expose rows and oid getter
@@ -633,5 +771,4 @@ class EmptyQueryResponse implements ProtocolMessage {
     'code': new String.fromCharCode(messageCode)
   });
 }
-
 
