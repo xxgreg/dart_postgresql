@@ -31,6 +31,19 @@ class Task {
   final StreamController controller = new StreamController();
 }
 
+String md5s(String s) {
+  var hash = new MD5();
+  hash.add(s.codeUnits.toList());
+  return CryptoUtils.bytesToHex(hash.close());
+}
+
+String md5CredentialsHash(String user, String password, List<int> salt) {
+  var hash = md5s(password + user);
+  var saltStr = new String.fromCharCodes(salt);
+  return 'md5' + md5s('$hash$saltStr');
+}
+
+
 class ConnectionImpl {
 
   ConnectionImpl(this._settings, this._client);
@@ -95,7 +108,7 @@ class ConnectionImpl {
         }
       }
       catch0(e0, s0) {
-        finally0(() => completer0.completeError(e0, s0));
+        finally0((_) => completer0.completeError(e0, s0));
       }
       stream0 = _client.messages.listen((x0) {
         var msg = x0;
@@ -120,7 +133,7 @@ class ConnectionImpl {
                 join2();
               }
               if (msg.authType == 5) {
-                var md5 = _md5CredentialsHash(_settings.user, _settings.password, msg.salt);
+                var md5 = md5CredentialsHash(_settings.user, _settings.password, msg.salt);
                 _client.send(new PasswordMessage(md5));
                 join3();
               } else {
@@ -136,7 +149,7 @@ class ConnectionImpl {
             assert(_state == CState.authenticated);
             assert(msg.transactionState == TransactionState.none);
             _state = CState.idle;
-            finally0(() {
+            finally0((_) {
               completer0.complete(null);
             });
           } else {
@@ -182,23 +195,9 @@ class ConnectionImpl {
     }
   });
   return completer0.future;
-}
+}  
   
-  
-  String _md5s(String s) {
-    var hash = new MD5();
-    hash.add(s.codeUnits.toList());
-    return CryptoUtils.bytesToHex(hash.close());
-  }
-  
-  String _md5CredentialsHash(String user, String password, List<int> salt) {
-    var hash = _md5s(password + user);
-    var saltStr = new String.fromCharCodes(salt);
-    return 'md5' + _md5s('$hash$saltStr');
-  }
-  
-  
-  void _idle() {
+Future _idle() {
   final completer0 = new Completer();
   scheduleMicrotask(() {
     try {

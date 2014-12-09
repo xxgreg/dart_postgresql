@@ -140,7 +140,7 @@ class ByteReader {
   int get bytesRead => _position;
 
   /// Warning - inefficient, only use for short lists.
-  List<int> peekBytes(int count) => _list.sublist(_position, count);
+  List<int> peekBytes(int count) => _list.sublist(_position, _position + count);
   
   void skipBytes(int count) {
     _position += count;
@@ -163,22 +163,36 @@ class ByteReader {
     
   /// If copy is false return a Uint8List view, otherwise copy into a new 
   /// Uint8List.
-  List<int> readBytes(int count, {copy: true}) => copy
+  List<int> readBytes(int count, {copy: true}) {
+    if (count < 0) throw new Exception(); //FIXME
+    
+    if (count == 0) return new Uint8List(0);
+    
+    var bytes = copy
       ? (new Uint8List(count)..setRange(0, count, _list, _position))
       : new Uint8List.view(_list.buffer, _position, count);
+    
+    _position += count;
+    
+    return bytes;
+  }
   
   /// Read a zero terminated UTF8 string.
   String readString() {
+    //TODO check using indexOf is fast, maybe just use a while loop.
     int len = _list.indexOf(0, _position) - _position;
-    _position += len;
+    if (len < 0) throw new Exception('Protocol error: unterminated string.'); //FIXME    
+    var bytes = readBytes(len, copy: false);
+    assert(readByte() == 0);
     //TODO soon can use UTF8.decoder.convert(bytes, start, end);
-    return UTF8.decode(readBytes(len, copy: false));
+    return UTF8.decode(bytes);
   }
   
   /// Read a fixed length UTF8 string.
-  String readStringN(int bytes) {
-    _position += bytes;
-    return UTF8.decode(readBytes(bytes, copy: false));
+  String readStringN(int lengthInBytes) {
+    var bytes = readBytes(lengthInBytes, copy: false);
+    _position += lengthInBytes;
+    return UTF8.decode(bytes);
   }
   
 }

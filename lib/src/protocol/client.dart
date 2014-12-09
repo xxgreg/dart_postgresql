@@ -56,7 +56,7 @@ class ProtocolClient {
   }
 
   final StreamController<ProtocolMessage> _messages =
-      new StreamController<ProtocolMessage>();
+      new StreamController<ProtocolMessage>.broadcast(); //TODO experiment with sync true.
   
   final ZeroCopyBytesBuilder _buffer = new ZeroCopyBytesBuilder();
   

@@ -29,7 +29,9 @@ abstract class ProtocolMessage {
     assert(msgBodyLength <= byteReader.bytesAvailable);
     var decoder = _messageDecoders[msgType];
     if (decoder == null) throw new Exception('Unknown message type: $msgType'); //TODO exception type, and atoi on messageType.
-    return decoder(msgType, msgBodyLength, byteReader);
+    var msg = decoder(msgType, msgBodyLength, byteReader);
+    print(msg);
+    return msg;
   }
 }
 
@@ -260,7 +262,6 @@ class ParameterStatus implements ProtocolMessage {
   
   static ProtocolMessage decode(int msgType, int bodyLength, ByteReader r) {
     assert(msgType == _S);
-    int maxlen = bodyLength;
     var name = r.readString();
     var value = r.readString();
     return new ParameterStatus(name, value);
@@ -322,7 +323,9 @@ class Field {
   
   bool get isBinary => formatCode == 1;
   
-  String toString() => JSON.encode({
+  String toString() => JSON.encode(toJson());
+  
+  Map toJson() => {
     'name': name,
     'fieldId': fieldId,
     'tableColNo': tableColNo,
@@ -330,7 +333,7 @@ class Field {
     'dataSize': dataSize,
     'typeModifier': typeModifier,
     'formatCode': formatCode
-  });
+  };  
 }
 
 class RowDescription implements ProtocolMessage {
@@ -431,7 +434,7 @@ class DataRow implements ProtocolMessage {
   String toString() => JSON.encode({
     'msg': runtimeType.toString(),
     'code': new String.fromCharCode(messageCode),
-    'values': _values.map(UTF8.decode) //TODO not all DataRows are text, some are binary.
+    'values': _values.map(UTF8.decode).toList() //TODO not all DataRows are text, some are binary.
   });
 }
 

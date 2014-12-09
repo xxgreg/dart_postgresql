@@ -31,6 +31,19 @@ class Task {
   final StreamController controller = new StreamController();
 }
 
+String md5s(String s) {
+  var hash = new MD5();
+  hash.add(s.codeUnits.toList());
+  return CryptoUtils.bytesToHex(hash.close());
+}
+
+String md5CredentialsHash(String user, String password, List<int> salt) {
+  var hash = md5s(password + user);
+  var saltStr = new String.fromCharCodes(salt);
+  return 'md5' + md5s('$hash$saltStr');
+}
+
+
 class ConnectionImpl {
 
   ConnectionImpl(this._settings, this._client);
@@ -62,6 +75,7 @@ class ConnectionImpl {
       return conn;
   }
   
+  // Need to manually patch cps output: finally0(() => ....); should be finally0((_) => ....);
   // http://www.postgresql.org/docs/9.2/static/protocol-flow.html#AEN95219
   Future _startup() async {
     
@@ -82,7 +96,7 @@ class ConnectionImpl {
           _client.send(new PasswordMessage(_settings.password));
           
         } else if (msg.authType == 5) { // md5
-          var md5 = _md5CredentialsHash(
+          var md5 = md5CredentialsHash(
               _settings.user, _settings.password, msg.salt);
           _client.send(new PasswordMessage(md5));
         }
@@ -109,28 +123,16 @@ class ConnectionImpl {
     }
     
     throw new Exception('Server disconnected during authentication.');
-  }
+  }  
   
-  
-  String _md5s(String s) {
-    var hash = new MD5();
-    hash.add(s.codeUnits.toList());
-    return CryptoUtils.bytesToHex(hash.close());
-  }
-  
-  String _md5CredentialsHash(String user, String password, List<int> salt) {
-    var hash = _md5s(password + user);
-    var saltStr = new String.fromCharCodes(salt);
-    return 'md5' + _md5s('$hash$saltStr');
-  }
-  
-  
-  void _idle() async {
+  //FIXME should be return void.
+  // But async_await chokes.
+  Future _idle() async {
     assert(_state == CState.idle);
     await for (var msg in _client.messages) {
       if (_state != CState.idle) {
         // State has changed stop listening.
-        return;
+        return null; //FIXME should just be return; but async await chokes. 
       }
       if (msg is ErrorResponse || msg is NoticeResponse) {
         _messages.add(new ServerMessage(msg is ErrorResponse, msg.fields));
