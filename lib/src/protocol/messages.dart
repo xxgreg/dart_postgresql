@@ -2,28 +2,10 @@ part of postgresql.protocol;
 
 // http://www.postgresql.org/docs/9.2/static/protocol-message-formats.html
 
-//TODO Swap the connection class over to using these.
-// currently just used for testing.
-
-//Map frontendMessages = {                      
-//};
-//
-//Map backedMessages = {                      
-//};
-
-
 abstract class ProtocolMessage {
   int get messageCode;
   List<int> encode();
-  
-  //TODO
-//  static ProtocolMessage decodeFrontend(List<int> buffer, int offset)
-//    => throw new UnimplementedError();
-//
-  //TODO
-//  static ProtocolMessage decodeBackend(List<int> buffer, int offset)
-//    => throw new UnimplementedError();
-  
+    
   // Note msgBodyLength excludes the 5 byte header. Is 0 for some message types.
   static ProtocolMessage decode(int msgType, int msgBodyLength, ByteReader byteReader) {
     assert(msgBodyLength <= byteReader.bytesAvailable);
@@ -31,6 +13,16 @@ abstract class ProtocolMessage {
     if (decoder == null) throw new Exception('Unknown message type: $msgType'); //TODO exception type, and atoi on messageType.
     var msg = decoder(msgType, msgBodyLength, byteReader);
     print(msg);
+    return msg;
+  }
+
+  // Some message codes are ambigous, as reused for both front and backend.
+  // Note msgBodyLength excludes the 5 byte header. Is 0 for some message types.
+  static ProtocolMessage decodeBackend(int msgType, int msgBodyLength, ByteReader byteReader) {
+    assert(msgBodyLength <= byteReader.bytesAvailable);
+    var decoder = _messageDecodersBackend[msgType];
+    if (decoder == null) throw new Exception('Unknown message type: $msgType'); //TODO exception type, and atoi on messageType.
+    var msg = decoder(msgType, msgBodyLength, byteReader);
     return msg;
   }
   
@@ -56,6 +48,17 @@ const int _R = 82;
 const int _X = 88;
 const int _Z = 90;
 
+const int _1 = 49;
+const int _2 = 50;
+const int _3 = 51;
+const int _A = 65;
+const int _B = 66;
+const int _n = 110;
+const int _P = 80;
+const int _s = 115;
+
+
+// TODO remove backend only messages
 const Map<int,Function> _messageDecoders = const {  
   _C : CommandComplete.decode,
   _c : CopyDone.decode,
@@ -75,6 +78,60 @@ const Map<int,Function> _messageDecoders = const {
   _T : RowDescription.decode,
   _X : Terminate.decode,
   _Z : ReadyForQuery.decode,
+  
+  _B : Bind.decode,
+  _2 : BindComplete.decode,
+//Ambigious frontend backend
+//  _C : Close.decode,
+  _3 : CloseComplete.decode,
+//  _D : Describe.decode,
+//  _E : Execute.decode,
+//  _H : Flush.decode,
+  _n : NoData.decode,
+  _A : NotificationResponse.decode,
+  _t : ParameterDescription.decode,
+  _P : Parse.decode,
+  _1 : ParseComplete.decode,
+  _s : PortalSuspended.decode,
+//  _S : Sync.decode
+};
+
+
+// TODO remove frontend only messages
+const Map<int,Function> _messageDecodersBackend = const { 
+//    _C : CommandComplete.decode,
+    _c : CopyDone.decode,
+//    _D : DataRow.decode,
+    _d : CopyData.decode,
+//    _E : ErrorResponse.decode,
+    _f : CopyFail.decode,
+    _G : CopyInResponse.decode,
+//    _H : CopyOutResponse.decode,
+    _I : EmptyQueryResponse.decode,
+    _K : BackendKeyData.decode,
+    _Q : Query.decode,
+    _N : NoticeResponse.decode,
+    _p : PasswordMessage.decode,
+    _R : AuthenticationRequest.decode,
+//    _S : ParameterStatus.decode,
+    _T : RowDescription.decode,
+    _X : Terminate.decode,
+    _Z : ReadyForQuery.decode,
+    
+    _B : Bind.decode,
+    _2 : BindComplete.decode,
+    _C : Close.decode,
+    _3 : CloseComplete.decode,
+    _D : Describe.decode,
+    _E : Execute.decode,
+    _H : Flush.decode,
+    _n : NoData.decode,
+    _A : NotificationResponse.decode,
+    _t : ParameterDescription.decode,
+    _P : Parse.decode,
+    _1 : ParseComplete.decode,
+    _s : PortalSuspended.decode,
+    _S : Sync.decode
 };
 
 class Startup implements ProtocolMessage {

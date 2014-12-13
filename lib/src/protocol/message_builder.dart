@@ -51,6 +51,8 @@ class MessageBuilder {
     _builder.addByte(d);
   }
 
+  void addString(String s) => addUtf8(s);
+  
   //FIXME rename to addString()
   /// Add a null terminated string.
   void addUtf8(String s) {
