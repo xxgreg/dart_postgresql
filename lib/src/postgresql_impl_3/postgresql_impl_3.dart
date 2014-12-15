@@ -36,11 +36,11 @@ typedef CopyOutCallback(Stream<List<int>> stream);
 
 class Task {
   
-  Task.query(this.sql, this.mapper, {this.copyIn, this.copyOut})
+  Task.query(this.sql, this.values, this.mapper, {this.copyIn, this.copyOut})
     : isExecute = false;
   
-  Task.execute(this.sql, {this.copyIn, this.copyOut})
-    : isExecute = true, mapper = ((a, b, c) {});
+//  Task.execute(this.sql, {this.copyIn, this.copyOut})
+//    : isExecute = true, mapper = ((a, b, c) {});
   
   final String sql;
   final bool isExecute;
@@ -48,6 +48,7 @@ class Task {
   final StreamController controller = new StreamController(); // Rename results or something.
   final CopyInCallback copyIn;
   final CopyOutCallback copyOut;
+  final List<Object> values;
   
   StreamController<List<int>> copyOutController;
   int cmd = 0;
@@ -153,9 +154,6 @@ class ConnectionImpl {
   }  
   
   void _handleMessage(ProtocolMessage msg) {
-    print(msg);
-    return;
-    
     switch (_state) {
       case CState.starting:
       case CState.authenticated:
@@ -166,7 +164,7 @@ class ConnectionImpl {
         break;
       case CState.busy:
       case CState.streaming:
-        _simpleQuery(msg);
+        _busy(msg);
         break;
       case CState.copyOut:
         _copyOut(msg);
@@ -229,38 +227,30 @@ class ConnectionImpl {
   }
   
 
-  Stream query(String sql) {
+  //FIXME
+  final _tc = new TypeConverter();
+  
+  Stream query(String sql, [List<Object> values]) {
     //TODO proper mapper.
-    var mapper = (RowDescription desc, int cmd, DataRow msg) =>
-          msg.values.map((bytes) => UTF8.decode(bytes)).toList(growable: false);
+    var mapper = (RowDescription desc, int cmd, DataRow msg) {
+      var result = new List(msg.values.length);
+      for (int i = 0; i < msg.values.length; i++) {
+        var s = UTF8.decode(msg.values[i]);
+        result[i] = _tc.decode(s, desc.fields[i].fieldType);
+      }
+      return result;
+    };
     
-    var task = new Task.query(sql, mapper);
+    var task = new Task.query(sql, values, mapper);
     _enqueue(task);
     return task.controller.stream;
   }
   
-  Future<int> execute(String sql) {
-    var task = new Task.execute(sql);
-    _enqueue(task);
-    return task.controller.stream.last;
-  }
-   
-  Future<int> executeWithCopy(String sql, {CopyInCallback copyIn, CopyOutCallback copyOut}) {
-    var task = new Task.execute(sql, copyIn: copyIn, copyOut: copyOut);
-    _enqueue(task);
-    return task.controller.stream.last;    
-  }
-
-  Stream queryWithCopy(String sql, {CopyInCallback copyIn, CopyOutCallback copyOut}) {
-    //TODO proper mapper.
-    var mapper = (RowDescription desc, int cmd, DataRow msg) =>
-          msg.values.map((bytes) => UTF8.decode(bytes)).toList(growable: false);
-    
-    var task = new Task.query(sql, mapper, copyIn: copyIn, copyOut: copyOut);
-    _enqueue(task);
-    return task.controller.stream;
-  }
-
+//  Future<int> execute(String sql) {
+//    var task = new Task.execute(sql);
+//    _enqueue(task);
+//    return task.controller.stream.last;
+//  }
   
   Stream _enqueue(Task task) {
     
@@ -281,12 +271,33 @@ class ConnectionImpl {
   void _processTask() {
     if (_state != CState.idle || _queue.isEmpty) return;
     _state = CState.busy;
-    _task = _queue.removeAt(0);    
-    _client.send(new Query(_task.sql));
+    _task = _queue.removeAt(0);
+    
+    // TODO have separate tasks for prepare and execute.
+    // So these can be performed separately.
+    
+    // This can be significanly more efficient by writing each value directly
+    // into the socket.
+    var fmt = new TypeConverter();
+    var parameters = _task.values == null
+        ? []
+        : _task.values.map((v) {
+          if (v == null) return null;
+          var s = v is String ? v : fmt.encode(v, null); // Just a quick hack for now. Fix this later.
+          return UTF8.encode(s);
+        }).toList();
+    
+    _client.sendAll([
+      new Parse("", _task.sql, []),
+      new Bind("", "", [], parameters, []),
+      new Describe('S'.codeUnitAt(0), ""),
+      new Execute("", 0),
+      new Sync()
+    ]);
   }
   
   // http://www.postgresql.org/docs/9.2/static/protocol-flow.html#AEN95294
-  void _simpleQuery(ProtocolMessage msg) {
+  void _busy(ProtocolMessage msg) {
     assert(_state == CState.busy || _state == CState.streaming);
     
     var out = _task.controller;
@@ -295,26 +306,32 @@ class ConnectionImpl {
         if (!out.isClosed && !_task.isExecute)
           out.add(_task.mapper(_task.desc, _task.cmd, msg));
 
-      } else if (msg is CommandComplete) {
-        _task.cmd++;
-        if (!out.isClosed && _task.isExecute)
-          out.add(msg.rowsAffected);
-        
-      } else if (msg is CopyInResponse) {
-        if (_task.copyIn == null)
-          throw new Exception('No CopyInCallback provided.'); //FIXME
-        
-        _state = CState.copyIn;
-        
-        // could use. ctl.stream.map ??
-        var ctl = new StreamController<List<int>>();
-        ctl.stream.listen(null)
-          ..onData((data) => _client.send(new CopyData(data)))
-          ..onError((err) => _client.send(new CopyFail(err.toString())))
-          ..onDone(() {
-            //TODO figure out why I get a bad state error if this is run synchronously.
-            // putting it in a microtask seems to fix it.
-            new Future.microtask(() => _client.send(new CopyDone()))
+    } else if (msg is ParseComplete) {
+        // Can ignore these when expecting results.
+    } else if (msg is BindComplete) {
+        // Can ignore these when expecting results.
+    } else if (msg is ParameterDescription) {
+        //TODO ??
+    } else if (msg is CommandComplete) {
+      _task.cmd++;
+      if (!out.isClosed && _task.isExecute)
+        out.add(msg.rowsAffected);
+      
+    } else if (msg is CopyInResponse) {
+      if (_task.copyIn == null)
+        throw new Exception('No CopyInCallback provided.'); //FIXME
+      
+      _state = CState.copyIn;
+      
+      // could use. ctl.stream.map ??
+      var ctl = new StreamController<List<int>>();
+      ctl.stream.listen(null)
+        ..onData((data) => _client.send(new CopyData(data)))
+        ..onError((err) => _client.send(new CopyFail(err.toString())))
+        ..onDone(() {
+          //TODO figure out why I get a bad state error if this is run synchronously.
+          // putting it in a microtask seems to fix it.
+          new Future.microtask(() => _client.send(new CopyDone()))
               .then((_) { _state = CState.streaming; }); //TODO not sure if this is the correct state.
 // TODO handle send (i.e.socket flush) failure. 
 //              .catchError((err) {

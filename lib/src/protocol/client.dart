@@ -75,8 +75,11 @@ class ProtocolClient {
   Future send(ProtocolMessage msg) {
     if (_state == closed) return new Future.error(
       'Protocol client state is closed, cannot send msg: $msg');
-    
-    print('sent $msg');
+    _send(msg);
+    return _socket.flush();
+  }
+  
+  void _send(ProtocolMessage msg) {
     
     // Prevent an unnecessary copy of the bytes stored in CopyData.data.
     // TODO consider changing msg.encode() to take a ByteSink instead of 
@@ -87,7 +90,12 @@ class ProtocolClient {
     } else {
       _socket.add(msg.encode());
     }
-    
+  }
+  
+  Future sendAll(List<ProtocolMessage> msgs) {
+    if (_state == closed) return new Future.error(
+            'Protocol client state is closed, cannot send msgs: $msgs');
+    msgs.forEach(_send);
     return _socket.flush();
   }
       
@@ -107,7 +115,7 @@ class ProtocolClient {
         return;
       }
       assert(s == ok);
-      var r = new ByteReader(_buffer.takeChunk());
+      r = new ByteReader(_buffer.takeChunk());
       assert(_buffer.isEmpty);
     } else {
       assert(false);
@@ -153,7 +161,7 @@ class ProtocolClient {
     _checkMessageLength(msgType, length);
     
     // Check to see if the entire message is already in the buffer.
-    if (r.bytesAvailable < length) return needInput;
+    if (r.bytesAvailable < length + 1) return needInput;
     
     int bytesRead = r.bytesRead;
     
@@ -164,6 +172,7 @@ class ProtocolClient {
     //FIXME consider how ProtocolExceptions are handled.
     _messages.add(ProtocolMessage.decode(msgType, length - 4, r));
     
+    //FIXME
     if (r.bytesRead - bytesRead != length + 1)
       throw new Exception('Protocol error: lost message sync'); //TODO exception type.
     
@@ -197,10 +206,10 @@ class ProtocolClient {
     _checkMessageLength(msgType, length);
     
     // Check to see if the entire message is already in the buffer.
-    if (bytes.length < length) return needInput;
+    if (bytes.length < length + 1) return needInput;
     
     // Get a view of the message data.
-    var list = bytes.takeBytes(length + 5, copy: false);
+    var list = bytes.takeBytes(length + 1, copy: false);
     
     // Skip the header which is already parsed
     var reader = new ByteReader(list)..skipBytes(5);
@@ -229,7 +238,7 @@ class ProtocolClient {
 
     //TODO exception type and atoi.
     error() => new Exception(
-        'Protocol error invalid message length: $msgType $msgLength');
+        'Protocol error invalid message length (probably lost sync): $msgType $msgLength');
 
 //FIXME figure out how to check these. Probably not neccesary but best to
 // match libpq's behaviour where possible.

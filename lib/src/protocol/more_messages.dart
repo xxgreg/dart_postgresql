@@ -36,8 +36,12 @@ class Bind implements ProtocolMessage {
     
     mb.addInt16(parameters.length);
     for (var bytes in parameters) {
-      mb.addInt32(bytes.length);
-      mb.addBytes(bytes);
+      if (bytes == null) {
+        mb.addInt32(-1);
+      } else {
+        mb.addInt32(bytes.length);
+        mb.addBytes(bytes);
+      }
     }
     
     mb.addInt16(resultFormats.length);

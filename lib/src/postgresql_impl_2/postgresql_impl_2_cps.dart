@@ -111,7 +111,7 @@ class ConnectionImpl {
   return completer0.future;
 }
     
-  // Need to manually patch cps output: finally0((_) => ....); should be finally0((_) => ....);
+  // Need to manually patch cps output: finally0(() => ....); should be finally0((_) => ....);
   // http://www.postgresql.org/docs/9.2/static/protocol-flow.html#AEN95219
   Future _startup() {
   final completer0 = new Completer();
@@ -132,7 +132,7 @@ class ConnectionImpl {
         }
       }
       catch0(e0, s0) {
-        finally0((_) => completer0.completeError(e0, s0));
+        finally0(() => completer0.completeError(e0, s0));
       }
       stream0 = _client.messages.listen((x0) {
         var msg = x0;
@@ -176,7 +176,7 @@ class ConnectionImpl {
             _client.messages.listen(_handleMessage)
                 ..onError(_handleError)
                 ..onDone(_handleDisconnect);
-            finally0((_) {
+            finally0(() {
               completer0.complete(null);
             });
           } else {
@@ -225,6 +225,9 @@ class ConnectionImpl {
 }  
   
   void _handleMessage(ProtocolMessage msg) {
+    print(msg);
+    return;
+    
     switch (_state) {
       case CState.starting:
       case CState.authenticated:
@@ -381,8 +384,10 @@ class ConnectionImpl {
           ..onData((data) => _client.send(new CopyData(data)))
           ..onError((err) => _client.send(new CopyFail(err.toString())))
           ..onDone(() {
+            //TODO figure out why I get a bad state error if this is run synchronously.
+            // putting it in a microtask seems to fix it.
             new Future.microtask(() => _client.send(new CopyDone()))
-            .then((_) { _state = CState.streaming; }); //TODO not sure if this is the correct state.
+              .then((_) { _state = CState.streaming; }); //TODO not sure if this is the correct state.
 // TODO handle send (i.e.socket flush) failure. 
 //              .catchError((err) {
 //                out.addError(err);
@@ -456,6 +461,13 @@ class ConnectionImpl {
       var err = new Exception(msg.message); //FIXME
       ctl.addError(err);
     }
+  }
+  
+  
+  Stream xquery(String sql) {
+    var parse = new Parse('foo', r'select $1', []);
+    _client.send(parse);
+    return null;
   }
   
 }

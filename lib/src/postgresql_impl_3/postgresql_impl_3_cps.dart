@@ -36,11 +36,11 @@ typedef CopyOutCallback(Stream<List<int>> stream);
 
 class Task {
   
-  Task.query(this.sql, this.mapper, {this.copyIn, this.copyOut})
+  Task.query(this.sql, this.values, this.mapper, {this.copyIn, this.copyOut})
     : isExecute = false;
   
-  Task.execute(this.sql, {this.copyIn, this.copyOut})
-    : isExecute = true, mapper = ((a, b, c) {});
+//  Task.execute(this.sql, {this.copyIn, this.copyOut})
+//    : isExecute = true, mapper = ((a, b, c) {});
   
   final String sql;
   final bool isExecute;
@@ -48,6 +48,7 @@ class Task {
   final StreamController controller = new StreamController(); // Rename results or something.
   final CopyInCallback copyIn;
   final CopyOutCallback copyOut;
+  final List<Object> values;
   
   StreamController<List<int>> copyOutController;
   int cmd = 0;
@@ -83,79 +84,148 @@ class ConnectionImpl {
   final List<Task> _queue = new List<Task>();  
   
   static Future<ConnectionImpl> connect(
-      Settings settings, Duration timeout) async {
-     
-      var client = await ProtocolClient.connect(
-          settings.host, settings.port, timeout: timeout);
-      
-      var conn = new ConnectionImpl(settings, client);
-      
-      await conn._startup();
-      
-      assert(conn._state == CState.idle);
-        
-      return conn;
-  }
-    
-  // Need to manually patch cps output: finally0(() => ....); should be finally0((_) => ....);
-  // http://www.postgresql.org/docs/9.2/static/protocol-flow.html#AEN95219
-  Future _startup() async {
-    
-    _client.send(new Startup(_settings.user, _settings.database, {}));
-    
-    //FIXME what to do with notices received during startup?
-    // Can't add to messages stream, as there won't be any listeners yet,
-    // and this stream doesn't buffer.
-    var notices = [];
-    
-    await for (var msg in _client.messages) {
-      
-      if (msg is AuthenticationRequest) {
-        if (msg.authType == 0) { // ok
-          _state = CState.authenticated;
-        
-        } else if (msg.authType == 3) { // cleartext
-          _client.send(new PasswordMessage(_settings.password));
-          
-        } else if (msg.authType == 5) { // md5
-          var md5 = md5CredentialsHash(
-              _settings.user, _settings.password, msg.salt);
-          _client.send(new PasswordMessage(md5));
+      Settings settings, Duration timeout) {
+  final completer0 = new Completer();
+  scheduleMicrotask(() {
+    try {
+      new Future.value(ProtocolClient.connect(settings.host, settings.port, timeout: timeout)).then((x0) {
+        try {
+          var client = x0;
+          var conn = new ConnectionImpl(settings, client);
+          new Future.value(conn._startup()).then((x1) {
+            try {
+              x1;
+              assert(conn._state == CState.idle);
+              completer0.complete(conn);
+            } catch (e0, s0) {
+              completer0.completeError(e0, s0);
+            }
+          }, onError: completer0.completeError);
+        } catch (e1, s1) {
+          completer0.completeError(e1, s1);
         }
-      } else if (msg is ReadyForQuery) {
-        assert(_state == CState.authenticated);
-        assert(msg.transactionState == TransactionState.none);
-        _state = CState.idle;
-
-        _client.messages.listen(_handleMessage)
-          ..onError(_handleError)
-          ..onDone(_handleDisconnect);
-
-        return null;
-      
-      } else if (msg is ErrorResponse) {
-        //FIXME throw new PostgresqlException('Error while establishing a connection.', null, serverMessage: msg);
-        throw new Exception('${msg.code}: ${msg.message}');
-      
-      } else if (msg is NoticeResponse) {
-        notices.add(msg);
-      
-      } else if (msg is BackendKeyData) {
-        _backendPid = msg.backendPid;
-        _secretKey = msg.secretKey;
-      
-      } else if (msg is ParameterStatus) {
-        _parameters[msg.name] = msg.value;
-      }
+      }, onError: completer0.completeError);
+    } catch (e, s) {
+      completer0.completeError(e, s);
     }
+  });
+  return completer0.future;
+}
     
-    throw new Exception('Server disconnected during authentication.');
-  }  
+  // Need to manually patch cps output: finally0((_) => ....); should be finally0((_) => ....);
+  // http://www.postgresql.org/docs/9.2/static/protocol-flow.html#AEN95219
+  Future _startup() {
+  final completer0 = new Completer();
+  scheduleMicrotask(() {
+    try {
+      _client.send(new Startup(_settings.user, _settings.database, {}));
+      var notices = [];
+      done0() {
+        throw new Exception('Server disconnected during authentication.');
+        completer0.complete();
+      }
+      var stream0;
+      finally0(cont0) {
+        try {
+          new Future.value(stream0.cancel()).then(cont0);
+        } catch (e0, s0) {
+          completer0.completeError(e0, s0);
+        }
+      }
+      catch0(e0, s0) {
+        finally0((_) => completer0.completeError(e0, s0));
+      }
+      stream0 = _client.messages.listen((x0) {
+        var msg = x0;
+        join0() {
+        }
+        if (msg is AuthenticationRequest) {
+          join1() {
+            join0();
+          }
+          if (msg.authType == 0) {
+            _state = CState.authenticated;
+            join1();
+          } else {
+            join2() {
+              join1();
+            }
+            if (msg.authType == 3) {
+              _client.send(new PasswordMessage(_settings.password));
+              join2();
+            } else {
+              join3() {
+                join2();
+              }
+              if (msg.authType == 5) {
+                var md5 = md5CredentialsHash(_settings.user, _settings.password, msg.salt);
+                _client.send(new PasswordMessage(md5));
+                join3();
+              } else {
+                join3();
+              }
+            }
+          }
+        } else {
+          join4() {
+            join0();
+          }
+          if (msg is ReadyForQuery) {
+            assert(_state == CState.authenticated);
+            assert(msg.transactionState == TransactionState.none);
+            _state = CState.idle;
+            _client.messages.listen(_handleMessage)
+                ..onError(_handleError)
+                ..onDone(_handleDisconnect);
+            finally0((_) {
+              completer0.complete(null);
+            });
+          } else {
+            join5() {
+              join4();
+            }
+            if (msg is ErrorResponse) {
+              throw new Exception('${msg.code}: ${msg.message}');
+              join5();
+            } else {
+              join6() {
+                join5();
+              }
+              if (msg is NoticeResponse) {
+                notices.add(msg);
+                join6();
+              } else {
+                join7() {
+                  join6();
+                }
+                if (msg is BackendKeyData) {
+                  _backendPid = msg.backendPid;
+                  _secretKey = msg.secretKey;
+                  join7();
+                } else {
+                  join8() {
+                    join7();
+                  }
+                  if (msg is ParameterStatus) {
+                    _parameters[msg.name] = msg.value;
+                    join8();
+                  } else {
+                    join8();
+                  }
+                }
+              }
+            }
+          }
+        }
+      }, onError: catch0, onDone: done0);
+    } catch (e, s) {
+      completer0.completeError(e, s);
+    }
+  });
+  return completer0.future;
+}  
   
   void _handleMessage(ProtocolMessage msg) {
-    print(msg);
-    return;
-    
     switch (_state) {
       case CState.starting:
       case CState.authenticated:
@@ -166,7 +236,7 @@ class ConnectionImpl {
         break;
       case CState.busy:
       case CState.streaming:
-        _simpleQuery(msg);
+        _busy(msg);
         break;
       case CState.copyOut:
         _copyOut(msg);
@@ -229,38 +299,30 @@ class ConnectionImpl {
   }
   
 
-  Stream query(String sql) {
+  //FIXME
+  final _tc = new TypeConverter();
+  
+  Stream query(String sql, [List<Object> values]) {
     //TODO proper mapper.
-    var mapper = (RowDescription desc, int cmd, DataRow msg) =>
-          msg.values.map((bytes) => UTF8.decode(bytes)).toList(growable: false);
+    var mapper = (RowDescription desc, int cmd, DataRow msg) {
+      var result = new List(msg.values.length);
+      for (int i = 0; i < msg.values.length; i++) {
+        var s = UTF8.decode(msg.values[i]);
+        result[i] = _tc.decode(s, desc.fields[i].fieldType);
+      }
+      return result;
+    };
     
-    var task = new Task.query(sql, mapper);
+    var task = new Task.query(sql, values, mapper);
     _enqueue(task);
     return task.controller.stream;
   }
   
-  Future<int> execute(String sql) {
-    var task = new Task.execute(sql);
-    _enqueue(task);
-    return task.controller.stream.last;
-  }
-   
-  Future<int> executeWithCopy(String sql, {CopyInCallback copyIn, CopyOutCallback copyOut}) {
-    var task = new Task.execute(sql, copyIn: copyIn, copyOut: copyOut);
-    _enqueue(task);
-    return task.controller.stream.last;    
-  }
-
-  Stream queryWithCopy(String sql, {CopyInCallback copyIn, CopyOutCallback copyOut}) {
-    //TODO proper mapper.
-    var mapper = (RowDescription desc, int cmd, DataRow msg) =>
-          msg.values.map((bytes) => UTF8.decode(bytes)).toList(growable: false);
-    
-    var task = new Task.query(sql, mapper, copyIn: copyIn, copyOut: copyOut);
-    _enqueue(task);
-    return task.controller.stream;
-  }
-
+//  Future<int> execute(String sql) {
+//    var task = new Task.execute(sql);
+//    _enqueue(task);
+//    return task.controller.stream.last;
+//  }
   
   Stream _enqueue(Task task) {
     
@@ -281,12 +343,33 @@ class ConnectionImpl {
   void _processTask() {
     if (_state != CState.idle || _queue.isEmpty) return;
     _state = CState.busy;
-    _task = _queue.removeAt(0);    
-    _client.send(new Query(_task.sql));
+    _task = _queue.removeAt(0);
+    
+    // TODO have separate tasks for prepare and execute.
+    // So these can be performed separately.
+    
+    // This can be significanly more efficient by writing each value directly
+    // into the socket.
+    var fmt = new TypeConverter();
+    var parameters = _task.values == null
+        ? []
+        : _task.values.map((v) {
+          if (v == null) return null;
+          var s = v is String ? v : fmt.encode(v, null); // Just a quick hack for now. Fix this later.
+          return UTF8.encode(s);
+        }).toList();
+    
+    _client.sendAll([
+      new Parse("", _task.sql, []),
+      new Bind("", "", [], parameters, []),
+      new Describe('S'.codeUnitAt(0), ""),
+      new Execute("", 0),
+      new Sync()
+    ]);
   }
   
   // http://www.postgresql.org/docs/9.2/static/protocol-flow.html#AEN95294
-  void _simpleQuery(ProtocolMessage msg) {
+  void _busy(ProtocolMessage msg) {
     assert(_state == CState.busy || _state == CState.streaming);
     
     var out = _task.controller;
@@ -295,26 +378,31 @@ class ConnectionImpl {
         if (!out.isClosed && !_task.isExecute)
           out.add(_task.mapper(_task.desc, _task.cmd, msg));
 
-      } else if (msg is CommandComplete) {
-        _task.cmd++;
-        if (!out.isClosed && _task.isExecute)
-          out.add(msg.rowsAffected);
-        
-      } else if (msg is CopyInResponse) {
-        if (_task.copyIn == null)
-          throw new Exception('No CopyInCallback provided.'); //FIXME
-        
-        _state = CState.copyIn;
-        
-        // could use. ctl.stream.map ??
-        var ctl = new StreamController<List<int>>();
-        ctl.stream.listen(null)
-          ..onData((data) => _client.send(new CopyData(data)))
-          ..onError((err) => _client.send(new CopyFail(err.toString())))
-          ..onDone(() {
-            //TODO figure out why I get a bad state error if this is run synchronously.
-            // putting it in a microtask seems to fix it.
-            new Future.microtask(() => _client.send(new CopyDone()))
+    } else if (msg is ParseComplete) {
+        // Can ignore these when expecting results.
+    } else if (msg is BindComplete) {
+        // Can ignore these when expecting results.
+    } else if (msg is ParameterDescription) {
+    } else if (msg is CommandComplete) {
+      _task.cmd++;
+      if (!out.isClosed && _task.isExecute)
+        out.add(msg.rowsAffected);
+      
+    } else if (msg is CopyInResponse) {
+      if (_task.copyIn == null)
+        throw new Exception('No CopyInCallback provided.'); //FIXME
+      
+      _state = CState.copyIn;
+      
+      // could use. ctl.stream.map ??
+      var ctl = new StreamController<List<int>>();
+      ctl.stream.listen(null)
+        ..onData((data) => _client.send(new CopyData(data)))
+        ..onError((err) => _client.send(new CopyFail(err.toString())))
+        ..onDone(() {
+          //TODO figure out why I get a bad state error if this is run synchronously.
+          // putting it in a microtask seems to fix it.
+          new Future.microtask(() => _client.send(new CopyDone()))
               .then((_) { _state = CState.streaming; }); //TODO not sure if this is the correct state.
 // TODO handle send (i.e.socket flush) failure. 
 //              .catchError((err) {

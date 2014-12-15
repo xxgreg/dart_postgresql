@@ -33,17 +33,17 @@ class ZeroCopyBytesBuilder {
   /// Returns a normal List<int>, not a Uint8List.
   List<int> peekBytes(int count) {
     if (_chunks.isEmpty) return const [];
-    int len = 0, c = 0, p = _position;
+    int i = 0, c = 0, p = _position;
     Uint8List chunk = _chunks.first;
     var result = new List(count);
-    while (len <= count) {
+    while (i < count) {
       if (p >= chunk.length) {
         p = 0;
         chunk = _chunks[++c];
       }      
-      result.add(chunk[p]);
+      result[i] = chunk[p];
       p++;
-      len++;
+      i++;
     }
     return result;
   }
@@ -85,6 +85,7 @@ class ZeroCopyBytesBuilder {
       bytes = new Uint8List(count);
       int len = chunk.length - _position;
       bytes.setRange(0, len, chunk, _position);
+      _chunks.removeAt(0);
       
       int p = len;
       while (p < count) {
@@ -113,9 +114,11 @@ class ZeroCopyBytesBuilder {
   /// Returns the remaining consecutive bytes in the builder.
   List<int> takeChunk() {
     if (isEmpty) return new Uint8List(0);
+    var chunk = _chunks.removeAt(0);
+    var view = new Uint8List.view(chunk.buffer, _position);
+    _length -= view.length;
     _position = 0;
-    _length -= _chunks.length;
-    return _chunks.removeAt(0);
+    return view;
   }
     
 }
@@ -126,7 +129,7 @@ class ByteReader {
   
   factory ByteReader(List<int> bytes, [int offset = 0]) {
     var list = bytes is Uint8List ? bytes : new Uint8List.fromList(bytes);
-    var byteData = new ByteData.view(list.buffer);
+    var byteData = new ByteData.view(list.buffer, list.offsetInBytes);
     return new ByteReader._private(byteData, list, offset);
   }
 

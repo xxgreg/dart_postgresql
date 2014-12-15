@@ -8,11 +8,14 @@ abstract class ProtocolMessage {
     
   // Note msgBodyLength excludes the 5 byte header. Is 0 for some message types.
   static ProtocolMessage decode(int msgType, int msgBodyLength, ByteReader byteReader) {
-    assert(msgBodyLength <= byteReader.bytesAvailable);
+    try {
+      assert(msgBodyLength <= byteReader.bytesAvailable);
+    } catch (ex) {
+      print('foo');
+    }
     var decoder = _messageDecoders[msgType];
     if (decoder == null) throw new Exception('Unknown message type: $msgType'); //TODO exception type, and atoi on messageType.
     var msg = decoder(msgType, msgBodyLength, byteReader);
-    print(msg);
     return msg;
   }
 

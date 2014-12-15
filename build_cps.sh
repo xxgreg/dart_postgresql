@@ -9,3 +9,4 @@ dart $ASYNC_AWAIT/bin/async_await.dart test/postgresql_mock_test.dart > test/pos
 dart $ASYNC_AWAIT/bin/async_await.dart test/postgresql_pool_test.dart > test/postgresql_pool_test_cps.dart
 
 dart $ASYNC_AWAIT/bin/async_await.dart lib/src/postgresql_impl_2/postgresql_impl_2.dart > lib/src/postgresql_impl_2/postgresql_impl_2_cps.dart
+dart $ASYNC_AWAIT/bin/async_await.dart lib/src/postgresql_impl_3/postgresql_impl_3.dart > lib/src/postgresql_impl_3/postgresql_impl_3_cps.dart
