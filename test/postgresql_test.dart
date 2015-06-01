@@ -590,6 +590,18 @@ main() {
 
     //TODO test Row.toList() and Row.toMap()
 
+    test('toColumns', () {
+      conn1.execute('insert into tx values (42)')
+      .then((_) => conn1.query('select * from tx').toList())
+      .then(
+        expectAsync((rows) {
+          rows.forEach((row) {
+            expect(row.toColumns()[0].name, 'val');
+          });
+        })
+      );
+    });
+
 /*
     test('isolation', () {
       var cb = expectAsync((_) { });
