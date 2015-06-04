@@ -162,7 +162,6 @@ abstract class Row {
   UnmodifiableListView<Column> toColumns();
 }
 
-@proxy
 abstract class Column {
   int get index;
   String get name;
