@@ -1,6 +1,7 @@
 library postgresql;
 
 import 'dart:async';
+import 'dart:collection';
 import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart' as impl;
 
 /// Connect to a PostgreSQL database.
@@ -158,7 +159,7 @@ abstract class Row {
   /// An unmodifiable map of column names and values. 
   Map toMap();
 
-  List<Column> toColumns();
+  UnmodifiableListView<Column> toColumns();
 }
 
 @proxy
