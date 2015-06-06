@@ -1,3 +1,7 @@
+#### Version 0.3.1+1
+
+ * Expose column information via row.getColumns(). Credit to Jesper Håkansson for this change.
+
 #### Version 0.3.0
 
   * A new connection pool with more configuration options.
