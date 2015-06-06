@@ -591,7 +591,7 @@ class ConnectionImpl implements Connection {
     }
 
     _query._columnCount = count;
-    _query._columns = list;
+    _query._columns = new UnmodifiableListView(list);
     _query._commandIndex++;
 
     _query.addRowDescription();

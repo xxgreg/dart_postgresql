@@ -157,6 +157,22 @@ abstract class Row {
   
   /// An unmodifiable map of column names and values. 
   Map toMap();
+
+  List<Column> getColumns();
+}
+
+abstract class Column {
+  int get index;
+  String get name;
+
+  int get fieldId;
+  int get tableColNo;
+  int get fieldType;
+  int get dataSize;
+  int get typeModifier;
+  int get formatCode;
+
+  bool get isBinary;
 }
 
 

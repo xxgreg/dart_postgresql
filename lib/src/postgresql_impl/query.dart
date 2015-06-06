@@ -34,7 +34,7 @@ class _Query {
   }
 
   void addRow() {
-    var row = new _Row(_columnNames, _rowData, _columnIndex);
+    var row = new _Row(_columnNames, _rowData, _columnIndex, _columns);
     _rowData = null;
     _controller.add(row);
   }
@@ -51,7 +51,7 @@ class _Query {
 }
 
 //TODO rename to field, as it may not be a column.
-class _Column {
+class _Column implements Column {
   final int index;
   final String name;
 
@@ -73,7 +73,7 @@ class _Column {
 }
 
 class _Row implements Row {
-  _Row(this._columnNames, this._columnValues, this._index) {
+  _Row(this._columnNames, this._columnValues, this._index, this._columns) {
     assert(this._columnNames.length == this._columnValues.length);
   }
 
@@ -81,6 +81,7 @@ class _Row implements Row {
   final Map<Symbol, int> _index;
   final List<String> _columnNames;
   final List _columnValues;
+  final List _columns;
 
   operator[] (int i) => _columnValues[i];
 
@@ -106,6 +107,8 @@ class _Row implements Row {
   List toList() => new UnmodifiableListView(_columnValues);
 
   Map toMap() => new Map.fromIterables(_columnNames, _columnValues);
+
+  List<Column> getColumns() => new UnmodifiableListView(_columns);
 }
 
 

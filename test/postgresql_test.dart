@@ -590,6 +590,17 @@ main() {
 
     //TODO test Row.toList() and Row.toMap()
 
+    test('getColumns', () {
+      conn1.query('select 42 as val').toList()
+      .then(
+        expectAsync((rows) {
+          rows.forEach((row) {
+            expect(row.getColumns()[0].name, 'val');
+          });
+        })
+      );
+    });
+
 /*
     test('isolation', () {
       var cb = expectAsync((_) { });
