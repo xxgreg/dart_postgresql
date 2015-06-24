@@ -191,8 +191,14 @@ class DefaultTypeConverter implements TypeConverter {
       return 'null';
 
     var timezoneString = (datetime.isUtc ? "" : datetime.timeZoneName);
+    var string = datetime.toIso8601String();
+    if(isDateOnly) {
+      string = string.split("T").first;
+    } else {
+      string = string + timezoneString;
+    }
 
-    return "'${datetime.toIso8601String()}${timezoneString}'";
+    return "'${string}'";
   }
   
   // See http://www.postgresql.org/docs/9.0/static/sql-syntax-lexical.html#SQL-SYNTAX-STRINGS-ESCAPE

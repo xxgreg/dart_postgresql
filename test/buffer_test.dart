@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:unittest/unittest.dart';
+import 'package:test/test.dart';
 import 'package:postgresql/src/buffer.dart';
 
 smiles(int i) {
