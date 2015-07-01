@@ -290,23 +290,6 @@ main() {
       );
     });
 
-    test('Select timestamp and timestamptz', () {
-
-      conn.execute('create temporary table dart_unit_test (a timestamp, b timestamptz)');
-      conn.execute("insert into dart_unit_test (a, b) values ('1979-12-20 09:00', '1979-12-20 09:00')");
-
-      conn.query('select a, b from dart_unit_test').toList().then(
-        expectAsync((rows) {
-          expect(rows[0][0], equals(new DateTime.utc(1979, 12, 20, 9)), reason: "UTC mismatch");
-          expect(rows[0][1], equals(new DateTime(1979, 12, 20, 9)), reason: "Local mismatch");
-
-          expect(rows[0][0].isUtc, true);
-          expect(rows[0][1].timeZoneName, new DateTime(1979, 12, 20, 9).timeZoneName);
-
-        })
-      );
-    });
-
     test('Select timestamp with milliseconds', () {
       var t0 = new DateTime.utc(1979, 12, 20, 9, 0, 0, 0);
       var t1 = new DateTime.utc(1979, 12, 20, 9, 0, 0, 9);
@@ -360,6 +343,29 @@ main() {
       conn.query("select a, b from dart_unit_test").toList().then(expectAsync((rows) {
         expect((rows[0][0] as DateTime).difference(utcNow), Duration.ZERO, reason: "UTC -> Timestamp not the same");
         expect((rows[0][1] as DateTime).difference(localNow), Duration.ZERO, reason: "Local -> Timestamptz not the same");
+      }));
+    });
+
+    test("Multiple Timezone encoding/decoding", () {
+      var bdayGMT = DateTime.parse("1983-11-06T06:01:00.123+00:00");
+      var bdayPositiveTZ = DateTime.parse("1983-11-06T06:01:00.123+04:00");
+      var bdayNegativeTZ = DateTime.parse("1983-11-06T06:01:00.123-04:00");
+      var bdayPositiveMinuteTZ = DateTime.parse("1983-11-06T06:01:00.123+01:30");
+      var bdayNegativeMinuteTZ = DateTime.parse("1983-11-06T06:01:00.123-01:15");
+
+      conn.execute('create temporary table dart_unit_test (a timestamptz)');
+      conn.execute("insert into dart_unit_test values (@a)", {"a" : bdayGMT});
+      conn.execute("insert into dart_unit_test values (@a)", {"a" : bdayPositiveTZ});
+      conn.execute("insert into dart_unit_test values (@a)", {"a" : bdayNegativeTZ});
+      conn.execute("insert into dart_unit_test values (@a)", {"a" : bdayPositiveMinuteTZ});
+      conn.execute("insert into dart_unit_test values (@a)", {"a" : bdayNegativeMinuteTZ});
+
+      conn.query("select a from dart_unit_test").toList().then(expectAsync((rows) {
+        expect((rows[0][0] as DateTime).difference(bdayGMT), Duration.ZERO, reason: "GMT");
+        expect((rows[1][0] as DateTime).difference(bdayPositiveTZ), Duration.ZERO, reason: "Positive Hour TZ");
+        expect((rows[2][0] as DateTime).difference(bdayNegativeTZ), Duration.ZERO, reason: "Negative Hour TZ");
+        expect((rows[3][0] as DateTime).difference(bdayPositiveMinuteTZ), Duration.ZERO, reason: "Positive Minute TZ");
+        expect((rows[4][0] as DateTime).difference(bdayNegativeMinuteTZ), Duration.ZERO, reason: "Negative Minute TZ");
       }));
     });
 

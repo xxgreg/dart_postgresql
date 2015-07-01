@@ -190,12 +190,30 @@ class DefaultTypeConverter implements TypeConverter {
     if (datetime == null)
       return 'null';
 
-    var timezoneString = (datetime.isUtc ? "" : datetime.timeZoneName);
     var string = datetime.toIso8601String();
     if(isDateOnly) {
       string = string.split("T").first;
     } else {
-      string = string + timezoneString;
+
+      // ISO8601 UTC times already carry Z, but local times carry no timezone info
+      // so this code will append it.
+      if (!datetime.isUtc) {
+        var timezoneHourOffset = datetime.timeZoneOffset.inHours;
+        var timezoneMinuteOffset = datetime.timeZoneOffset.inMinutes % 60;
+
+        // Note that the sign is stripped via abs() and appended later.
+        var hourComponent = timezoneHourOffset.abs().toString().padLeft(2, "0");
+        var minuteComponent = timezoneMinuteOffset.abs().toString().padLeft(2, "0");
+
+        if (timezoneHourOffset >= 0) {
+          hourComponent = "+${hourComponent}";
+        } else {
+          hourComponent = "-${hourComponent}";
+        }
+
+        var timezoneString = [hourComponent, minuteComponent].join(":");
+        string = [string, timezoneString].join("");
+      }
     }
 
     return "'${string}'";
@@ -266,7 +284,7 @@ class DefaultTypeConverter implements TypeConverter {
     if(pgType == _PG_TIMESTAMP) {
       formattedValue = formattedValue + "Z";
     } else if(pgType == _PG_TIMESTAMPZ) {
-
+      // PG will return the timestamp in the connection's timezone. The resulting DateTime.parse will handle accordingly.
     } else if(pgType == _PG_DATE) {
       formattedValue = formattedValue + "T00:00:00Z";
     }
