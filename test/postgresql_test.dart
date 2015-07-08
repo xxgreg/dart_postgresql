@@ -395,6 +395,21 @@ main() {
       );
     });
 
+    /*
+    These tests will handle timestamps outside of the explicitly supported ISO8601 range.
+
+    test("DateTime Edge Cases", () {
+      conn.execute('create temporary table dart_unit_test (a timestamp)');
+      conn.execute("insert into dart_unit_test (a) values (@t)", {"t" : new DateTime(10000).toUtc()});
+      conn.execute("insert into dart_unit_test (a) values (@t)", {"t" : new DateTime(-10).toUtc()});
+
+      conn.query("select a from dart_unit_test").toList().then(expectAsync((rows) {
+        expect((rows[0][0] as DateTime).difference(new DateTime(10000).toUtc()), Duration.ZERO);
+        expect((rows[1][0] as DateTime).difference(new DateTime(-10).toUtc()), Duration.ZERO);
+      }));
+    });
+    */
+
     test('Select double', () {
 
       conn.execute('create temporary table dart_unit_test (a float4, b float8)');

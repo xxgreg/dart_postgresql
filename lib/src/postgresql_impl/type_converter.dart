@@ -191,6 +191,7 @@ class DefaultTypeConverter implements TypeConverter {
       return 'null';
 
     var string = datetime.toIso8601String();
+
     if(isDateOnly) {
       string = string.split("T").first;
     } else {
@@ -272,6 +273,11 @@ class DefaultTypeConverter implements TypeConverter {
   }
 
   DateTime decodeDateTime(String value, int pgType, {bool isUtcTimeZone, getConnectionName()}) {
+    // Built in Dart dates can either be local time or utc. Which means that the
+    // the postgresql timezone parameter for the connection must be either set
+    // to UTC, or the local time of the server on which the client is running.
+    // This restriction could be relaxed by using a more advanced date library
+    // capable of creating DateTimes for a non-local time zone.
 
     if (value == 'infinity' || value == '-infinity') {
       throw _error('Server returned a timestamp with value '

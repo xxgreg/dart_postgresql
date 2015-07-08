@@ -495,6 +495,7 @@ class ConnectionImpl implements Connection {
     try {
       if (values != null)
         sql = substitute(sql, values, _typeConverter.encode);
+
       var query = _enqueueQuery(sql);
       return query.stream.isEmpty.then((_) => query._rowsAffected);
     } on Exception catch (ex, st) {
