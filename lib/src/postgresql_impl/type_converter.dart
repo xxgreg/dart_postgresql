@@ -192,7 +192,7 @@ class DefaultTypeConverter implements TypeConverter {
 
     var string = datetime.toIso8601String();
 
-    if(isDateOnly) {
+    if (isDateOnly) {
       string = string.split("T").first;
     } else {
 
@@ -215,6 +215,15 @@ class DefaultTypeConverter implements TypeConverter {
         var timezoneString = [hourComponent, minuteComponent].join(":");
         string = [string, timezoneString].join("");
       }
+    }
+
+    if (string.substring(0, 1) == "-") {
+      // Postgresql uses a BC suffix for dates rather than the negative prefix returned by
+      // dart's ISO8601 date string.
+      string = string.substring(1) + " BC";
+    } else if (string.substring(0, 1) == "+") {
+      // Postgresql doesn't allow leading + signs for 6 digit dates. Strip it out.
+      string = string.substring(1);
     }
 
     return "'${string}'";
@@ -287,12 +296,16 @@ class DefaultTypeConverter implements TypeConverter {
     }
 
     var formattedValue = value;
-    if(pgType == _PG_TIMESTAMP) {
-      formattedValue = formattedValue + "Z";
-    } else if(pgType == _PG_TIMESTAMPZ) {
+
+    // Postgresql uses a BC suffix rather than a negative prefix as in ISO8601.
+    if (value.endsWith(' BC')) formattedValue = '-' + value.substring(0, value.length - 3);
+
+    if (pgType == _PG_TIMESTAMP) {
+        formattedValue += 'Z';
+    } else if (pgType == _PG_TIMESTAMPZ) {
       // PG will return the timestamp in the connection's timezone. The resulting DateTime.parse will handle accordingly.
-    } else if(pgType == _PG_DATE) {
-      formattedValue = formattedValue + "T00:00:00Z";
+    } else if (pgType == _PG_DATE) {
+      formattedValue = formattedValue + 'T00:00:00Z';
     }
 
     return DateTime.parse(formattedValue);

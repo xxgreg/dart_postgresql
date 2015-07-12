@@ -27,7 +27,8 @@ main() {
 
 
 // Timezone offsets
-// Do these need to be parsed?
+  //FIXME check that timezone offsets match the current system timezone offset.
+  // Example strings that postgres may send.
 //  "2001-02-03 04:05:06.123-07"
 //  "2001-02-03 04:05:06-07"
 //  "2001-02-03 04:05:06-07:42"
@@ -35,34 +36,29 @@ main() {
 //  "2001-02-03 04:05:06+07"
 //  "0010-02-03 04:05:06.123-07 BC"
 
-//FIXME
-//  How to handle Date/Timestamp Infinity/-Infinity?
-//  Throw exception or return null?
-//  Or crazy idea - return something that implements core.Datetime, including the correct comparison functions?
-// Something that wraps it. PgDateTime implements DateTime { _datetime; isInfinity; isNegativeInfinity; }
-// Perhaps just throw an exception. Solution is for client code to cast to a string if they want to handle infinity values.
-
 //  Also consider that some Dart datetimes will not be able to be represented
 // in postgresql timestamps. i.e. pre 4713 BC or post 294276 AD. Perhaps just
 // send these dates and rely on the database to return an error.
 
 
   test('encode datetime', () {
+    // Get users current timezone
+    var tz = new DateTime(2001).timeZoneOffset;
+    var tzoff = "${tz.isNegative ? '-' : '+'}${tz.inHours}"
+    ":${(tz.inSeconds % 60).toString().padLeft(2, '0')}";
+
     var data = [
-      "2001-02-03T00:00:00.000",     new DateTime(2001, DateTime.FEBRUARY, 3),
-      "2001-02-03T04:05:06.000",     new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
-      "2001-02-03T04:05:06.999",     new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 999),
-      "-0010-02-03T04:05:06.123",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 123),
-      "-0010-02-03T04:05:06.000",      new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 0)
-      //TODO test minimum allowable postgresql date
+      "2001-02-03T00:00:00.000$tzoff",      new DateTime(2001, DateTime.FEBRUARY, 3),
+      "2001-02-03T04:05:06.000$tzoff",      new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
+      "2001-02-03T04:05:06.999$tzoff",      new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 999),
+      "0010-02-03T04:05:06.123$tzoff BC",   new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 123),
+      "0010-02-03T04:05:06.000$tzoff BC",   new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
+      "012345-02-03T04:05:06.000$tzoff BC",  new DateTime(-12345, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
+      "012345-02-03T04:05:06.000$tzoff",     new DateTime(12345, DateTime.FEBRUARY, 3, 4, 5, 6, 0)
     ];
     var tc = new TypeConverter();
-    var d = new DateTime(2001).timeZoneName; // Get users current timezone
-
     for (int i = 0; i < data.length; i += 2) {
-      var str = data[i];
-      var dt = data[i + 1];
-      expect(tc.encode(dt, null), equals("'$str$d'"));
+      expect(tc.encode(data[i + 1], null), equals("'${data[i]}'"));
     }
   });
 
@@ -71,8 +67,10 @@ main() {
       "2001-02-03",     new DateTime(2001, DateTime.FEBRUARY, 3),
       "2001-02-03",     new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
       "2001-02-03",     new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 999),
-      "-0010-02-03",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 123),
-      "-0010-02-03",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 0)
+      "0010-02-03 BC",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 123),
+      "0010-02-03 BC",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
+      "012345-02-03 BC", new DateTime(-12345, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
+      "012345-02-03",    new DateTime(12345, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
     ];
     var tc = new TypeConverter();
     for (int i = 0; i < data.length; i += 2) {
@@ -81,8 +79,6 @@ main() {
       expect(tc.encode(dt, 'date'), equals("'$str'"));
     }
   });
-
-  //TODO test more encoding fails too.
 
   test('encode double', () {
     var data = [
