@@ -2,7 +2,7 @@ library postgresql.pool;
 
 import 'dart:async';
 import 'package:postgresql/postgresql.dart' as pg;
-import 'package:postgresql/src/pool_impl_cps.dart';
+import 'package:postgresql/src/pool_impl.dart';
 import 'package:postgresql/src/pool_settings_impl.dart';
 
 /// A connection pool for PostgreSQL database connections.
