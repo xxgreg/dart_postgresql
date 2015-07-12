@@ -4,4 +4,6 @@ out
 *.js
 *.deps
 test/test_config.yaml
+/.pub
+/.idea
 
