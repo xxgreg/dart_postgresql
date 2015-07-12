@@ -93,7 +93,7 @@ class PoolSettingsImpl implements PoolSettings {
     if (uri == null) {
       try {
         uri = new pg.Settings.fromMap(map).toUri();
-      } on pg.PostgresqlException catch (ex) {
+      } on pg.PostgresqlException {
       }
     }
     

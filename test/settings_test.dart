@@ -59,6 +59,7 @@ main() {
 
 	test('Load settings from yaml file', () {
 	  Settings s = loadSettings();
+    expect(s.database, isNotNull);
 	});
 	
 	test('Pool settings', () {
@@ -93,7 +94,6 @@ main() {
        expect(getter(), equals(value));
        var m = s.toMap();
        expect(m[mapKey], equals(flatValue));
-       var s2 = new PoolSettings.fromMap(m);
        expect(getter(), equals(value));    
      }
 	  

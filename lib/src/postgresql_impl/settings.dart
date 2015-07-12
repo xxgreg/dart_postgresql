@@ -67,7 +67,7 @@ class SettingsImpl implements Settings {
     if (!config.containsKey(DATABASE))
       throw _error(DATABASE);
     
-    this._host = config[HOST];
+    this._host = host;
     this._port = port;
     this._user = config[USER];
     this._password = config[PASSWORD];

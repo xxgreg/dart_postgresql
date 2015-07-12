@@ -5,7 +5,6 @@ class _Query {
   final String sql;
   final StreamController<_Row> _controller = new StreamController<_Row>();
   int _commandIndex = 0;
-  int _rowIndex = -1;
   int _columnCount;
   List<_Column> _columns;
   List<dynamic> _rowData;

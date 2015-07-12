@@ -20,7 +20,6 @@ main() {
 }
 
 PoolImpl createPool(PoolSettings settings) {
-  int minConnections = 2;
   return new PoolImpl(settings, null, mockConnectionFactory());
 }
 
@@ -77,9 +76,9 @@ Future testStartTimeout() async {
 
   try {
     expect(pool.connections, isEmpty);
-    var v = await pool.start();
+    await pool.start();
     fail('Pool started, but should have timed out.');
-  } catch (ex, st) {
+  } catch (ex) {
     expect(ex, new isInstanceOf<PostgresqlException>());
     expect(ex.message, contains('timed out'));
     expect(pool.state, equals(startFailed));
@@ -118,9 +117,9 @@ Future testConnectTimeout() async {
   
   try {
     // All connections are in use, this should timeout.
-    var c = await pool.connect();
+    await pool.connect();
     fail('connect() should have timed out.');
-  } on PostgresqlException catch (ex, st) {
+  } on PostgresqlException catch (ex) {
     expect(ex, new isInstanceOf<PostgresqlException>());
     expect(ex.message, contains('timeout'));
     expect(pool.state, equals(running));

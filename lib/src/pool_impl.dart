@@ -35,16 +35,16 @@ class ConnectionDecorator implements pg.Connection {
 
   _error(fnName) => new pg.PostgresqlException(
       '$fnName() called on closed connection.', _debugName);
-  
+
   bool _isReleased = false;
   final pg.Connection _conn;
   final PoolImpl _pool;
   final PooledConnectionImpl _pconn;
   final String _debugName;
-  
+
   void close() {
     if (!_isReleased) _pool._releaseConnection(_pconn);
-    _isReleased = true;    
+    _isReleased = true;
   }
 
   Stream query(String sql, [values]) => _isReleased
@@ -55,31 +55,31 @@ class ConnectionDecorator implements pg.Connection {
       ? throw _error('execute')
       : _conn.execute(sql, values);
 
-  Future runInTransaction(Future operation(), 
-                          [pg.Isolation isolation = readCommitted]) 
+  Future runInTransaction(Future operation(),
+                          [pg.Isolation isolation = readCommitted])
     => _isReleased
         ? throw throw _error('runInTransaction')
         : _conn.runInTransaction(operation, isolation);
 
   pg.ConnectionState get state => _isReleased ? closed : _conn.state;
 
-  pg.TransactionState get transactionState => _isReleased 
+  pg.TransactionState get transactionState => _isReleased
       ? unknown
       : _conn.transactionState;
-  
-  @deprecated pg.TransactionState get transactionStatus 
+
+  @deprecated pg.TransactionState get transactionStatus
     => transactionState;
 
   Stream<pg.Message> get messages => _isReleased
     ? new Stream.fromIterable([])
     : _conn.messages;
-  
+
   @deprecated Stream<pg.Message> get unhandled => messages;
 
   Map<String,String> get parameters => _isReleased ? {} : _conn.parameters;
-  
+
   int get backendPid => _conn.backendPid;
-  
+
   String get debugName => _debugName;
 }
 
@@ -90,7 +90,6 @@ class PooledConnectionImpl implements PooledConnection {
 
   final PoolImpl _pool;
   pg.Connection _connection;
-  ConnectionDecorator _decorator;
   PooledConnectionState _state;
   DateTime _established;
   DateTime _obtained;
@@ -222,8 +221,6 @@ class PoolImpl implements Pool {
     // This shouldn't be able to happen - but is here for robustness.
     if (_connections.length >= settings.maxConnections)
       return new Future.value();
-    
-    var stopwatch = new Stopwatch()..start();
     
     var pconn = new PooledConnectionImpl(this);
     pconn._state = connecting;
@@ -365,7 +362,7 @@ class PoolImpl implements Pool {
 
     var pconn = _getFirstAvailable();
     
-    var onTimeout = () => throw new pg.PostgresqlException(
+    timeoutException() => new pg.PostgresqlException(
       'Obtaining connection from pool exceeded timeout: '
         '${settings.connectionTimeout}', 
             pconn == null ? null : pconn.name);    
@@ -377,7 +374,7 @@ class PoolImpl implements Pool {
       var c = new Completer<PooledConnectionImpl>();
       _waitQueue.add(c);
       try {
-        pconn = await c.future.timeout(timeout, onTimeout: onTimeout);
+        pconn = await c.future.timeout(timeout, onTimeout: () => throw timeoutException());
       } finally {
         _waitQueue.remove(c);
       }
@@ -391,11 +388,11 @@ class PoolImpl implements Pool {
     
     pconn._state = testing;
         
-    if (await _testConnection(pconn, timeout - stopwatch.elapsed, onTimeout))
+    if (await _testConnection(pconn, timeout - stopwatch.elapsed, () => throw timeoutException()))
       return pconn;
     
     if (timeout > stopwatch.elapsed) {
-      onTimeout();
+      throw timeoutException();
     } else {
       _destroyConnection(pconn);
       // Get another connection out of the pool and test again.
@@ -444,7 +441,6 @@ class PoolImpl implements Pool {
       Duration timeout, 
       Function onTimeout) async {
     bool ok;
-    Exception exception;
     try {
       var row = await pconn._connection.query('select true')
                          .single.timeout(timeout);

@@ -164,7 +164,6 @@ class DefaultTypeConverter implements TypeConverter {
     }
   
     try {
-      var map = value.toJson();
       return encodeString(JSON.encode(value));
     } catch (e) {
       throw _error('Could not convert object to JSON. '

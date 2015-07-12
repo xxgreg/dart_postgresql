@@ -304,15 +304,7 @@ class CommandComplete implements ProtocolMessage {
   });
 }
 
-
-//FIXME use an enum when implemented
-class TransactionStatus {
-  const TransactionStatus(this._name);
-  final String _name;
-  static const TransactionStatus none = const TransactionStatus('TransactionStatus.none'); // idle
-  static const TransactionStatus transaction = const TransactionStatus('TransactionStatus.transaction'); // in transaction
-  static const TransactionStatus failed = const TransactionStatus('TransactionStatus.failed'); // failed transaction
-}
+enum TransactionStatus { none, transaction, failed }
 
 class ReadyForQuery implements ProtocolMessage {
   

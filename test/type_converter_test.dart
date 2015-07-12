@@ -43,9 +43,10 @@ main() {
 
   test('encode datetime', () {
     // Get users current timezone
-    var tz = new DateTime(2001).timeZoneOffset;
-    var tzoff = "${tz.isNegative ? '-' : '+'}${tz.inHours}"
-    ":${(tz.inSeconds % 60).toString().padLeft(2, '0')}";
+    var tz = new DateTime(2001, 2, 3).timeZoneOffset;
+    var tzoff = "${tz.isNegative ? '-' : '+'}"
+      "${tz.inHours.toString().padLeft(2, '0')}"
+      ":${(tz.inSeconds % 60).toString().padLeft(2, '0')}";
 
     var data = [
       "2001-02-03T00:00:00.000$tzoff",      new DateTime(2001, DateTime.FEBRUARY, 3),

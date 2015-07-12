@@ -198,6 +198,8 @@ class _ListMockRow implements MockRow {
   List toList() => new UnmodifiableListView(_values);
   
   Map toMap() => new Map.fromIterables(_columnNames, _values);
+
+  List getColumns() => throw new UnimplementedError();
 }
 
 

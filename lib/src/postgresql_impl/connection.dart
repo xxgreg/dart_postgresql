@@ -17,8 +17,6 @@ class ConnectionImpl implements Connection {
           : typeConverter,
       _getDebugName = getDebugName,
       _buffer = new Buffer((msg) => new PostgresqlException(msg, getDebugName()));
-      
-  static int _sequence = 1;
 
   ConnectionState get state => _state;
   ConnectionState _state = notConnected;
@@ -475,11 +473,6 @@ class ConnectionImpl implements Connection {
     }
   }
 
-  Stream _errorStream(err) {
-    return new Stream.fromFuture(
-        new Future.error(err));
-  }
-
   Stream query(String sql, [values]) {
     try {
       if (values != null)
@@ -636,11 +629,6 @@ class ConnectionImpl implements Connection {
       _query.addRow();
   }
 
-  dynamic _decodeBinaryValue(_Column col, List<int> data) {
-    throw new PostgresqlException('Binary data parsing not implemented.',
-        _getDebugName());
-  }
-
   void _readCommandComplete(int msgType, int length) {
 
     assert(_buffer.bytesAvailable >= length);
@@ -658,7 +646,6 @@ class ConnectionImpl implements Connection {
     if (_state == closed)
       return;
 
-    var prior = _state;
     _state = closed;
 
     // If a query is in progress then send an error and close the result stream.
