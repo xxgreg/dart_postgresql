@@ -1,3 +1,8 @@
+#### Version 0.3.2
+
+ * Improve handing of datetimes. Thanks to Joe Conway.
+ * Remove manually cps transformed async code.
+
 #### Version 0.3.1+1
 
  * Expose column information via row.getColumns(). Credit to Jesper Håkansson for this change.
