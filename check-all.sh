@@ -12,6 +12,7 @@ dartanalyzer test/substitute_test.dart
 
 dart --checked test/substitute_test.dart
 dart --checked test/settings_test.dart
+dart --checked test/type_converter_test.dart
 dart --checked test/postgresql_test.dart
 #dart --checked test/postgresql_mock_test.dart
 dart --checked test/postgresql_pool_test.dart
