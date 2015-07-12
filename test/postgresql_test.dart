@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart';
-import 'package:unittest/unittest.dart';
+import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
 /**
@@ -290,23 +290,14 @@ main() {
       );
     });
 
-    test('Select timestamp', () {
-
-      conn.execute('create temporary table dart_unit_test (a timestamp)');
-      conn.execute("insert into dart_unit_test values ('1979-12-20 09:00')");
-
-      conn.query('select a from dart_unit_test').toList().then(
-        expectAsync((rows) {
-          expect(rows[0][0], equals(new DateTime.utc(1979, 12, 20, 9)));
-        })
-      );
-    });
-
     test('Select timestamp with milliseconds', () {
-      var t0 = new DateTime.utc(1979, 12, 20, 9, 0, 0);
-      var t1 = new DateTime.utc(1979, 12, 20, 9, 0, 9);
-      var t2 = new DateTime.utc(1979, 12, 20, 9, 0, 99);
-      var t3 = new DateTime.utc(1979, 12, 20, 9, 0, 999);
+      var t0 = new DateTime.utc(1979, 12, 20, 9, 0, 0, 0);
+      var t1 = new DateTime.utc(1979, 12, 20, 9, 0, 0, 9);
+      var t2 = new DateTime.utc(1979, 12, 20, 9, 0, 0, 10);
+      var t3 = new DateTime.utc(1979, 12, 20, 9, 0, 0, 99);
+      var t4 = new DateTime.utc(1979, 12, 20, 9, 0, 0, 100);
+      var t5 = new DateTime.utc(1979, 12, 20, 9, 0, 0, 999);
+
 
       conn.execute('create temporary table dart_unit_test (a timestamp)');
 
@@ -315,14 +306,80 @@ main() {
       conn.execute(insert, {"time": t1});
       conn.execute(insert, {"time": t2});
       conn.execute(insert, {"time": t3});
+      conn.execute(insert, {"time": t4});
+      conn.execute(insert, {"time": t5});
+
+      conn.query('select a from dart_unit_test order by a asc').toList().then(
+        expectAsync((rows) {
+          expect((rows[0][0] as DateTime).difference(t0), Duration.ZERO);
+          expect((rows[1][0] as DateTime).difference(t1), Duration.ZERO);
+          expect((rows[2][0] as DateTime).difference(t2), Duration.ZERO);
+          expect((rows[3][0] as DateTime).difference(t3), Duration.ZERO);
+          expect((rows[4][0] as DateTime).difference(t4), Duration.ZERO);
+          expect((rows[5][0] as DateTime).difference(t5), Duration.ZERO);
+        })
+      );
+    });
+
+    test("Insert timestamp with milliseconds and timezone", () {
+      var t0 = new DateTime.now();
+
+      conn.execute('create temporary table dart_unit_test (a timestamptz)');
+
+      conn.execute("insert into dart_unit_test values (@time)", {"time" : t0});
+
+      conn.query("select a from dart_unit_test").toList().then(expectAsync((rows) {
+        expect((rows[0][0] as DateTime).difference(t0), Duration.ZERO);
+      }));
+    });
+
+    test("Insert and select timestamp and timestamptz from using UTC and local DateTime", () {
+      var localNow = new DateTime.now();
+      var utcNow = new DateTime.now().toUtc();
+
+      conn.execute('create temporary table dart_unit_test (a timestamp, b timestamptz)');
+      conn.execute("insert into dart_unit_test values (@timestamp, @timestamptz)", {"timestamp" : utcNow, "timestamptz" : localNow});
+
+      conn.query("select a, b from dart_unit_test").toList().then(expectAsync((rows) {
+        expect((rows[0][0] as DateTime).difference(utcNow), Duration.ZERO, reason: "UTC -> Timestamp not the same");
+        expect((rows[0][1] as DateTime).difference(localNow), Duration.ZERO, reason: "Local -> Timestamptz not the same");
+      }));
+    });
+
+    test("Multiple Timezone encoding/decoding", () {
+      var bdayGMT = DateTime.parse("1983-11-06T06:01:00.123+00:00");
+      var bdayPositiveTZ = DateTime.parse("1983-11-06T06:01:00.123+04:00");
+      var bdayNegativeTZ = DateTime.parse("1983-11-06T06:01:00.123-04:00");
+      var bdayPositiveMinuteTZ = DateTime.parse("1983-11-06T06:01:00.123+01:30");
+      var bdayNegativeMinuteTZ = DateTime.parse("1983-11-06T06:01:00.123-01:15");
+
+      conn.execute('create temporary table dart_unit_test (a timestamptz)');
+      conn.execute("insert into dart_unit_test values (@a)", {"a" : bdayGMT});
+      conn.execute("insert into dart_unit_test values (@a)", {"a" : bdayPositiveTZ});
+      conn.execute("insert into dart_unit_test values (@a)", {"a" : bdayNegativeTZ});
+      conn.execute("insert into dart_unit_test values (@a)", {"a" : bdayPositiveMinuteTZ});
+      conn.execute("insert into dart_unit_test values (@a)", {"a" : bdayNegativeMinuteTZ});
+
+      conn.query("select a from dart_unit_test").toList().then(expectAsync((rows) {
+        expect((rows[0][0] as DateTime).difference(bdayGMT), Duration.ZERO, reason: "GMT");
+        expect((rows[1][0] as DateTime).difference(bdayPositiveTZ), Duration.ZERO, reason: "Positive Hour TZ");
+        expect((rows[2][0] as DateTime).difference(bdayNegativeTZ), Duration.ZERO, reason: "Negative Hour TZ");
+        expect((rows[3][0] as DateTime).difference(bdayPositiveMinuteTZ), Duration.ZERO, reason: "Positive Minute TZ");
+        expect((rows[4][0] as DateTime).difference(bdayNegativeMinuteTZ), Duration.ZERO, reason: "Negative Minute TZ");
+      }));
+    });
+
+    test("Selected null timestamp DateTime", () {
+      var dt = null;
+
+      conn.execute('create temporary table dart_unit_test (a timestamp)');
+      conn.execute("insert into dart_unit_test values (@time)", {"time" : dt});
 
       conn.query('select a from dart_unit_test').toList().then(
-        expectAsync((rows) {
-          expect(rows[0][0], equals(t0));
-          expect(rows[1][0], equals(t1));
-          expect(rows[2][0], equals(t2));
-          expect(rows[3][0], equals(t3));
-        })
+          expectAsync((rows) {
+            expect(rows[0], isNotNull);
+            expect(rows[0][0], isNull);
+          })
       );
     });
 
@@ -337,6 +394,21 @@ main() {
         })
       );
     });
+
+    /*
+    These tests will handle timestamps outside of the explicitly supported ISO8601 range.
+
+    test("DateTime Edge Cases", () {
+      conn.execute('create temporary table dart_unit_test (a timestamp)');
+      conn.execute("insert into dart_unit_test (a) values (@t)", {"t" : new DateTime(10000).toUtc()});
+      conn.execute("insert into dart_unit_test (a) values (@t)", {"t" : new DateTime(-10).toUtc()});
+
+      conn.query("select a from dart_unit_test").toList().then(expectAsync((rows) {
+        expect((rows[0][0] as DateTime).difference(new DateTime(10000).toUtc()), Duration.ZERO);
+        expect((rows[1][0] as DateTime).difference(new DateTime(-10).toUtc()), Duration.ZERO);
+      }));
+    });
+    */
 
     test('Select double', () {
 

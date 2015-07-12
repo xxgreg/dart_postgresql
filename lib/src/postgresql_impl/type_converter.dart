@@ -189,37 +189,35 @@ class DefaultTypeConverter implements TypeConverter {
   
     if (datetime == null)
       return 'null';
-    
-    // 2004-10-19 10:23:54.445 BC PST
-    var year = datetime.year.abs().toString().padLeft(4, '0');
-    var month = datetime.month.toString().padLeft(2,'0');
-    var day = datetime.day.toString().padLeft(2,'0');
-  
-    var hour = datetime.hour.toString().padLeft(2,'0');
-    var minute = datetime.minute.toString().padLeft(2,'0');
-    var second = datetime.second.toString().padLeft(2,'0');
-    var millisecond = datetime.millisecond.toString().padLeft(3,'0');
-  
-    var bc = datetime.year < 0 ? ' BC' : '';
-  
-    String tz;
-    if (datetime.isUtc) {
-      tz = 'UTC';
+
+    var string = datetime.toIso8601String();
+
+    if(isDateOnly) {
+      string = string.split("T").first;
     } else {
-      // Construct localtime offset '+12:00:00';
-      var offset = datetime.timeZoneOffset;
-      var sign = offset.isNegative ? '-' : '+';
-      var totalSeconds = offset.inSeconds;
-      var hours = (totalSeconds ~/ 3600).toString().padLeft(2,'0');
-      var minutes = ((totalSeconds % 3600) ~/ 60).toString().padLeft(2,'0');
-      var seconds = (totalSeconds % 60).toString().padLeft(2,'0');
-      tz = '$sign$hours:$minutes:$seconds';
+
+      // ISO8601 UTC times already carry Z, but local times carry no timezone info
+      // so this code will append it.
+      if (!datetime.isUtc) {
+        var timezoneHourOffset = datetime.timeZoneOffset.inHours;
+        var timezoneMinuteOffset = datetime.timeZoneOffset.inMinutes % 60;
+
+        // Note that the sign is stripped via abs() and appended later.
+        var hourComponent = timezoneHourOffset.abs().toString().padLeft(2, "0");
+        var minuteComponent = timezoneMinuteOffset.abs().toString().padLeft(2, "0");
+
+        if (timezoneHourOffset >= 0) {
+          hourComponent = "+${hourComponent}";
+        } else {
+          hourComponent = "-${hourComponent}";
+        }
+
+        var timezoneString = [hourComponent, minuteComponent].join(":");
+        string = [string, timezoneString].join("");
+      }
     }
-  
-    if (isDateOnly)
-      return "'$year-$month-$day$bc'";
-    else
-      return "'$year-$month-$day $hour:$minute:$second.$millisecond$bc $tz'";
+
+    return "'${string}'";
   }
   
   // See http://www.postgresql.org/docs/9.0/static/sql-syntax-lexical.html#SQL-SYNTAX-STRINGS-ESCAPE
@@ -251,7 +249,7 @@ class DefaultTypeConverter implements TypeConverter {
       case _PG_TIMESTAMP:
       case _PG_TIMESTAMPZ:
       case _PG_DATE:
-        return decodeDateTime(value, isDateOnly: pgType == _PG_DATE,
+        return decodeDateTime(value, pgType,
                   isUtcTimeZone: isUtcTimeZone, getConnectionName: getConnectionName);
   
       case _PG_JSON:
@@ -273,55 +271,31 @@ class DefaultTypeConverter implements TypeConverter {
         return value;
     }
   }
-  
-  
-  
-  final _timestampRegexp = new RegExp(
-      r'(\d{4,10})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)( BC)?');
-  
-  final _dateRegexp = new RegExp(r'^(\d{4,10})-(\d\d)-(\d\d)( BC)?$');
-  
-  DateTime decodeDateTime(String value, {bool isDateOnly, bool isUtcTimeZone, getConnectionName()}) {
-      
+
+  DateTime decodeDateTime(String value, int pgType, {bool isUtcTimeZone, getConnectionName()}) {
+    // Built in Dart dates can either be local time or utc. Which means that the
+    // the postgresql timezone parameter for the connection must be either set
+    // to UTC, or the local time of the server on which the client is running.
+    // This restriction could be relaxed by using a more advanced date library
+    // capable of creating DateTimes for a non-local time zone.
+
     if (value == 'infinity' || value == '-infinity') {
       throw _error('Server returned a timestamp with value '
           '"$value", this cannot be represented as a dart date object, if '
           'infinity values are required, rewrite the sql query to cast the '
           'value to a string, i.e. col::text.', getConnectionName);
     }
-  
-    var m = isDateOnly
-         ? _dateRegexp.firstMatch(value)
-         : _timestampRegexp.firstMatch(value);
-  
-    if (m == null)
-      throw _error('Unexpected ${isDateOnly ? 'date' : 'timestamp'} format '
-                   'returned from server: "$value".', getConnectionName);
-  
-    int year = int.parse(m[1]);
-    int month = int.parse(m[2]);
-    int day = int.parse(m[3]);
-  
-    int hour = 0, minute = 0, second = 0;
-  
-    if (!isDateOnly) {
-      hour = int.parse(m[4]);
-      minute = int.parse(m[5]);
-      second = int.parse(m[6]);
+
+    var formattedValue = value;
+    if(pgType == _PG_TIMESTAMP) {
+      formattedValue = formattedValue + "Z";
+    } else if(pgType == _PG_TIMESTAMPZ) {
+      // PG will return the timestamp in the connection's timezone. The resulting DateTime.parse will handle accordingly.
+    } else if(pgType == _PG_DATE) {
+      formattedValue = formattedValue + "T00:00:00Z";
     }
-  
-    if ((isDateOnly && m[4] != null)
-        || (!isDateOnly && m[7] != null))
-      year = -year;
-  
-    // Built in Dart dates can either be local time or utc. Which means that the
-    // the postgresql timezone parameter for the connection must be either set
-    // to UTC, or the local time of the server on which the client is running.
-    // This restriction could be relaxed by using a more advanced date library
-    // capable of creating DateTimes for a non-local time zone.
-    return isUtcTimeZone
-       ? new DateTime.utc(year, month, day, hour, minute, second)
-       : new DateTime(year, month, day, hour, minute, second);
+
+    return DateTime.parse(formattedValue);
   }
   
 }

@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:unittest/unittest.dart';
+import 'package:test/test.dart';
 import 'package:postgresql/postgresql.dart';
 import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart';
 import 'package:yaml/yaml.dart';
@@ -49,34 +49,30 @@ main() {
 
   test('encode datetime', () {
     var data = [
-      "22001-02-03 00:00:00.000",    new DateTime(22001, DateTime.FEBRUARY, 3),
-      "2001-02-03 00:00:00.000",     new DateTime(2001, DateTime.FEBRUARY, 3),
-      "2001-02-03 04:05:06.000",     new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
-      "2001-02-03 04:05:06.999",     new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 999),
-      "0010-02-03 04:05:06.123 BC",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 123),
-      "0010-02-03 04:05:06.000 BC",      new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 0)
+      "2001-02-03T00:00:00.000",     new DateTime(2001, DateTime.FEBRUARY, 3),
+      "2001-02-03T04:05:06.000",     new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
+      "2001-02-03T04:05:06.999",     new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 999),
+      "-0010-02-03T04:05:06.123",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 123),
+      "-0010-02-03T04:05:06.000",      new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 0)
       //TODO test minimum allowable postgresql date
     ];
     var tc = new TypeConverter();
-    var d = new DateTime.now().timeZoneOffset; // Get users current timezone
-    pad(int i) => i.toString().padLeft(2, '0');
-    var tzoff = '${d.isNegative ? '-' : '+'}'
-      '${d.inHours}:${pad(d.inMinutes % 60)}:${pad(d.inSeconds % 60)}';
+    var d = new DateTime(2001).timeZoneName; // Get users current timezone
+
     for (int i = 0; i < data.length; i += 2) {
       var str = data[i];
       var dt = data[i + 1];
-      expect(tc.encode(dt, null), equals("'$str $tzoff'"));
+      expect(tc.encode(dt, null), equals("'$str$d'"));
     }
   });
 
   test('encode date', () {
     var data = [
-      "22001-02-03",    new DateTime(22001, DateTime.FEBRUARY, 3),
       "2001-02-03",     new DateTime(2001, DateTime.FEBRUARY, 3),
       "2001-02-03",     new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 0),
       "2001-02-03",     new DateTime(2001, DateTime.FEBRUARY, 3, 4, 5, 6, 999),
-      "0010-02-03 BC",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 123),
-      "0010-02-03 BC",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 0)
+      "-0010-02-03",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 123),
+      "-0010-02-03",  new DateTime(-10, DateTime.FEBRUARY, 3, 4, 5, 6, 0)
     ];
     var tc = new TypeConverter();
     for (int i = 0; i < data.length; i += 2) {
@@ -151,7 +147,7 @@ main() {
     expect(tc.encode(1, 'String'), equals(" E'1' "));
 
     expect(tc.encode(new DateTime.utc(1979,12,20,9), 'date'), equals("'1979-12-20'"));
-    expect(tc.encode(new DateTime.utc(1979,12,20,9), 'timestamp'), equals("'1979-12-20 09:00:00.000 UTC'"));
+    expect(tc.encode(new DateTime.utc(1979,12,20,9), 'timestamp'), equals("'1979-12-20T09:00:00.000Z'"));
   });
 
   

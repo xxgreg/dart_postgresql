@@ -4,7 +4,7 @@ import 'package:postgresql/pool.dart';
 import 'package:postgresql/postgresql.dart';
 import 'package:postgresql/src/mock/mock.dart';
 import 'package:postgresql/src/pool_impl_cps.dart';
-import 'package:unittest/unittest.dart';
+import 'package:test/test.dart';
 
 
 //_log(msg) => print(msg);

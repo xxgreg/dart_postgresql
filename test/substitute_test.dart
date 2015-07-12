@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:unittest/unittest.dart';
+import 'package:test/test.dart';
 import 'package:postgresql/postgresql.dart';
 import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart';
 import 'package:postgresql/src/substitute.dart';
