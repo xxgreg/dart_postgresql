@@ -11,7 +11,7 @@ class ConnectionImpl implements Connection {
       String getDebugName())
     : _userName = settings.user,
       _passwordHash = _md5s(settings.password + settings.user),
-      _databaseName = settings.database,
+      _databaseName = Uri.decodeFull(settings.database),
       _typeConverter = typeConverter == null
           ? new TypeConverter()
           : typeConverter,
