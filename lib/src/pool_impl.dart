@@ -410,7 +410,7 @@ class PoolImpl implements Pool {
     => _connections.firstWhere((c) => c._state == available, orElse: () => null);
 
   /// If connections are available, return them to waiting clients.
-  _processWaitQueue() async {
+  void _processWaitQueue() {
     
     if (_state != running) return;
     
@@ -428,21 +428,24 @@ class PoolImpl implements Pool {
     }
         
     // If required start more connection.
-    if (!_establishing //once at a time
-        && _waitQueue.isNotEmpty
-        && _connections.length < settings.maxConnections) {
-      _establishing = true;
-      try {
-        int count = math.min(_waitQueue.length,
-            settings.maxConnections - _connections.length);
-        for (int i = 0; i < count; i++) {
-          await _establishConnection();
-        }
-      } finally {
-        _establishing = false;
-      }
+    if (!_establishing) { //once at a time
+      final int count = math.min(_waitQueue.length,
+          settings.maxConnections - _connections.length);
+      if (count > 0) {
+        _establishing = true;
+        new Future.sync(() {
+          final List<Future> ops = new List(count);
+          for (int i = 0; i < count; i++) {
+            ops[i] = _establishConnection();
+          }
+          return Future.wait(ops);
+        })
+        .whenComplete(() {
+          _establishing = false;
 
-      _processWaitQueue(); //do again; there might be more requests
+          _processWaitQueue(); //do again; there might be more requests
+        });
+      }
     }
   }
   bool _establishing = false;
