@@ -17,6 +17,7 @@ main() {
   test('Test start timeout', testStartTimeout);
   test('Test connect timeout', testConnectTimeout);
   test('Test wait queue', testWaitQueue);
+  test('Test empty pool', testEmptyPool);
 }
 
 PoolImpl createPool(PoolSettings settings) {
@@ -178,4 +179,27 @@ Future testWaitQueue() async {
   c3.close();
 
   
+}
+
+
+Future testEmptyPool() async {
+var settings = new PoolSettings(
+    databaseUri: 'postgresql://fakeuri',
+    minConnections: 0,
+    maxConnections: 2);
+
+    var pool = createPool(settings);
+
+    expect(pool.connections, isEmpty);
+
+    var v = await pool.start();
+
+    expect(v, isNull);
+    expect(pool.connections.length, equals(0));
+
+    var c1 = await pool.connect();
+
+    expect(c1.state, equals(idle));
+
+    c1.close();
 }
