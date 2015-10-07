@@ -374,6 +374,7 @@ class PoolImpl implements Pool {
       var c = new Completer<PooledConnectionImpl>();
       _waitQueue.add(c);
       try {
+        _processWaitQueue();
         pconn = await c.future.timeout(timeout, onTimeout: () => throw timeoutException());
       } finally {
         _waitQueue.remove(c);
