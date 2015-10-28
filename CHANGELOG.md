@@ -2,6 +2,8 @@
 
  * Improve handing of datetimes. Thanks to Joe Conway.
  * Remove manually cps transformed async code.
+ * Fix #58: Establish connections concurrently. Thanks to Tom Yeh.
+ * Fix #69: Empty connection pool not establishing connections.
 
 #### Version 0.3.1+1
 
