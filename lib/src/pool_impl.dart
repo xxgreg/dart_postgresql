@@ -81,6 +81,9 @@ class ConnectionDecorator implements pg.Connection {
   int get backendPid => _conn.backendPid;
 
   String get debugName => _debugName;
+
+  @override
+  String toString() => "$_pconn";
 }
 
 
@@ -407,7 +410,7 @@ class PoolImpl implements Pool {
     => _connections.firstWhere((c) => c._state == available, orElse: () => null);
 
   /// If connections are available, return them to waiting clients.
-  _processWaitQueue() {
+  void _processWaitQueue() {
     
     if (_state != running) return;
     
@@ -425,15 +428,27 @@ class PoolImpl implements Pool {
     }
         
     // If required start more connection.
-    if (_waitQueue.isNotEmpty
-        && _connections.length < settings.maxConnections) {
-      int count = math.min(_waitQueue.length,
+    if (!_establishing) { //once at a time
+      final int count = math.min(_waitQueue.length,
           settings.maxConnections - _connections.length);
-      for (int i = 0; i < count; i++) {
-        _establishConnection();
+      if (count > 0) {
+        _establishing = true;
+        new Future.sync(() {
+          final List<Future> ops = new List(count);
+          for (int i = 0; i < count; i++) {
+            ops[i] = _establishConnection();
+          }
+          return Future.wait(ops);
+        })
+        .whenComplete(() {
+          _establishing = false;
+
+          _processWaitQueue(); //do again; there might be more requests
+        });
       }
     }
   }
+  bool _establishing = false;
 
   /// Perfom a query to check the state of the connection.
   Future<bool> _testConnection(
