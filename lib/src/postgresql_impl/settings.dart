@@ -29,15 +29,18 @@ class SettingsImpl implements Settings {
     
     var u = Uri.parse(uri);
     if (u.scheme != 'postgres' && u.scheme != 'postgresql')
-      throw _error('Invalid uri.');
+      throw _error('Invalid uri: scheme must be `postgres` or `postgresql`.');
 
-    if (u.userInfo == null || !u.userInfo.contains(':'))
-      throw _error('Invalid uri.');
+    if (u.userInfo == null || u.userInfo == '')
+      throw _error('Invalid uri: username must be specified.');
 
-    var userInfo = u.userInfo.split(':');
+    var userInfo;
+    if (u.userInfo.contains(':'))
+      userInfo = u.userInfo.split(':');
+    else userInfo = [u.userInfo, ''];
 
-    if (u.path == null || !u.path.startsWith('/'))
-      throw _error('Invalid uri.');
+    if (u.path == null || !u.path.startsWith('/') || !(u.path.length > 1))
+      throw _error('Invalid uri: `database name must be specified`.');
 
     bool requireSsl = false;
     if (u.query != null)
@@ -48,7 +51,7 @@ class SettingsImpl implements Settings {
         u.port == null ? Settings.defaultPort : u.port,
         userInfo[0],
         userInfo[1],
-        u.path.substring(1, u.path.length), // Remove preceding forward slash.
+        u.path.substring(1), // Remove preceding forward slash.
         requireSsl: requireSsl);
   }
 
