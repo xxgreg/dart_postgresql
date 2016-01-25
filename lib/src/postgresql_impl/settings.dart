@@ -47,11 +47,11 @@ class SettingsImpl implements Settings {
       requireSsl = u.query.contains('sslmode=require');
 
     return new Settings(
-        u.host,
+        Uri.decodeComponent(u.host),
         u.port == 0 ? Settings.defaultPort : u.port,
-        userInfo[0],
-        userInfo[1],
-        u.path.substring(1), // Remove preceding forward slash.
+        Uri.decodeComponent(userInfo[0]),
+        Uri.decodeComponent(userInfo[1]),
+        Uri.decodeComponent(u.path.substring(1)), // Remove preceding forward slash.
         requireSsl: requireSsl);
   }
 
@@ -89,11 +89,15 @@ class SettingsImpl implements Settings {
   String get database => _database;
   bool get requireSsl => _requireSsl;
 
-  String toUri() {
-    var userInfo = _user + (_password == '' ? '' : ':$_password');
-    return "postgres://$userInfo@$_host:$_port"
-        "/$_database${requireSsl ? '?sslmode=require' : ''}";
-  }
+  String toUri() => new Uri(
+        scheme: 'postgres',
+        userInfo: _password == null || _password == ''
+            ? '$_user'
+            : '$_user:$_password',
+        host: _host,
+        port: _port,
+        path: _database,
+        query: requireSsl ? '?sslmode=require' : null).toString();
   
   String toString()
     => "Settings {host: $_host, port: $_port, user: $_user, database: $_database}";

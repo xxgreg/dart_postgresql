@@ -73,6 +73,22 @@ main() {
         equals(''));
   });
 
+  test('String encoding', () {
+    var m = {'host': 'ho st',
+      'port': 5433,
+      'user': 'us er',
+      'password': 'pass word',
+      'database': 'data base'};
+    var uri = new Settings.fromMap(m).toUri();
+    expect(uri, equals('postgres://us%20er:pass%20word@ho%20st:5433/data%20base'));
+
+    var settings = new Settings.fromUri(uri);
+    expect(settings.toMap(), equals(m));
+
+    expect(new Settings.fromUri('postgres://us er:pass word@ho st:5433/data base').toUri().toString(),
+        'postgres://us%20er:pass%20word@ho%20st:5433/data%20base');
+  });
+
 	test('Load settings from yaml file', () {
 	  Settings s = loadSettings();
     expect(s.database, isNotNull);
