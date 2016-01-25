@@ -12,49 +12,65 @@ Settings loadSettings(){
 main() {
 
 	test('Test missing user setting', () {
-    var map = new Map();
-    map['host'] = "dummy1";
-    map['password'] = "dummy2";
-    map['database'] = "dummy3";
-    expect(() => new Settings.fromMap(map),
+    expect(() => new Settings.fromMap(
+        {'host': 'host', 'password': 'password', 'database': 'database'}),
         throwsA(predicate((e) => e is PostgresqlException)));
   });
 
-	test('Test missing password setting', () {
-    var map = new Map();
-    map['host'] = "dummy1";
-    map['user'] = "dummy2";
-    map['database'] = "dummy3";
-    expect(() => new Settings.fromMap(map),
+  test('Test missing password setting', () {
+    expect(() => new Settings.fromMap(
+        {'host': 'host', 'user': 'user', 'database': 'database'}),
         throwsA(predicate((e) => e is PostgresqlException)));
   });
 
 	test('Test missing database setting', () {
-    var map = new Map();
-    map['host'] = "dummy1";
-    map['user'] = "dummy2";
-    map['password'] = "dummy3";
-    expect(() => new Settings.fromMap(map),
+    expect(() => new Settings.fromMap(
+        {'host': 'host', 'password': 'password', 'user': 'user'}),
         throwsA(predicate((e) => e is PostgresqlException)));
   });
 
 	test('Valid settings', () {
-    var map = new Map();
-    map['host'] = "host";
-    map['user'] = "user";
-    map['password'] = "password";
-    map['database'] = "database";
-    expect(new Settings.fromMap(map).toUri(), 'postgres://user:password@host:5432/database');
+    expect(new Settings.fromMap(
+        {'user': 'user', 'password': 'password', 'host': 'host',
+        'database': 'database'}).toUri(),
+        equals('postgres://user:password@host:5432/database'));
+  });
+
+  test('Valid settings - empty password', () {
+    expect(new Settings.fromMap(
+        {'user': 'user', 'password': '', 'host': 'host',
+          'database': 'database'}).toUri(),
+        equals('postgres://user@host:5432/database'));
+
+    expect(new Settings.fromMap(
+        {'user': 'user', 'password': null, 'host': 'host',
+          'database': 'database'}).toUri(),
+        equals('postgres://user@host:5432/database'));
+  });
+
+  test('Valid Uri', () {
+    expect(new Settings.fromUri('postgres://user:password@host:5433/database').toMap(),
+        equals({'host': 'host', 'user': 'user', 'password': 'password',
+          'database': 'database', 'port': 5433}));
+
+    expect(new Settings.fromUri('postgres://user:password@host/database').toMap(),
+        equals({'host': 'host', 'user': 'user', 'password': 'password',
+          'database': 'database', 'port': 5432}));
+
+    expect(new Settings.fromUri('postgres://user@host/database').toMap(),
+        equals({'host': 'host', 'user': 'user', 'password': '',
+          'database': 'database', 'port': 5432}));
   });
 
 	test('Valid settings different port', () {
-    var map = new Map();
-    map['host'] = "host";
-    map['port'] = 5433;
-    map['user'] = "user";
-    map['password'] = "password";
-    map['database'] = "database";
-    expect(new Settings.fromMap(map).toUri(), 'postgres://user:password@host:5433/database');
+    expect(new Settings.fromMap({'host': 'host', 'user': 'user',
+      'password': 'password', 'database': 'database', 'port': 5433}).toUri(),
+        equals('postgres://user:password@host:5433/database'));
+  });
+
+  test('Missing password ok - from uri', () {
+    expect(new Settings.fromUri('postgres://user@host/foo').password,
+        equals(''));
   });
 
 	test('Load settings from yaml file', () {

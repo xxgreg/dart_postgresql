@@ -48,7 +48,7 @@ class SettingsImpl implements Settings {
 
     return new Settings(
         u.host,
-        u.port == null ? Settings.defaultPort : u.port,
+        u.port == 0 ? Settings.defaultPort : u.port,
         userInfo[0],
         userInfo[1],
         u.path.substring(1), // Remove preceding forward slash.
@@ -73,7 +73,9 @@ class SettingsImpl implements Settings {
     this._host = host;
     this._port = port;
     this._user = config[USER];
-    this._password = config[PASSWORD];
+
+    var pwd = config[PASSWORD];
+    this._password = pwd == null || pwd == '' ? '' : pwd;
     this._database = config[DATABASE];
 
     this._requireSsl = config.containsKey('sslmode') 
@@ -87,9 +89,11 @@ class SettingsImpl implements Settings {
   String get database => _database;
   bool get requireSsl => _requireSsl;
 
-  String toUri()
-    => "postgres://$_user:$_password@$_host:$_port"
-          "/$_database${requireSsl ? '?sslmode=require' : ''}";
+  String toUri() {
+    var userInfo = _user + (_password == '' ? '' : ':$_password');
+    return "postgres://$userInfo@$_host:$_port"
+        "/$_database${requireSsl ? '?sslmode=require' : ''}";
+  }
   
   String toString()
     => "Settings {host: $_host, port: $_port, user: $_user, database: $_database}";
