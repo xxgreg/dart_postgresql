@@ -1,3 +1,8 @@
+#### Version 0.3.3
+
+ * Fix #73 Properly encode/decode connection uris. Thanks to Martin Manev.
+ * Permit connection without a password. Thanks to Jirka Daněk.
+
 #### Version 0.3.2
 
  * Improve handing of datetimes. Thanks to Joe Conway.
