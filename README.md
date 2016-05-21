@@ -59,7 +59,7 @@ conn.execute('insert into crayons values (@id, @color)',
 
 ### Closing the connection
 
-You must remember to call Connection.close() when you're done. This wont be
+You must remember to call Connection.close() when you're done. This won't be
 done automatically for you.
 
 ### Conversion of Postgresql datatypes.
