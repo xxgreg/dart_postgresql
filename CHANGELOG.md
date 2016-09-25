@@ -1,3 +1,7 @@
+### Version 0.3.4
+ 
+ * Update broken crypto dependency.
+
 #### Version 0.3.3
 
  * Fix #73 Properly encode/decode connection uris. Thanks to Martin Manev.
