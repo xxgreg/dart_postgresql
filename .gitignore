@@ -6,4 +6,4 @@ out
 test/test_config.yaml
 /.pub
 /.idea
-
+/.packages
