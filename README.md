@@ -1,6 +1,6 @@
 # PostgreSQL database driver for Dart
 
-[![Build Status](https://drone.io/github.com/xxgreg/postgresql/status.png)](https://drone.io/github.com/xxgreg/postgresql/latest)
+[![Build Status](https://travis-ci.org/xxgreg/dart_postgresql.svg?branch=master)](https://travis-ci.org/xxgreg/dart_postgresql/)
 
 ## Basic usage
 
