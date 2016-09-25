@@ -121,9 +121,8 @@ class ConnectionImpl implements Connection {
   }
 
   static String _md5s(String s) {
-    var hash = new MD5();
-    hash.add(s.codeUnits.toList());
-    return CryptoUtils.bytesToHex(hash.close());
+    var digest = md5.convert(s.codeUnits.toList());
+    return hex.encode(digest.bytes);
   }
 
   //TODO yuck - this needs a rewrite.
