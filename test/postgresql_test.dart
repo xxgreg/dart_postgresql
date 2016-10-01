@@ -672,32 +672,23 @@ main() {
       );
     });
 
-/*
-    test('isolation', () {
-      var cb = expectAsync((_) { });
-      var cb2 = expectAsync((_) { });
+  test('isolation', () {
+      var cb = expectAsync((_) {});
+      conn1.runInTransaction(() async {
+        int count = await conn1.execute('insert into tx values (42)');
+        expect(count, 1, reason: "single value should be added");
+        List result = await (await conn1.query('select val from tx')).toList();
+        expect(result[0][0], equals(42));
+        await conn2.runInTransaction(() async {
+          await conn2.execute('insert into tx values (43)');
 
-      print('isolation');
-
-      conn1.runInTransaction(() {
-        return conn1.execute('insert into tx values (42)')
-          .then((_) => conn1.query('select val from tx').toList())
-          .then((result) { expect(result[0][0], equals(42)); });
-      })
-      .then((_) => conn1.query('select val from tx').toList())
-      .then((result) { expect(result[0][0], equals(42)); })
-      .then(cb);
-
-      conn2.runInTransaction(() {
-        return conn1.execute('insert into tx values (43)')
-          .then((_) => conn1.query('select val from tx').toList())
-          .then((result) { expect(result[0][0], equals(43)); });
-      })
-      .then((_) => conn1.query('select val from tx').toList())
-      .then((result) { expect(result[0][0], equals(43)); })
-      .then(cb2);
+          ///Read committed conn2 should not see 42 added by conn1
+          List result2 =
+              await (await conn2.query('select min(val) from tx')).toList();
+          expect(result2[0][0], equals(43));
+        });
+      }).then(cb);
     });
-*/
 
   });
 
