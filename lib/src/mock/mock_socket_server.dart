@@ -113,13 +113,13 @@ class MockSocketServerImpl implements MockServer {
       _waitForConnect = null;
     }
   }
-  
-  Completer _waitForConnect;
+
+  Completer<Backend> _waitForConnect;
   
   /// Wait for the next client to connect.
-  Future waitForConnect() {
+  Future<Backend> waitForConnect() {
     if (_waitForConnect == null)
-      _waitForConnect = new Completer();
+      _waitForConnect = new Completer<Backend>();
     return _waitForConnect.future;
   }
 

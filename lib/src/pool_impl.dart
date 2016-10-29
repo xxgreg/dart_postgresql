@@ -19,7 +19,7 @@ const PooledConnectionState inUse = PooledConnectionState.inUse;
 const PooledConnectionState connClosed = PooledConnectionState.closed;
 
 
-typedef Future<pgi.ConnectionImpl> ConnectionFactory(
+typedef Future<pg.Connection> ConnectionFactory(
     String uri,
     {Duration connectionTimeout,
      String applicationName,
@@ -47,7 +47,7 @@ class ConnectionDecorator implements pg.Connection {
     _isReleased = true;
   }
 
-  Stream query(String sql, [values]) => _isReleased
+  Stream<pg.Row> query(String sql, [values]) => _isReleased
       ? throw _error('query')
       : _conn.query(sql, values);
 

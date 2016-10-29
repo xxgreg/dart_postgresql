@@ -127,7 +127,7 @@ class PoolSettingsImpl implements PoolSettings {
     Duration getDuration(String field) {
       var value = map[field];
       if (value == null) return null;
-      fail2([_]) => fail('$field is not a duration string: "$value". Use this format: "120s".');
+      fail2([String _]) => fail('$field is not a duration string: "$value". Use this format: "120s".');
       if (value is! String) fail2(); 
       return _durationFmt.parse(value, onError: fail2);
     }

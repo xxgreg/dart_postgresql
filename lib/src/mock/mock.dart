@@ -8,7 +8,7 @@ import 'package:postgresql/constants.dart';
 import 'package:postgresql/postgresql.dart' as pg;
 import 'package:postgresql/src/pool_impl.dart' as pi;
 import 'package:postgresql/src/postgresql_impl/postgresql_impl.dart';
-
+import 'package:func/func.dart';
 part 'mock_server.dart';
 part 'mock_socket_server.dart';
 
@@ -86,6 +86,8 @@ Stream<pg.Row> queryResults(List rows) => new Stream.fromIterable(
 
 int _sequence = 1;
 
+
+
 class MockConnection implements pg.Connection {
 
   pg.ConnectionState state = pg.ConnectionState.idle;
@@ -98,7 +100,7 @@ class MockConnection implements pg.Connection {
   
   String debugName = 'pgconn';
   
-  Stream query(String sql, [values]) {
+  Stream<pg.Row> query(String sql, [values]) {
     _log('query("$sql")');
     if (sql == 'select pg_backend_pid()') return queryResults([[_sequence++]]);
     if (sql == 'select true') return queryResults([[true]]);
@@ -113,14 +115,14 @@ class MockConnection implements pg.Connection {
     return onQuery(sql, values);
   }
 
-  Function onQuery = (sql, values) {};
+  Func2<String, dynamic, Stream<pg.Row>> onQuery = (sql, values) {};
 
   Future<int> execute(String sql, [values]) {
     _log('execute("$sql")');
     return onExecute(sql, values);
   }
 
-  Function onExecute = (sql, values) {};
+  Func2<String, dynamic, Future<int>> onExecute = (sql, values) {};
 
 
   void close() {
@@ -199,7 +201,9 @@ class _ListMockRow implements MockRow {
   
   Map toMap() => new Map.fromIterables(_columnNames, _values);
 
-  List getColumns() => throw new UnimplementedError();
+  List<pg.Column> getColumns() {
+    throw new UnimplementedError();
+  }
 }
 
 

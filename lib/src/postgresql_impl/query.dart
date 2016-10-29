@@ -107,7 +107,7 @@ class _Row implements Row {
 
   Map toMap() => new Map.fromIterables(_columnNames, _columnValues);
 
-  List<Column> getColumns() => new UnmodifiableListView(_columns);
+  List<Column> getColumns() => new UnmodifiableListView(_columns) as List<Column>;
 }
 
 

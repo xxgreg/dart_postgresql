@@ -62,7 +62,7 @@ class ConnectionImpl implements Connection {
     return _parametersView;
   }
   
-  Stream get messages => _messages.stream;
+  Stream<Message> get messages => _messages.stream as Stream<Message>;
 
   @deprecated Stream<Message> get unhandled => messages;
   
@@ -472,12 +472,12 @@ class ConnectionImpl implements Connection {
     }
   }
 
-  Stream query(String sql, [values]) {
+  Stream<Row> query(String sql, [values]) {
     try {
       if (values != null)
         sql = substitute(sql, values, _typeConverter.encode);
       var query = _enqueueQuery(sql);
-      return query.stream;
+      return query.stream as Stream<Row>;
     } on Exception catch (ex, st) {
       return new Stream.fromFuture(new Future.error(ex, st));
     }
