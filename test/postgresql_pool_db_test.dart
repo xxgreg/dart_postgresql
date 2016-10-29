@@ -58,7 +58,7 @@ main() {
   int slowQueriesCompleted = 0;
 
   
-  var loggerFunc = (t) {
+  var loggerFunc = (Timer t) {
     print('queriesSent: $queriesSent  queriesCompleted: $queriesCompleted  slowSent: $slowQueriesSent  slowCompleted: $slowQueriesCompleted  connect timeouts: $connectTimeout  queryError: $queryError   connectError: $connectError ');
     debug(pool);
   };

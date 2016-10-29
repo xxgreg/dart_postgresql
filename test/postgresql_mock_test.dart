@@ -23,8 +23,8 @@ int PG_TEXT = 25;
 // But is good test test things like socket errors.
 testStartup(MockServer server) async {
     
-    Future connecting = server.connect();
-    Future backendStarting = server.waitForConnect();
+    var connecting = server.connect();
+    var backendStarting = server.waitForConnect();
     
     var backend = await backendStarting;
     
